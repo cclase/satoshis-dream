@@ -545,8 +545,8 @@
       for (var j = 0; j < DARK_WEB.length; j++) {
         if (DARK_WEB[j].id !== 'd2') hGen += (s.owned[DARK_WEB[j].id] || 0) * DARK_WEB[j].heat;
       }
-      // Heat gen scaled by /8 (was /15), passive cooling at 1.5/s (was 4/s)
-      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 8 * dt) - (1.5 * dt)));
+      // Heat gen scaled by /3, passive cooling at 0.5/s
+      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 3 * dt) - (0.5 * dt)));
 
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.15; // per second base

@@ -410,13 +410,20 @@
       // Mail orders - deliver
       for (var m = s.mailOrders.length - 1; m >= 0; m--) {
         if (now >= s.mailOrders[m].arrivesAt) {
-          var order = s.mailOrders.splice(m, 1)[0];
+          var order = s.mailOrders[m];
           var item = HARDWARE.find(function(u) { return u.id === order.itemId; }) ||
                      DARK_WEB.find(function(u) { return u.id === order.itemId; });
           if (item) {
-            s.owned[item.id] = (s.owned[item.id] || 0) + 1;
-            if (UI && UI.toast) UI.toast('\u{1F4E6} ' + order.name + ' delivered!');
+            // Check slot limits for hardware items
+            if (item.slots && this.getUsedSlots() + item.slots > this.getMaxSlots()) {
+              if (UI && UI.toast) UI.toast('\u{1F4E6} ' + order.name + ' delivered but no room! Sold for parts.');
+              s.usd += Math.floor(item.base * 0.3);
+            } else {
+              s.owned[item.id] = (s.owned[item.id] || 0) + 1;
+              if (UI && UI.toast) UI.toast('\u{1F4E6} ' + order.name + ' delivered!');
+            }
           }
+          s.mailOrders.splice(m, 1);
         }
       }
 
@@ -485,6 +492,31 @@
       if (!this._saveInterval) {
         this._saveInterval = setInterval(function() { Game.save(); }, 5000);
       }
+    },
+
+    // ── Prestige ──
+    getPrestigeTokens: function() {
+      // Earn 1 token per 100K lifetime sats, minimum 1 to prestige
+      return Math.floor(this.state.lifetimeSats / 100000);
+    },
+
+    canPrestige: function() {
+      return this.getPrestigeTokens() > this.state.tokens;
+    },
+
+    prestige: function() {
+      var newTokens = this.getPrestigeTokens();
+      if (newTokens <= this.state.tokens) return false;
+      var tokens = newTokens;
+      var def = defaultState();
+      def.tokens = tokens;
+      def.lastTick = Date.now();
+      this.state = def;
+      this.floatingTexts = [];
+      // Save BEFORE init so load() picks up the new token count
+      this.save();
+      this.init();
+      return tokens;
     },
 
     formatNumber: function(n) {

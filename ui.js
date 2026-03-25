@@ -188,24 +188,41 @@
     showResetConfirm: function() {
       var modal = document.getElementById('modal');
       modal.classList.add('active');
+      var newTokens = Game.getPrestigeTokens();
+      var canPrestige = Game.canPrestige();
+      var tokenGain = newTokens - Game.state.tokens;
       modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
-        '<div class="modal-title" style="color:var(--red);">Reset Game?</div>' +
-        '<p style="color:var(--dim);margin-bottom:20px;font-size:14px;">This will delete ALL progress. Cannot be undone.</p>' +
+        '<div class="modal-title" style="color:var(--purple);">\u{1FA99} Prestige</div>' +
+        '<p style="color:var(--dim);margin-bottom:12px;font-size:14px;">Reset all progress but keep <strong style="color:var(--purple);">Prestige Tokens</strong>.<br>Each token gives <strong>+10%</strong> to all income permanently!</p>' +
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">' +
+          '<div style="font-size:12px;color:var(--dim);margin-bottom:4px;">CURRENT TOKENS</div>' +
+          '<div style="font-size:24px;font-weight:900;color:var(--purple);">' + Game.state.tokens + '</div>' +
+        '</div>' +
+        (canPrestige ?
+          '<div style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:10px;padding:12px;margin-bottom:12px;">' +
+            '<div style="font-size:12px;color:var(--dim);margin-bottom:4px;">AFTER PRESTIGE</div>' +
+            '<div style="font-size:24px;font-weight:900;color:var(--purple);">' + newTokens + ' <span style="font-size:14px;color:var(--green);">(+' + tokenGain + ')</span></div>' +
+            '<div style="font-size:11px;color:var(--dim);margin-top:4px;">From ' + Game.formatNumber(Game.state.lifetimeSats) + ' lifetime sats (1 token per 100K)</div>' +
+          '</div>' :
+          '<div style="background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:10px;padding:12px;margin-bottom:12px;">' +
+            '<div style="font-size:12px;color:var(--red);">Need ' + Game.formatNumber(((Game.state.tokens + 1) * 100000) - Game.state.lifetimeSats) + ' more lifetime sats to earn next token</div>' +
+            '<div style="font-size:11px;color:var(--dim);margin-top:4px;">Current: ' + Game.formatNumber(Game.state.lifetimeSats) + ' / ' + Game.formatNumber((Game.state.tokens + 1) * 100000) + '</div>' +
+          '</div>') +
         '<div style="display:flex;gap:10px;">' +
           '<button class="modal-btn" id="resetCancel" style="background:var(--card);color:var(--text);border:1px solid var(--border);">Cancel</button>' +
-          '<button class="modal-btn" id="resetConfirm" style="background:var(--red);color:white;">Reset</button>' +
+          '<button class="modal-btn" id="resetConfirm" style="background:var(--purple);color:white;' + (canPrestige ? '' : 'opacity:0.3;cursor:not-allowed;') + '"' + (canPrestige ? '' : ' disabled') + '>\u{1FA99} Prestige' + (canPrestige ? ' (+' + tokenGain + ')' : '') + '</button>' +
         '</div></div>';
       document.getElementById('resetCancel').addEventListener('click', function() { modal.classList.remove('active'); modal.innerHTML = ''; });
       document.getElementById('resetConfirm').addEventListener('click', function() {
-        localStorage.removeItem('sd_town_v1');
+        if (!Game.canPrestige()) return;
         Game.running = false;
-        Game.state = { avatar: null, sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0, heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1, priceEvent: null, nextEventAt: 0, housing: 'studio', vehicle: null, pet: null, energy: 100, research: {}, loans: [], loanTime: 0, electricityBill: 0, electricitySolar: 0, policeRisk: 0, mailOrders: [], gymLevel: 0, health: 100, casinoLock: 0, version: 2, lastTick: Date.now() };
-        Game.floatingTexts = [];
-        Game.init();
+        var tokens = Game.prestige();
+        Game.save();
         modal.classList.remove('active'); modal.innerHTML = '';
         UI.hidePanel();
         UI.setupHUD();
         UI.showAvatarCreation();
+        UI.toast('\u{1FA99} Prestiged! ' + tokens + ' tokens (+' + (tokens * 10) + '% income)');
       });
     },
 
@@ -536,13 +553,15 @@
     buildCarDealerPanel: function() {
       var s = Game.state, html = '<div class="panel-body">';
       var cur = s.vehicle ? Game.VEHICLES.find(function(v){return v.id===s.vehicle;}) : null;
-      html += '<p style="margin-bottom:12px;">Current: <strong>' + (cur ? cur.icon + ' ' + cur.name : 'Walking') + '</strong> (' + (cur ? cur.speed + 'x' : '1x') + ' speed)</p>';
+      var tradeIn = cur ? Math.floor(cur.cost * 0.5) : 0;
+      html += '<p style="margin-bottom:12px;">Current: <strong>' + (cur ? cur.icon + ' ' + cur.name : 'Walking') + '</strong> (' + (cur ? cur.speed + 'x' : '1x') + ' speed)' + (tradeIn > 0 ? ' <span style="color:var(--green);font-size:12px;">Trade-in: $' + Game.formatNumber(tradeIn) + '</span>' : '') + '</p>';
       Game.VEHICLES.forEach(function(v) {
         var owned = s.vehicle === v.id;
-        html += '<div class="hw-card' + (owned ? '' : (s.usd < v.cost ? ' locked' : '')) + '" data-vehicle="' + v.id + '">' +
+        var effectiveCost = tradeIn > 0 ? Math.max(0, v.cost - tradeIn) : v.cost;
+        html += '<div class="hw-card' + (owned ? '' : (s.usd < effectiveCost ? ' locked' : '')) + '" data-vehicle="' + v.id + '">' +
           '<div class="hw-icon">' + v.icon + '</div>' +
           '<div class="hw-info"><div class="hw-name">' + v.name + '</div><div class="hw-sub">' + v.speed + 'x speed</div></div>' +
-          '<div class="hw-cost">' + (owned ? '\u2705 Owned' : '$' + Game.formatNumber(v.cost)) + '</div></div>';
+          '<div class="hw-cost">' + (owned ? '\u2705 Owned' : '$' + Game.formatNumber(v.cost) + (tradeIn > 0 ? '<div style="color:var(--green);font-size:10px;">net $' + Game.formatNumber(effectiveCost) + '</div>' : '')) + '</div></div>';
       });
       return html + '</div>';
     },
@@ -550,10 +569,17 @@
       document.querySelectorAll('[data-vehicle]').forEach(function(el) {
         el.addEventListener('click', function() {
           var v = Game.VEHICLES.find(function(x){return x.id===el.dataset.vehicle;});
-          if (!v || Game.state.vehicle === v.id || Game.state.usd < v.cost) return;
-          Game.state.usd -= v.cost;
+          if (!v || Game.state.vehicle === v.id) return;
+          // Refund 50% of old vehicle
+          var refund = 0;
+          if (Game.state.vehicle) {
+            var old = Game.VEHICLES.find(function(x){return x.id===Game.state.vehicle;});
+            if (old) refund = Math.floor(old.cost * 0.5);
+          }
+          if (Game.state.usd + refund < v.cost) return;
+          Game.state.usd += refund - v.cost;
           Game.state.vehicle = v.id;
-          UI.toast('Bought ' + v.name + '!');
+          UI.toast('Bought ' + v.name + '!' + (refund > 0 ? ' (trade-in: $' + Game.formatNumber(refund) + ')' : ''));
           UI.showPanel(UI.currentBuilding);
         });
       });
@@ -580,10 +606,17 @@
       document.querySelectorAll('[data-pet]').forEach(function(el) {
         el.addEventListener('click', function() {
           var p = Game.PETS.find(function(x){return x.id===el.dataset.pet;});
-          if (!p || Game.state.pet === p.id || Game.state.usd < p.cost) return;
-          Game.state.usd -= p.cost;
+          if (!p || Game.state.pet === p.id) return;
+          // Refund 50% of old pet
+          var refund = 0;
+          if (Game.state.pet) {
+            var old = Game.PETS.find(function(x){return x.id===Game.state.pet;});
+            if (old) refund = Math.floor(old.cost * 0.5);
+          }
+          if (Game.state.usd + refund < p.cost) return;
+          Game.state.usd += refund - p.cost;
           Game.state.pet = p.id;
-          UI.toast('Adopted ' + p.name + '!');
+          UI.toast('Adopted ' + p.name + '!' + (refund > 0 ? ' (rehomed old pet: $' + Game.formatNumber(refund) + ')' : ''));
           UI.showPanel(UI.currentBuilding);
         });
       });

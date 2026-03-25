@@ -236,13 +236,13 @@
       this._renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
       this._renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       this._renderer.setSize(canvasEl.clientWidth, canvasEl.clientHeight);
-      this._renderer.setClearColor(0x050510, 1);
+      this._renderer.setClearColor(0x1a1520, 1);
       this._renderer.shadowMap.enabled = true;
       this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       // Scene
       this._scene = new THREE.Scene();
-      this._scene.fog = new THREE.FogExp2(0x050510, 0.00025);
+      this._scene.fog = new THREE.FogExp2(0x2a1a25, 0.0002);
 
       // Camera - isometric-like perspective
       var aspect = canvasEl.clientWidth / canvasEl.clientHeight;
@@ -252,11 +252,14 @@
       this._camera3.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
 
       // Lighting
-      var ambient = new THREE.AmbientLight(0x222244, 0.6);
+      var ambient = new THREE.AmbientLight(0x8877aa, 0.4);
       this._scene.add(ambient);
 
-      var dirLight = new THREE.DirectionalLight(0x8888cc, 0.5);
-      dirLight.position.set(400, 800, 200);
+      var hemiLight = new THREE.HemisphereLight(0xffeedd, 0x223344, 0.3);
+      this._scene.add(hemiLight);
+
+      var dirLight = new THREE.DirectionalLight(0xffcc88, 0.8);
+      dirLight.position.set(-300, 600, -200);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.width = 2048;
       dirLight.shadow.mapSize.height = 2048;
@@ -268,8 +271,8 @@
       dirLight.shadow.camera.bottom = -1500;
       this._scene.add(dirLight);
 
-      // Subtle point light for cyberpunk glow
-      var pointLight = new THREE.PointLight(0xf7931a, 0.3, 2000);
+      // Warm point light
+      var pointLight = new THREE.PointLight(0xffaa44, 0.4, 2000);
       pointLight.position.set(WORLD_W / 2, 300, WORLD_H / 2);
       this._scene.add(pointLight);
 
@@ -277,9 +280,11 @@
       this._raycaster = new THREE.Raycaster();
 
       // Build the scene
+      this._buildSky();
       this._buildGround();
       this._buildRoads();
       this._buildBuildings();
+      this._buildTrees();
       this._buildAvatar();
       this._buildMoveTarget();
       this._buildPrompt();
@@ -345,7 +350,7 @@
       // Main ground plane
       var groundGeo = new THREE.PlaneGeometry(WORLD_W + 200, WORLD_H + 200);
       var groundMat = new THREE.MeshStandardMaterial({
-        color: 0x0a0a18,
+        color: 0x3a3530,
         roughness: 0.95,
         metalness: 0.1
       });
@@ -355,8 +360,8 @@
       this._groundPlane.receiveShadow = true;
       this._scene.add(this._groundPlane);
 
-      // Grid lines on ground
-      var gridMat = new THREE.LineBasicMaterial({ color: 0x0f0f22, transparent: true, opacity: 0.5 });
+      // Subtle grid lines on ground
+      var gridMat = new THREE.LineBasicMaterial({ color: 0x4a4540, transparent: true, opacity: 0.25 });
       var gridGeo = new THREE.BufferGeometry();
       var gridVerts = [];
       for (var gx = 0; gx <= WORLD_W; gx += 64) {
@@ -368,22 +373,54 @@
       gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridVerts, 3));
       var grid = new THREE.LineSegments(gridGeo, gridMat);
       this._scene.add(grid);
+
+      // Green grass patches between buildings
+      var grassMat = new THREE.MeshStandardMaterial({ color: 0x3a6630, roughness: 0.95, metalness: 0.0 });
+      var rng = function(seed) { return ((Math.sin(seed * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1; };
+      for (var gi = 0; gi < 20; gi++) {
+        var gpx = rng(gi * 3 + 1) * WORLD_W;
+        var gpz = rng(gi * 3 + 2) * WORLD_H;
+        // Skip if on a building or road
+        var onBuilding = false;
+        for (var bi = 0; bi < BUILDINGS.length; bi++) {
+          var bb = BUILDINGS[bi];
+          if (gpx >= bb.x - 20 && gpx <= bb.x + bb.w + 20 && gpz >= bb.y - 20 && gpz <= bb.y + bb.h + 20) { onBuilding = true; break; }
+        }
+        if (onBuilding) continue;
+        var onRoad = false;
+        for (var ri = 0; ri < H_ROADS.length; ri++) { if (gpz >= H_ROADS[ri].y - 10 && gpz <= H_ROADS[ri].y + H_ROADS[ri].h + 10) { onRoad = true; break; } }
+        for (var vi = 0; vi < V_ROADS.length; vi++) { if (gpx >= V_ROADS[vi].x - 10 && gpx <= V_ROADS[vi].x + V_ROADS[vi].w + 10) { onRoad = true; break; } }
+        if (onRoad) continue;
+        var gSize = 30 + rng(gi * 7) * 50;
+        var grassGeo = new THREE.PlaneGeometry(gSize, gSize);
+        var grassMesh = new THREE.Mesh(grassGeo, grassMat);
+        grassMesh.rotation.x = -Math.PI / 2;
+        grassMesh.position.set(gpx, 0.15, gpz);
+        this._scene.add(grassMesh);
+      }
     },
 
     _buildRoads: function() {
       var roadMat = new THREE.MeshStandardMaterial({
-        color: 0x0d0d20,
+        color: 0x555550,
         roughness: 0.9,
         metalness: 0.05
       });
+      var sidewalkMat = new THREE.MeshStandardMaterial({
+        color: 0x998877,
+        roughness: 0.85,
+        metalness: 0.02
+      });
 
-      // Dashed center-line material
+      // Dashed yellow center-line material
       var lineMat = new THREE.LineDashedMaterial({
-        color: 0x1a1a30,
+        color: 0xcccc99,
         dashSize: 20,
         gapSize: 15,
         linewidth: 1
       });
+
+      var sidewalkW = 10;
 
       for (var ri = 0; ri < H_ROADS.length; ri++) {
         var hr = H_ROADS[ri];
@@ -392,6 +429,18 @@
         rMesh.rotation.x = -Math.PI / 2;
         rMesh.position.set(WORLD_W / 2, 0.2, hr.y + hr.h / 2);
         this._scene.add(rMesh);
+
+        // Sidewalks along both sides
+        var swGeoTop = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
+        var swTop = new THREE.Mesh(swGeoTop, sidewalkMat);
+        swTop.rotation.x = -Math.PI / 2;
+        swTop.position.set(WORLD_W / 2, 0.25, hr.y - sidewalkW / 2);
+        this._scene.add(swTop);
+        var swGeoBot = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
+        var swBot = new THREE.Mesh(swGeoBot, sidewalkMat);
+        swBot.rotation.x = -Math.PI / 2;
+        swBot.position.set(WORLD_W / 2, 0.25, hr.y + hr.h + sidewalkW / 2);
+        this._scene.add(swBot);
 
         // Center line
         var lineGeo = new THREE.BufferGeometry();
@@ -411,6 +460,18 @@
         vrMesh.position.set(vr.x + vr.w / 2, 0.2, WORLD_H / 2);
         this._scene.add(vrMesh);
 
+        // Sidewalks along both sides
+        var vswGeoL = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
+        var vswL = new THREE.Mesh(vswGeoL, sidewalkMat);
+        vswL.rotation.x = -Math.PI / 2;
+        vswL.position.set(vr.x - sidewalkW / 2, 0.25, WORLD_H / 2);
+        this._scene.add(vswL);
+        var vswGeoR = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
+        var vswR = new THREE.Mesh(vswGeoR, sidewalkMat);
+        vswR.rotation.x = -Math.PI / 2;
+        vswR.position.set(vr.x + vr.w + sidewalkW / 2, 0.25, WORLD_H / 2);
+        this._scene.add(vswR);
+
         var vlGeo = new THREE.BufferGeometry();
         vlGeo.setAttribute('position', new THREE.Float32BufferAttribute([
           vr.x + vr.w / 2, 0.4, 0, vr.x + vr.w / 2, 0.4, WORLD_H
@@ -421,31 +482,118 @@
       }
     },
 
+    _buildSky: function() {
+      // Large inverted sphere for sunset sky
+      var skyGeo = new THREE.SphereGeometry(3000, 32, 16);
+      var skyCanvas = document.createElement('canvas');
+      skyCanvas.width = 256;
+      skyCanvas.height = 256;
+      var skyCtx = skyCanvas.getContext('2d');
+      var grad = skyCtx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#1a1030');
+      grad.addColorStop(0.3, '#3a2040');
+      grad.addColorStop(0.5, '#884455');
+      grad.addColorStop(0.7, '#cc7744');
+      grad.addColorStop(0.85, '#ffaa66');
+      grad.addColorStop(1, '#ffddaa');
+      skyCtx.fillStyle = grad;
+      skyCtx.fillRect(0, 0, 256, 256);
+      var skyTex = new THREE.CanvasTexture(skyCanvas);
+      var skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false });
+      var skyMesh = new THREE.Mesh(skyGeo, skyMat);
+      skyMesh.position.set(WORLD_W / 2, 0, WORLD_H / 2);
+      this._scene.add(skyMesh);
+    },
+
+    _buildTrees: function() {
+      var greens = [0x336633, 0x447744, 0x2a5a2a, 0x558855];
+      var trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9, metalness: 0.0 });
+      var rng = function(seed) { return ((Math.sin(seed * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1; };
+
+      for (var ti = 0; ti < 30; ti++) {
+        var tx = rng(ti * 5 + 100) * WORLD_W;
+        var tz = rng(ti * 5 + 101) * WORLD_H;
+
+        // Skip if on a building
+        var onBuilding = false;
+        for (var bi = 0; bi < BUILDINGS.length; bi++) {
+          var bb = BUILDINGS[bi];
+          if (tx >= bb.x - 15 && tx <= bb.x + bb.w + 15 && tz >= bb.y - 15 && tz <= bb.y + bb.h + 15) { onBuilding = true; break; }
+        }
+        if (onBuilding) continue;
+
+        // Skip if on a road
+        var onRoad = false;
+        for (var ri = 0; ri < H_ROADS.length; ri++) { if (tz >= H_ROADS[ri].y - 5 && tz <= H_ROADS[ri].y + H_ROADS[ri].h + 5) { onRoad = true; break; } }
+        for (var vi = 0; vi < V_ROADS.length; vi++) { if (tx >= V_ROADS[vi].x - 5 && tx <= V_ROADS[vi].x + V_ROADS[vi].w + 5) { onRoad = true; break; } }
+        if (onRoad) continue;
+
+        var trunkH = 20 + rng(ti * 5 + 102) * 10;
+        var canopyR = 12 + rng(ti * 5 + 103) * 6;
+        var greenColor = greens[ti % greens.length];
+
+        // Trunk
+        var trunkGeo = new THREE.CylinderGeometry(3, 3, trunkH, 6);
+        var trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.set(tx, trunkH / 2, tz);
+        trunk.castShadow = true;
+        this._scene.add(trunk);
+
+        // Canopy - alternate between cone and sphere
+        var canopyMat = new THREE.MeshStandardMaterial({ color: greenColor, roughness: 0.9, metalness: 0.0 });
+        var canopy;
+        if (ti % 2 === 0) {
+          var coneGeo = new THREE.ConeGeometry(canopyR, canopyR * 1.8, 8);
+          canopy = new THREE.Mesh(coneGeo, canopyMat);
+        } else {
+          var sphereGeo = new THREE.SphereGeometry(canopyR, 8, 6);
+          canopy = new THREE.Mesh(sphereGeo, canopyMat);
+        }
+        canopy.position.set(tx, trunkH + canopyR * 0.6, tz);
+        canopy.castShadow = true;
+        this._scene.add(canopy);
+      }
+    },
+
     _buildBuildings: function() {
       this._buildingMeshes = [];
       this._buildingEdgeMeshes = [];
 
-      // Height variation per building type
-      var heightScale = { mine: 0.5, hardware: 0.4, exchange: 0.55, bank: 0.6,
-        diner: 0.25, coffee: 0.2, university: 0.5, hospital: 0.55,
-        internet_cafe: 0.3, casino: 0.45, post_office: 0.3, gym: 0.35,
-        real_estate: 0.3, car_dealer: 0.25, pet_shop: 0.25, pawn_shop: 0.25,
-        utility: 0.4, apartment: 0.35 };
+      // Wall colors per building type
+      var wallColors = {
+        mine: '#c4956a', hardware: '#b8a88a', exchange: '#d4c8b0', bank: '#e8dcc8',
+        diner: '#cc6655', coffee: '#8b7355', university: '#c8b8a0', hospital: '#e0d8d0',
+        internet_cafe: '#7a8878', casino: '#9a6688', post_office: '#b0a898', gym: '#bb8844',
+        real_estate: '#a8b898', car_dealer: '#c0b8b0', pet_shop: '#d8b8a0', pawn_shop: '#998866',
+        utility: '#8899aa', apartment: '#c0b0a0'
+      };
+
+      // Roof colors cycled per building
+      var roofColors = ['#9a5533', '#554433', '#667766', '#884444'];
+
+      // Building heights by category
+      var buildingHeights = {
+        mine: 70, hardware: 50, exchange: 55, bank: 95,
+        diner: 35, coffee: 30, university: 70, hospital: 75,
+        internet_cafe: 45, casino: 65, post_office: 48, gym: 50,
+        real_estate: 65, car_dealer: 60, pet_shop: 32, pawn_shop: 35,
+        utility: 52, apartment: 55
+      };
+
+      // Shop types that get awnings
+      var awningTypes = { diner: '#cc3333', coffee: '#664422', pet_shop: '#dd8866', pawn_shop: '#887744' };
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         var b = BUILDINGS[i];
-        var rgb = hexToRGB(b.color);
-        var hs = heightScale[b.panelType] || 0.35;
-        var buildingHeight = Math.max(b.w, b.h) * hs;
-
-        // Building group
         var bGroup = new THREE.Group();
+        var wallHex = wallColors[b.panelType] || '#bbaa99';
+        var buildingHeight = buildingHeights[b.panelType] || 50;
 
-        // Main building body - darker, more realistic
+        // 1. Main body
         var bodyMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(rgb.r * 0.12 + 0.04, rgb.g * 0.12 + 0.04, rgb.b * 0.12 + 0.04),
-          roughness: 0.85,
-          metalness: 0.15
+          color: wallHex,
+          roughness: 0.8,
+          metalness: 0.05
         });
         var bodyGeo = new THREE.BoxGeometry(b.w, buildingHeight, b.h);
         var bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
@@ -455,36 +603,122 @@
         bGroup.add(bodyMesh);
         this._buildingMeshes.push(bodyMesh);
 
-        // Neon edge wireframe
+        // Edge highlight for nearby detection
         var edgeGeo = new THREE.EdgesGeometry(bodyGeo);
         var edgeMat = new THREE.LineBasicMaterial({
-          color: new THREE.Color(rgb.r * 0.7, rgb.g * 0.7, rgb.b * 0.7),
+          color: 0x887766,
           transparent: true,
-          opacity: 0.4
+          opacity: 0.6
         });
         var edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
         edgeMesh.position.copy(bodyMesh.position);
         bGroup.add(edgeMesh);
         this._buildingEdgeMeshes.push(edgeMesh);
 
-        // Windows - rows of small glowing rectangles on front face
-        var winColor = new THREE.Color(rgb.r * 0.5 + 0.3, rgb.g * 0.5 + 0.3, rgb.b * 0.5 + 0.1);
-        var winMat = new THREE.MeshBasicMaterial({ color: winColor, transparent: true, opacity: 0.6 });
+        // 2. Peaked roof - triangular prism along longer axis
+        var roofHex = roofColors[i % roofColors.length];
+        var roofRGB = hexToRGB(roofHex);
+        var roofMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(roofRGB.r, roofRGB.g, roofRGB.b),
+          roughness: 0.85,
+          metalness: 0.05
+        });
+        var ridgeHeight = buildingHeight * 0.4;
+        var hw = b.w / 2;
+        var hd = b.h / 2;
+        var bx = b.x + b.w / 2;
+        var bz = b.y + b.h / 2;
+        var roofY = buildingHeight;
+
+        if (b.w >= b.h) {
+          // Ridge along X axis (width is longer)
+          var roofVerts = new Float32Array([
+            // Left triangle
+            bx - hw, roofY, bz - hd,
+            bx - hw, roofY, bz + hd,
+            bx - hw, roofY + ridgeHeight, bz,
+            // Right triangle
+            bx + hw, roofY, bz - hd,
+            bx + hw, roofY, bz + hd,
+            bx + hw, roofY + ridgeHeight, bz,
+            // Front slope
+            bx - hw, roofY, bz + hd,
+            bx + hw, roofY, bz + hd,
+            bx + hw, roofY + ridgeHeight, bz,
+            bx - hw, roofY, bz + hd,
+            bx + hw, roofY + ridgeHeight, bz,
+            bx - hw, roofY + ridgeHeight, bz,
+            // Back slope
+            bx - hw, roofY, bz - hd,
+            bx + hw, roofY + ridgeHeight, bz,
+            bx + hw, roofY, bz - hd,
+            bx - hw, roofY, bz - hd,
+            bx - hw, roofY + ridgeHeight, bz,
+            bx + hw, roofY + ridgeHeight, bz
+          ]);
+        } else {
+          // Ridge along Z axis (height/depth is longer)
+          var roofVerts = new Float32Array([
+            // Near triangle
+            bx - hw, roofY, bz - hd,
+            bx + hw, roofY, bz - hd,
+            bx, roofY + ridgeHeight, bz - hd,
+            // Far triangle
+            bx - hw, roofY, bz + hd,
+            bx + hw, roofY, bz + hd,
+            bx, roofY + ridgeHeight, bz + hd,
+            // Left slope
+            bx - hw, roofY, bz - hd,
+            bx, roofY + ridgeHeight, bz - hd,
+            bx, roofY + ridgeHeight, bz + hd,
+            bx - hw, roofY, bz - hd,
+            bx, roofY + ridgeHeight, bz + hd,
+            bx - hw, roofY, bz + hd,
+            // Right slope
+            bx + hw, roofY, bz - hd,
+            bx, roofY + ridgeHeight, bz + hd,
+            bx, roofY + ridgeHeight, bz - hd,
+            bx + hw, roofY, bz - hd,
+            bx + hw, roofY, bz + hd,
+            bx, roofY + ridgeHeight, bz + hd
+          ]);
+        }
+
+        var roofGeo = new THREE.BufferGeometry();
+        roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(roofVerts, 3));
+        roofGeo.computeVertexNormals();
+        var roofMesh = new THREE.Mesh(roofGeo, roofMat);
+        roofMesh.castShadow = true;
+        bGroup.add(roofMesh);
+
+        // 3. Windows - warm yellow glow
+        var winMat = new THREE.MeshBasicMaterial({
+          color: '#ffeecc',
+          transparent: true,
+          opacity: 0.85
+        });
+        var winEmMat = new THREE.MeshStandardMaterial({
+          color: '#ffeecc',
+          emissive: '#ffeecc',
+          emissiveIntensity: 0.6,
+          roughness: 0.3,
+          metalness: 0.0
+        });
         var floors = Math.max(1, Math.floor(buildingHeight / 25));
         var cols = Math.max(1, Math.floor(b.w / 40));
         var winW = 12, winH = 10;
         for (var fl = 0; fl < floors; fl++) {
           for (var wc = 0; wc < cols; wc++) {
             var wGeo = new THREE.PlaneGeometry(winW, winH);
-            // Front face windows
-            var wMesh = new THREE.Mesh(wGeo, winMat);
+            var wMesh = new THREE.Mesh(wGeo, winEmMat);
             var wx = b.x + 20 + wc * (b.w - 40) / Math.max(1, cols - 1);
             if (cols === 1) wx = b.x + b.w / 2;
             var wy = 12 + fl * 25;
+            // Front face
             wMesh.position.set(wx, wy, b.y + b.h + 0.5);
             bGroup.add(wMesh);
-            // Back face windows
-            var wBack = new THREE.Mesh(wGeo, winMat);
+            // Back face
+            var wBack = new THREE.Mesh(wGeo, winEmMat);
             wBack.position.set(wx, wy, b.y - 0.5);
             wBack.rotation.y = Math.PI;
             bGroup.add(wBack);
@@ -498,53 +732,55 @@
             var sz = b.y + 20 + sc * (b.h - 40) / Math.max(1, sideCols - 1);
             if (sideCols === 1) sz = b.y + b.h / 2;
             var sy = 12 + fl2 * 25;
-            var sRight = new THREE.Mesh(sGeo, winMat);
+            var sRight = new THREE.Mesh(sGeo, winEmMat);
             sRight.position.set(b.x + b.w + 0.5, sy, sz);
             sRight.rotation.y = Math.PI / 2;
             bGroup.add(sRight);
-            var sLeft = new THREE.Mesh(sGeo, winMat);
+            var sLeft = new THREE.Mesh(sGeo, winEmMat);
             sLeft.position.set(b.x - 0.5, sy, sz);
             sLeft.rotation.y = -Math.PI / 2;
             bGroup.add(sLeft);
           }
         }
 
-        // Roof - slightly darker with subtle color, raised to avoid Z-fighting
-        var roofGeo = new THREE.PlaneGeometry(b.w + 4, b.h + 4);
-        var roofMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(rgb.r * 0.08 + 0.02, rgb.g * 0.08 + 0.02, rgb.b * 0.08 + 0.02),
-          roughness: 0.9, metalness: 0.1,
-          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
-        });
-        var roofMesh = new THREE.Mesh(roofGeo, roofMat);
-        roofMesh.rotation.x = -Math.PI / 2;
-        roofMesh.position.set(b.x + b.w / 2, buildingHeight + 2, b.y + b.h / 2);
-        bGroup.add(roofMesh);
+        // 4. Door - dark rectangle on front face at ground level
+        var doorMat = new THREE.MeshStandardMaterial({ color: '#443322', roughness: 0.9, metalness: 0.05 });
+        var doorGeo = new THREE.PlaneGeometry(14, 20);
+        var doorMesh = new THREE.Mesh(doorGeo, doorMat);
+        doorMesh.position.set(b.x + b.w / 2, 10, b.y + b.h + 0.6);
+        bGroup.add(doorMesh);
 
-        // Neon sign strip at top of building (colored band), offset down from roof
-        var signGeo = new THREE.BoxGeometry(b.w + 1, 3, b.h + 1);
-        var signMat = new THREE.MeshBasicMaterial({
-          color: new THREE.Color(rgb.r, rgb.g, rgb.b),
-          transparent: true, opacity: 0.3
-        });
-        var signMesh = new THREE.Mesh(signGeo, signMat);
-        signMesh.position.set(b.x + b.w / 2, buildingHeight - 1, b.y + b.h / 2);
-        bGroup.add(signMesh);
+        // 5. Optional awning for shop types
+        if (awningTypes[b.panelType]) {
+          var awningMat = new THREE.MeshStandardMaterial({
+            color: awningTypes[b.panelType],
+            roughness: 0.7,
+            metalness: 0.0,
+            side: THREE.DoubleSide
+          });
+          var awningW = Math.min(b.w * 0.6, 80);
+          var awningGeo = new THREE.PlaneGeometry(awningW, 15);
+          var awning = new THREE.Mesh(awningGeo, awningMat);
+          awning.position.set(b.x + b.w / 2, 22, b.y + b.h + 7);
+          awning.rotation.x = -Math.PI * 0.15;
+          awning.castShadow = true;
+          bGroup.add(awning);
+        }
 
-        // Emoji sprite above building
+        // 6. Emoji sprite above building
         var emojiSprite = makeEmojiSprite(b.emoji, 56);
-        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + 32, b.y + b.h / 2);
+        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + ridgeHeight + 24, b.y + b.h / 2);
         bGroup.add(emojiSprite);
 
         // Name label sprite
         var labelSprite = makeTextSprite(b.name, { fontSize: 36, color: '#e8e8f0', bold: true });
-        labelSprite.position.set(b.x + b.w / 2, buildingHeight + 14, b.y + b.h / 2);
+        labelSprite.position.set(b.x + b.w / 2, buildingHeight + ridgeHeight + 8, b.y + b.h / 2);
         bGroup.add(labelSprite);
 
         this._scene.add(bGroup);
 
-        // Ground glow
-        var glow = new THREE.PointLight(new THREE.Color(rgb.r, rgb.g, rgb.b), 0.2, Math.max(b.w, b.h) * 1.5);
+        // Warm ground light per building
+        var glow = new THREE.PointLight(0xffddaa, 0.15, Math.max(b.w, b.h) * 1.2);
         glow.position.set(b.x + b.w / 2, 3, b.y + b.h / 2);
         this._scene.add(glow);
       }

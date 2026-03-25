@@ -1103,9 +1103,9 @@
     },
     _renderSaveSlots: function(modal) {
       var slots = Game.getSaveSlots();
+      var hasAvatar = !!Game.state.avatar;
       var html = '<div class="modal-card">' +
-        '<div class="modal-title">\u{1F4BE} Save Slots</div>' +
-        '<p style="color:var(--dim);text-align:center;margin-bottom:16px;font-size:12px;">Save or load your game to any slot</p>';
+        '<div class="modal-title">\u{1F4BE} Save &amp; Load</div>';
 
       for (var i = 0; i < 4; i++) {
         var slot = slots[i];
@@ -1117,42 +1117,44 @@
         }
         html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-weight:800;font-size:13px;color:var(--text);">Slot ' + (i + 1) + (isEmpty ? ' <span style="color:var(--dim);font-weight:400;">- Empty</span>' : '') + '</div>' +
-            (isEmpty ? '' :
+            '<div style="font-weight:800;font-size:13px;color:var(--text);">Slot ' + (i + 1) + '</div>' +
+            (isEmpty ?
+              '<div style="font-size:11px;color:var(--dim);margin-top:2px;">Empty</div>' :
               '<div style="font-size:11px;color:var(--dim);margin-top:2px;">' + slot.name + ' \u2022 ' + Game.formatNumber(slot.sats) + ' lifetime sats \u2022 \u{1FA99} ' + slot.tokens + '</div>' +
               '<div style="font-size:10px;color:var(--dim);">' + timeStr + '</div>') +
           '</div>' +
           '<div style="display:flex;gap:6px;flex-shrink:0;">' +
-            '<button class="slot-btn slot-save" data-slot-save="' + i + '" style="background:var(--green);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Save</button>' +
-            (isEmpty ? '' : '<button class="slot-btn slot-load" data-slot-load="' + i + '" style="background:var(--blue);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Load</button>') +
-            (isEmpty ? '' : '<button class="slot-btn slot-del" data-slot-del="' + i + '" style="background:var(--red);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">\u2715</button>') +
+            (isEmpty ?
+              '<button class="slot-btn" data-slot-new="' + i + '" style="background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">New Game</button>' :
+              (hasAvatar ? '<button class="slot-btn" data-slot-save="' + i + '" style="background:var(--green);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Save</button>' : '') +
+              '<button class="slot-btn" data-slot-load="' + i + '" style="background:var(--blue);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Load</button>' +
+              '<button class="slot-btn" data-slot-del="' + i + '" style="background:var(--red);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">\u2715</button>') +
           '</div>' +
         '</div>';
       }
 
       html += '<div style="display:flex;gap:8px;margin-top:8px;">' +
         '<button class="modal-btn" id="slotClose" style="flex:1;background:var(--card);color:var(--text);border:1px solid var(--border);">Close</button>' +
-        '<button class="modal-btn" id="slotReset" style="flex:0 0 auto;background:var(--red);color:white;padding:14px 20px;">\u{1F5D1} Reset All</button>' +
+        (hasAvatar ? '<button class="modal-btn" id="slotReset" style="flex:0 0 auto;background:var(--red);color:white;padding:14px 20px;">\u{1F5D1} Reset Current</button>' : '') +
         '</div></div>';
       modal.innerHTML = html;
 
       document.getElementById('slotClose').addEventListener('click', function() {
         modal.classList.remove('active'); modal.innerHTML = '';
       });
-      document.getElementById('slotReset').addEventListener('click', function() {
+      var resetBtn = document.getElementById('slotReset');
+      if (resetBtn) resetBtn.addEventListener('click', function() {
         modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
-          '<div class="modal-title" style="color:var(--red);">\u{1F5D1} Reset Everything?</div>' +
-          '<p style="color:var(--dim);margin-bottom:20px;font-size:14px;">This will delete ALL progress, tokens, upgrades, and achievements.<br>Cannot be undone.</p>' +
+          '<div class="modal-title" style="color:var(--red);">\u{1F5D1} Reset Current Game?</div>' +
+          '<p style="color:var(--dim);margin-bottom:20px;font-size:14px;">This resets your current active game.<br>Save slots are NOT affected.</p>' +
           '<div style="display:flex;gap:10px;">' +
             '<button class="modal-btn" id="hardResetCancel" style="background:var(--card);color:var(--text);border:1px solid var(--border);">Cancel</button>' +
-            '<button class="modal-btn" id="hardResetConfirm" style="background:var(--red);color:white;">Delete Everything</button>' +
+            '<button class="modal-btn" id="hardResetConfirm" style="background:var(--red);color:white;">Reset Game</button>' +
           '</div></div>';
         document.getElementById('hardResetCancel').addEventListener('click', function() { modal.classList.remove('active'); modal.innerHTML = ''; });
         document.getElementById('hardResetConfirm').addEventListener('click', function() {
           localStorage.removeItem('sd_town_v1');
-          for (var i = 0; i < 4; i++) localStorage.removeItem('sd_slot_' + i);
           Game.running = false;
-          Game.state = Game.state.__proto__ && Game.state.__proto__.constructor ? new (Game.state.__proto__.constructor)() : {};
           Object.assign(Game.state, {avatar:null,sats:0,usd:0,totalSats:0,lifetimeSats:0,heat:0,owned:{},tokens:0,price:65000,buyMulti:1,priceEvent:null,nextEventAt:0,housing:'studio',vehicle:null,pet:null,energy:100,research:{},loans:[],loanTime:0,electricityBill:0,electricitySolar:0,policeRisk:0,mailOrders:[],gymLevel:0,health:100,casinoLock:0,prestigeUpgrades:{},achievements:{},version:3,lastTick:Date.now()});
           Game.floatingTexts = [];
           Game.init();
@@ -1160,11 +1162,29 @@
           UI.hidePanel();
           UI.setupHUD();
           UI.showAvatarCreation();
-          UI.toast('Game reset completely');
+          UI.toast('Game reset');
         });
       });
 
       var self = this;
+      // New game on empty slot
+      modal.querySelectorAll('[data-slot-new]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.slotNew);
+          // Save current game to the slot as a fresh start
+          var prevState = JSON.stringify(Game.state);
+          // Reset current game
+          localStorage.removeItem('sd_town_v1');
+          Game.running = false;
+          Object.assign(Game.state, {avatar:null,sats:0,usd:0,totalSats:0,lifetimeSats:0,heat:0,owned:{},tokens:0,price:65000,buyMulti:1,priceEvent:null,nextEventAt:0,housing:'studio',vehicle:null,pet:null,energy:100,research:{},loans:[],loanTime:0,electricityBill:0,electricitySolar:0,policeRisk:0,mailOrders:[],gymLevel:0,health:100,casinoLock:0,prestigeUpgrades:{},achievements:{},version:3,lastTick:Date.now()});
+          Game.floatingTexts = [];
+          Game.init();
+          modal.classList.remove('active'); modal.innerHTML = '';
+          UI.hidePanel();
+          UI.setupHUD();
+          UI.showAvatarCreation();
+        });
+      });
       modal.querySelectorAll('[data-slot-save]').forEach(function(btn) {
         btn.addEventListener('click', function() {
           var idx = parseInt(btn.dataset.slotSave);

@@ -12,9 +12,9 @@
   ];
 
   var DARK_WEB = [
-    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 100,   rate: 1200,  heat: 0,    cur: 'usd', desc: 'Passive hash' },
-    { id: 'd2', name: 'Coolant', icon: '\u2744\uFE0F', base: 500,   rate: 0,     heat: -0.05, cur: 'usd', desc: '-Heat gen' },
-    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 10000, rate: 25000, heat: 15,   cur: 'usd', desc: 'Deep-web nodes' },
+    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 500,    rate: 50,    heat: 2,    cur: 'usd', desc: '+50/s, +heat, +risk' },
+    { id: 'd2', name: 'Coolant', icon: '\u2744\uFE0F', base: 1000,  rate: 0,     heat: -0.05, cur: 'usd', desc: '-Heat gen' },
+    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 25000, rate: 500,   heat: 8,    cur: 'usd', desc: '+500/s, high heat+risk' },
   ];
 
   var HOUSING = [
@@ -26,11 +26,11 @@
   ];
 
   var VEHICLES = [
-    { id: 'bicycle',   name: 'Bicycle',     icon: '\u{1F6B2}', speed: 1.25, cost: 50,     cur: 'usd' },
-    { id: 'scooter',   name: 'Scooter',     icon: '\u{1F6F5}', speed: 1.5,  cost: 200,    cur: 'usd' },
-    { id: 'car',       name: 'Car',         icon: '\u{1F697}', speed: 2.0,  cost: 2000,   cur: 'usd' },
-    { id: 'sports',    name: 'Sports Car',  icon: '\u{1F3CE}\uFE0F', speed: 3.0,  cost: 25000,  cur: 'usd' },
-    { id: 'heli',      name: 'Helicopter',  icon: '\u{1F681}', speed: 5.0,  cost: 500000, cur: 'usd' },
+    { id: 'bicycle',   name: 'Bicycle',     icon: '\u{1F6B2}', speed: 1.2,  cost: 50,     cur: 'usd' },
+    { id: 'scooter',   name: 'Scooter',     icon: '\u{1F6F5}', speed: 1.4,  cost: 200,    cur: 'usd' },
+    { id: 'car',       name: 'Car',         icon: '\u{1F697}', speed: 1.6,  cost: 2000,   cur: 'usd' },
+    { id: 'sports',    name: 'Sports Car',  icon: '\u{1F3CE}\uFE0F', speed: 1.8,  cost: 25000,  cur: 'usd' },
+    { id: 'heli',      name: 'Helicopter',  icon: '\u{1F681}', speed: 2.5,  cost: 500000, cur: 'usd' },
   ];
 
   var PETS = [
@@ -54,6 +54,25 @@
     { id: 'small',  name: 'Small Loan',  amount: 100,   rate: 0.05 },
     { id: 'medium', name: 'Medium Loan', amount: 1000,  rate: 0.08 },
     { id: 'large',  name: 'Large Loan',  amount: 10000, rate: 0.12 },
+  ];
+
+  var CLOTHING = [
+    { id: 'cl_hat',     name: 'Bitcoin Cap',     icon: '\u{1F9E2}', cost: 50,    cur: 'usd', desc: '+2% income',     bonus: 'income', val: 0.02 },
+    { id: 'cl_jacket',  name: 'Hoodie',          icon: '\u{1F9E5}', cost: 200,   cur: 'usd', desc: '-3% heat',       bonus: 'heat',   val: 0.03 },
+    { id: 'cl_shoes',   name: 'Running Shoes',   icon: '\u{1F45F}', cost: 500,   cur: 'usd', desc: '+10% speed',     bonus: 'speed',  val: 0.1 },
+    { id: 'cl_suit',    name: 'Business Suit',   icon: '\u{1F454}', cost: 2000,  cur: 'usd', desc: '+5% sell price', bonus: 'sell',   val: 0.05 },
+    { id: 'cl_watch',   name: 'Gold Watch',      icon: '\u231A',    cost: 10000, cur: 'usd', desc: '+8% income',     bonus: 'income', val: 0.08 },
+  ];
+
+  var FURNITURE = [
+    { id: 'fu_desk',    name: 'Mining Desk',     icon: '\u{1F5A5}\uFE0F', cost: 100,   cur: 'usd', desc: '+3% production', bonus: 'prod', val: 0.03 },
+    { id: 'fu_chair',   name: 'Gaming Chair',    icon: '\u{1FA91}', cost: 300,   cur: 'usd', desc: '+5 max energy',  bonus: 'energy', val: 5 },
+    { id: 'fu_plant',   name: 'House Plant',     icon: '\u{1FAB4}', cost: 150,   cur: 'usd', desc: '-2% heat',       bonus: 'heat',   val: 0.02 },
+    { id: 'fu_poster',  name: 'BTC Poster',      icon: '\u{1F5BC}\uFE0F', cost: 75,    cur: 'usd', desc: '+1% income',     bonus: 'income', val: 0.01 },
+    { id: 'fu_lamp',    name: 'Neon Lamp',       icon: '\u{1F4A1}', cost: 200,   cur: 'usd', desc: '+2% production', bonus: 'prod',   val: 0.02 },
+    { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
+    { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+3 energy regen',bonus: 'eregen', val: 3 },
+    { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
   ];
 
   var SAVE_KEY = 'sd_town_v1';
@@ -100,6 +119,7 @@
       avatar: null,
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
+      clothing: {}, furniture: {},
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -130,7 +150,7 @@
     HARDWARE: HARDWARE, DARK_WEB: DARK_WEB, HOUSING: HOUSING,
     VEHICLES: VEHICLES, PETS: PETS, RESEARCH: RESEARCH, LOANS: LOANS,
     PRESTIGE_UPGRADES: PRESTIGE_UPGRADES, ACHIEVEMENTS: ACHIEVEMENTS,
-    COST_SCALE: COST_SCALE,
+    COST_SCALE: COST_SCALE, CLOTHING: CLOTHING, FURNITURE: FURNITURE,
     lastFrame: 0, running: false, floatingTexts: [],
     _offlineReport: null, // set after offline calc
 
@@ -155,7 +175,7 @@
       var s = this.state;
       if (!s.avatar || !s.lastTick) return;
       var elapsed = (Date.now() - s.lastTick) / 1000;
-      if (elapsed < 10) return; // less than 10s, skip
+      if (elapsed < 60) return; // less than 60s, skip (prevents refresh exploit)
       elapsed = Math.min(elapsed, MAX_OFFLINE_SECS);
       var rate = this.getProductionRate();
       if (rate <= 0 && !this.hasPrestigeUpgrade('pu_automine')) return;
@@ -306,6 +326,15 @@
       return rate;
     },
 
+    // Sum bonuses from clothing + furniture for a given type
+    _getItemBonus: function(bonusType) {
+      var s = this.state; var total = 0;
+      var cl = s.clothing || {}, fu = s.furniture || {};
+      CLOTHING.forEach(function(c) { if (cl[c.id] && c.bonus === bonusType) total += c.val; });
+      FURNITURE.forEach(function(f) { if (fu[f.id] && f.bonus === bonusType) total += f.val; });
+      return total;
+    },
+
     getMultiplier: function() {
       var s = this.state;
       var mul = 1 + (s.tokens * 0.1);
@@ -315,6 +344,8 @@
       if (s.pet === 'dog') mul *= 1.05;
       if (s.pet === 'snake') mul *= 1.25;
       if (this.hasPrestigeUpgrade('pu_megaprod')) mul *= 1.5;
+      mul *= (1 + this._getItemBonus('income'));
+      mul *= (1 + this._getItemBonus('prod'));
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
@@ -339,13 +370,15 @@
       if (s.avatar && s.avatar.bonus === 'coolrunner') mul *= 0.8;
       if (s.research.heatsink) mul *= 0.7;
       if (s.pet === 'cat') mul *= 0.95;
-      return mul;
+      mul *= (1 - this._getItemBonus('heat'));
+      return Math.max(0.1, mul);
     },
 
     getSellMultiplier: function() {
       var mul = 1.0;
       if (this.state.research.algo_trade) mul *= 1.10;
       if (this.state.pet === 'parrot') mul *= 1.15;
+      mul *= (1 + this._getItemBonus('sell'));
       return mul;
     },
 
@@ -356,6 +389,7 @@
         if (v) base = v.speed;
       }
       if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
+      base *= (1 + this._getItemBonus('speed'));
       return base;
     },
 
@@ -374,7 +408,7 @@
     },
 
     getEnergyMax: function() {
-      return 100 + (this.state.gymLevel * 20);
+      return 100 + (this.state.gymLevel * 20) + this._getItemBonus('energy');
     },
 
     getEnergyRegen: function() {
@@ -495,6 +529,7 @@
     tick: function(dt) {
       var s = this.state;
       var now = Date.now();
+      s.lastTick = now; // Update every tick so offline calc is accurate
 
       // Production
       var rate = this.getProductionRate();
@@ -510,7 +545,8 @@
       for (var j = 0; j < DARK_WEB.length; j++) {
         if (DARK_WEB[j].id !== 'd2') hGen += (s.owned[DARK_WEB[j].id] || 0) * DARK_WEB[j].heat;
       }
-      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 15 * dt) - (4 * dt)));
+      // Heat gen scaled by /3, passive cooling at 0.5/s
+      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 3 * dt) - (0.5 * dt)));
 
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.15; // per second base
@@ -532,21 +568,36 @@
         }
       }
 
-      // Loan interest (compounds daily, check every 60s)
+      // Loan interest (compounds every 30s, auto-deducts payment)
       if (s.loans.length > 0) {
         if (!s.loanTime) s.loanTime = now;
-        if (now - s.loanTime > 60000) {
+        if (now - s.loanTime > 30000) {
           var loan = s.loans[0];
           var loanDef = LOANS.find(function(l) { return l.id === loan.id; });
           if (loanDef) {
-            loan.owed *= (1 + loanDef.rate * 0.001); // Small compound per minute
+            loan.owed *= (1 + loanDef.rate * 0.01); // 1% of rate per 30s — much faster compound
+          }
+          // Auto-deduct minimum payment (2% of owed) from USD
+          var minPayment = loan.owed * 0.02;
+          if (s.usd >= minPayment) {
+            s.usd -= minPayment;
+            loan.owed -= minPayment;
+          } else {
+            // Can't pay — add penalty interest
+            loan.owed *= 1.02;
           }
           s.loanTime = now;
-          // Default: if owed > 5x original
-          if (loan.owed > loan.amount * 5) {
+          // Fully paid off
+          if (loan.owed <= 1) {
             s.loans = [];
-            s.sats = Math.floor(s.sats * 0.5); // Penalty
-            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost 50% sats!');
+            if (UI && UI.toast) UI.toast('\u2705 Loan fully paid off!');
+          }
+          // Default: if owed > 3x original (was 5x, now stricter)
+          if (loan.owed > loan.amount * 3) {
+            s.loans = [];
+            s.sats = Math.floor(s.sats * 0.5);
+            s.usd = Math.max(0, s.usd - loan.amount * 0.5); // Also lose USD
+            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost 50% sats and $' + Game.formatNumber(loan.amount * 0.5) + '!');
           }
         }
       }

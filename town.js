@@ -25,7 +25,9 @@
     { id: 'pet_shop',     name: 'Pet Shop',        emoji: '\u{1F43E}',    x: 960,  y: 1088, w: 128, h: 128, color: '#ffaacc', panelType: 'pet_shop' },
     { id: 'pawn_shop',    name: 'Pawn Shop',       emoji: '\u{1F48D}',    x: 1344, y: 1088, w: 128, h: 128, color: '#aa8833', panelType: 'pawn_shop' },
     { id: 'utility',      name: 'Utility Co.',     emoji: '\u26A1',       x: 128,  y: 1408, w: 192, h: 128, color: '#66aaff', panelType: 'utility' },
-    { id: 'apartment',    name: 'Studio Apt.',     emoji: '\u{1F6CF}\uFE0F', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
+    { id: 'clothing',     name: 'Clothing Store',  emoji: '\u{1F455}',    x: 576,  y: 1408, w: 192, h: 128, color: '#dd88aa', panelType: 'clothing' },
+    { id: 'apartment',    name: 'Your Home',       emoji: '\u{1F3E0}', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
+    { id: 'homegoods',    name: 'Home Goods',      emoji: '\u{1F6CB}\uFE0F', x: 1344, y: 1408, w: 192, h: 128, color: '#88aa66', panelType: 'homegoods' },
   ];
 
   // Road definitions
@@ -79,49 +81,64 @@
   }
 
   function findPath(sx, sy, ex, ey) {
-    // Simple waypoint path: go to nearest road, travel along roads, exit to destination
-    var startRoad = findNearestRoadPoint(sx, sy);
-    var endRoad = findNearestRoadPoint(ex, ey);
+    // Route through nearest road intersections to avoid buildings
+    // Find nearest intersection to start and end
+    var startInt = nearestIntersection(sx, sy);
+    var endInt = nearestIntersection(ex, ey);
     var path = [];
 
-    // Step 1: walk to nearest road
-    if (Math.abs(sx - startRoad.x) > 5 || Math.abs(sy - startRoad.y) > 5) {
-      path.push(startRoad);
-    }
+    // Step 1: walk to nearest intersection
+    path.push(startInt);
 
-    // Step 2: navigate on road grid (L-shaped: first horizontal, then vertical, or vice versa)
-    // Try both orderings, pick the one that doesn't cut through buildings
-    var midA = { x: endRoad.x, y: startRoad.y }; // go horizontal first
-    var midB = { x: startRoad.x, y: endRoad.y }; // go vertical first
-
-    // Use whichever intermediate point is closer to a road center
-    var useA = isOnRoad(midA.x, midA.y);
-    var useB = isOnRoad(midB.x, midB.y);
-    if (useA) {
-      path.push(midA);
-    } else if (useB) {
-      path.push(midB);
+    // Step 2: travel along road grid via intersections
+    // If start and end are on same H road or same V road, go direct
+    if (startInt.x === endInt.x || startInt.y === endInt.y) {
+      // Same axis, go direct
+      if (startInt.x !== endInt.x || startInt.y !== endInt.y) path.push(endInt);
     } else {
-      // Find nearest intersection as intermediate
-      var bestWp = null, bestD = Infinity;
-      for (var w = 0; w < WAYPOINTS.length; w++) {
-        var wp = WAYPOINTS[w];
-        var d = Math.abs(wp.x - startRoad.x) + Math.abs(wp.y - startRoad.y) +
-                Math.abs(wp.x - endRoad.x) + Math.abs(wp.y - endRoad.y);
-        if (d < bestD) { bestD = d; bestWp = wp; }
+      // Need an L-shaped turn through a shared intersection
+      // Option A: go horizontal on startInt.y, turn at endInt.x
+      var cornerA = { x: endInt.x, y: startInt.y };
+      // Option B: go vertical on startInt.x, turn at endInt.y
+      var cornerB = { x: startInt.x, y: endInt.y };
+      // Pick the corner that's an actual intersection (both coords on roads)
+      var aValid = isIntersection(cornerA.x, cornerA.y);
+      var bValid = isIntersection(cornerB.x, cornerB.y);
+      if (aValid) { path.push(cornerA); }
+      else if (bValid) { path.push(cornerB); }
+      else {
+        // Neither is a clean intersection — route through closest real intersection
+        var best = null, bestD = Infinity;
+        for (var w = 0; w < WAYPOINTS.length; w++) {
+          var wp = WAYPOINTS[w];
+          var d = Math.abs(wp.x - startInt.x) + Math.abs(wp.y - startInt.y) +
+                  Math.abs(wp.x - endInt.x) + Math.abs(wp.y - endInt.y);
+          if (d < bestD) { bestD = d; best = wp; }
+        }
+        if (best) path.push(best);
       }
-      if (bestWp) path.push(bestWp);
+      path.push(endInt);
     }
 
-    // Step 3: go to road point near destination
-    if (Math.abs(endRoad.x - (path.length > 0 ? path[path.length-1].x : sx)) > 5 ||
-        Math.abs(endRoad.y - (path.length > 0 ? path[path.length-1].y : sy)) > 5) {
-      path.push(endRoad);
-    }
-
-    // Step 4: walk to destination
+    // Step 3: walk from last intersection to destination
     path.push({ x: ex, y: ey });
     return path;
+  }
+
+  function nearestIntersection(px, py) {
+    var best = WAYPOINTS[0], bestD = Infinity;
+    for (var i = 0; i < WAYPOINTS.length; i++) {
+      var d = Math.abs(WAYPOINTS[i].x - px) + Math.abs(WAYPOINTS[i].y - py);
+      if (d < bestD) { bestD = d; best = WAYPOINTS[i]; }
+    }
+    return { x: best.x, y: best.y };
+  }
+
+  function isIntersection(px, py) {
+    var onH = false, onV = false;
+    for (var i = 0; i < ROAD_CENTERS_H.length; i++) { if (Math.abs(py - ROAD_CENTERS_H[i]) < 5) { onH = true; break; } }
+    for (var j = 0; j < ROAD_CENTERS_V.length; j++) { if (Math.abs(px - ROAD_CENTERS_V[j]) < 5) { onV = true; break; } }
+    return onH && onV;
   }
 
   function isOnRoad(px, py) {
@@ -182,8 +199,8 @@
   }
 
   // ── Building Style Data ──
-  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',apartment:'#c0b0a0'};
-  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,apartment:40};
+  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',clothing:'#d8a8b8',apartment:'#c0b0a0',homegoods:'#a8b890'};
+  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,clothing:35,apartment:40,homegoods:38};
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];

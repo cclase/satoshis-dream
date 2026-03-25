@@ -1124,9 +1124,9 @@
               '<div style="font-size:10px;color:var(--dim);">' + timeStr + '</div>') +
           '</div>' +
           '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+            (hasAvatar ? '<button class="slot-btn" data-slot-save="' + i + '" style="background:var(--green);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Save</button>' : '') +
             (isEmpty ?
               '<button class="slot-btn" data-slot-new="' + i + '" style="background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">New Game</button>' :
-              (hasAvatar ? '<button class="slot-btn" data-slot-save="' + i + '" style="background:var(--green);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Save</button>' : '') +
               '<button class="slot-btn" data-slot-load="' + i + '" style="background:var(--blue);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Load</button>' +
               '<button class="slot-btn" data-slot-del="' + i + '" style="background:var(--red);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">\u2715</button>') +
           '</div>' +

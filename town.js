@@ -41,28 +41,181 @@
     { x: 1216, w: 50 },
   ];
 
+  // ── Helpers ──
+  function hexToRGB(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    return {
+      r: parseInt(hex.substring(0,2), 16) / 255,
+      g: parseInt(hex.substring(2,4), 16) / 255,
+      b: parseInt(hex.substring(4,6), 16) / 255
+    };
+  }
+
+  function makeTextSprite(text, opts) {
+    opts = opts || {};
+    var fontSize = opts.fontSize || 48;
+    var color = opts.color || '#e8e8f0';
+    var bold = opts.bold !== false;
+
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var font = (bold ? 'bold ' : '') + fontSize + 'px -apple-system, system-ui, sans-serif';
+    ctx.font = font;
+    var metrics = ctx.measureText(text);
+    var tw = Math.ceil(metrics.width) + 16;
+    var th = fontSize + 16;
+    // Power-of-two sizing for texture
+    canvas.width = nextPow2(tw);
+    canvas.height = nextPow2(th);
+
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    var sprite = new THREE.Sprite(mat);
+    sprite.scale.set(canvas.width / 4, canvas.height / 4, 1);
+    sprite._canvasEl = canvas;
+    return sprite;
+  }
+
+  function makeEmojiSprite(emoji, size) {
+    size = size || 64;
+    var canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    var ctx = canvas.getContext('2d');
+    ctx.font = size + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 64);
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    var sprite = new THREE.Sprite(mat);
+    sprite.scale.set(32, 32, 1);
+    return sprite;
+  }
+
+  function nextPow2(v) {
+    v--;
+    v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16;
+    return v + 1;
+  }
+
+  // ── Town Object ──
   var Town = {
     canvas: null,
-    ctx: null,
     camera: { x: 0, y: 0 },
     nearbyBuilding: null,
-    moveTarget: null,  // { x, y } click-to-move destination
-    autoEnterBuilding: null, // building to auto-enter on arrival
+    moveTarget: null,
+    autoEnterBuilding: null,
     BUILDINGS: BUILDINGS,
+
+    // Three.js objects
+    _renderer: null,
+    _scene: null,
+    _camera3: null,
+    _raycaster: null,
+    _groundPlane: null,
+    _avatarGroup: null,
+    _avatarBody: null,
+    _avatarHead: null,
+    _avatarNameSprite: null,
+    _moveTargetMesh: null,
+    _promptSprite: null,
+    _buildingMeshes: [],
+    _buildingEdgeMeshes: [],
+    _floatingTextSprites: [],
+    _time: 0,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
-      this.ctx = canvasEl.getContext('2d');
-      this.resize();
+
+      // Set up Three.js renderer using the existing canvas
+      this._renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
+      this._renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this._renderer.setSize(canvasEl.clientWidth, canvasEl.clientHeight);
+      this._renderer.setClearColor(0x050510, 1);
+      this._renderer.shadowMap.enabled = true;
+      this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // Scene
+      this._scene = new THREE.Scene();
+      this._scene.fog = new THREE.FogExp2(0x050510, 0.00025);
+
+      // Camera - isometric-like perspective
+      var aspect = canvasEl.clientWidth / canvasEl.clientHeight;
+      this._camera3 = new THREE.PerspectiveCamera(45, aspect, 10, 5000);
+      // Initial position; will be updated by updateCamera
+      this._camera3.position.set(WORLD_W / 2, 600, WORLD_H / 2 + 500);
+      this._camera3.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
+
+      // Lighting
+      var ambient = new THREE.AmbientLight(0x222244, 0.6);
+      this._scene.add(ambient);
+
+      var dirLight = new THREE.DirectionalLight(0x8888cc, 0.5);
+      dirLight.position.set(400, 800, 200);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 1;
+      dirLight.shadow.camera.far = 2000;
+      dirLight.shadow.camera.left = -1500;
+      dirLight.shadow.camera.right = 1500;
+      dirLight.shadow.camera.top = 1500;
+      dirLight.shadow.camera.bottom = -1500;
+      this._scene.add(dirLight);
+
+      // Subtle point light for cyberpunk glow
+      var pointLight = new THREE.PointLight(0xf7931a, 0.3, 2000);
+      pointLight.position.set(WORLD_W / 2, 300, WORLD_H / 2);
+      this._scene.add(pointLight);
+
+      // Raycaster for click-to-move
+      this._raycaster = new THREE.Raycaster();
+
+      // Build the scene
+      this._buildGround();
+      this._buildRoads();
+      this._buildBuildings();
+      this._buildAvatar();
+      this._buildMoveTarget();
+      this._buildPrompt();
+
+      // Resize handler
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
 
-      // Click/tap-to-move with building detection
+      // Click/tap-to-move
       function handleMapTap(clientX, clientY) {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
         var rect = canvasEl.getBoundingClientRect();
-        var worldX = clientX - rect.left + self.camera.x;
-        var worldY = clientY - rect.top + self.camera.y;
+
+        // Normalize mouse to NDC
+        var mouse = new THREE.Vector2();
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Raycast to ground plane (y=0)
+        self._raycaster.setFromCamera(mouse, self._camera3);
+        var planeNormal = new THREE.Vector3(0, 1, 0);
+        var plane = new THREE.Plane(planeNormal, 0);
+        var intersection = new THREE.Vector3();
+        var hit = self._raycaster.ray.intersectPlane(plane, intersection);
+
+        if (!hit) return;
+
+        // intersection.x = worldX, intersection.z = worldY (2D mapping)
+        var worldX = intersection.x;
+        var worldY = intersection.z;
 
         // Check if tapped on a building
         var tappedBuilding = null;
@@ -75,7 +228,6 @@
         }
 
         if (tappedBuilding) {
-          // Walk to building entrance and auto-enter
           self.moveTarget = { x: tappedBuilding.x + tappedBuilding.w / 2, y: tappedBuilding.y + tappedBuilding.h + 30 };
           self.autoEnterBuilding = tappedBuilding;
         } else {
@@ -92,12 +244,235 @@
       });
     },
 
-    resize: function() {
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      this.canvas.width = this.canvas.clientWidth * dpr;
-      this.canvas.height = this.canvas.clientHeight * dpr;
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // ── Scene Construction ──
+
+    _buildGround: function() {
+      // Main ground plane
+      var groundGeo = new THREE.PlaneGeometry(WORLD_W + 200, WORLD_H + 200);
+      var groundMat = new THREE.MeshStandardMaterial({
+        color: 0x0a0a18,
+        roughness: 0.95,
+        metalness: 0.1
+      });
+      this._groundPlane = new THREE.Mesh(groundGeo, groundMat);
+      this._groundPlane.rotation.x = -Math.PI / 2;
+      this._groundPlane.position.set(WORLD_W / 2, -0.5, WORLD_H / 2);
+      this._groundPlane.receiveShadow = true;
+      this._scene.add(this._groundPlane);
+
+      // Grid lines on ground
+      var gridMat = new THREE.LineBasicMaterial({ color: 0x0f0f22, transparent: true, opacity: 0.5 });
+      var gridGeo = new THREE.BufferGeometry();
+      var gridVerts = [];
+      for (var gx = 0; gx <= WORLD_W; gx += 64) {
+        gridVerts.push(gx, 0.1, 0, gx, 0.1, WORLD_H);
+      }
+      for (var gy = 0; gy <= WORLD_H; gy += 64) {
+        gridVerts.push(0, 0.1, gy, WORLD_W, 0.1, gy);
+      }
+      gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridVerts, 3));
+      var grid = new THREE.LineSegments(gridGeo, gridMat);
+      this._scene.add(grid);
     },
+
+    _buildRoads: function() {
+      var roadMat = new THREE.MeshStandardMaterial({
+        color: 0x0d0d20,
+        roughness: 0.9,
+        metalness: 0.05
+      });
+
+      // Dashed center-line material
+      var lineMat = new THREE.LineDashedMaterial({
+        color: 0x1a1a30,
+        dashSize: 20,
+        gapSize: 15,
+        linewidth: 1
+      });
+
+      for (var ri = 0; ri < H_ROADS.length; ri++) {
+        var hr = H_ROADS[ri];
+        var rGeo = new THREE.PlaneGeometry(WORLD_W, hr.h);
+        var rMesh = new THREE.Mesh(rGeo, roadMat);
+        rMesh.rotation.x = -Math.PI / 2;
+        rMesh.position.set(WORLD_W / 2, 0.2, hr.y + hr.h / 2);
+        this._scene.add(rMesh);
+
+        // Center line
+        var lineGeo = new THREE.BufferGeometry();
+        lineGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+          0, 0.4, hr.y + hr.h / 2, WORLD_W, 0.4, hr.y + hr.h / 2
+        ], 3));
+        var line = new THREE.Line(lineGeo, lineMat);
+        line.computeLineDistances();
+        this._scene.add(line);
+      }
+
+      for (var vi = 0; vi < V_ROADS.length; vi++) {
+        var vr = V_ROADS[vi];
+        var vrGeo = new THREE.PlaneGeometry(vr.w, WORLD_H);
+        var vrMesh = new THREE.Mesh(vrGeo, roadMat);
+        vrMesh.rotation.x = -Math.PI / 2;
+        vrMesh.position.set(vr.x + vr.w / 2, 0.2, WORLD_H / 2);
+        this._scene.add(vrMesh);
+
+        var vlGeo = new THREE.BufferGeometry();
+        vlGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+          vr.x + vr.w / 2, 0.4, 0, vr.x + vr.w / 2, 0.4, WORLD_H
+        ], 3));
+        var vline = new THREE.Line(vlGeo, lineMat);
+        vline.computeLineDistances();
+        this._scene.add(vline);
+      }
+    },
+
+    _buildBuildings: function() {
+      this._buildingMeshes = [];
+      this._buildingEdgeMeshes = [];
+
+      for (var i = 0; i < BUILDINGS.length; i++) {
+        var b = BUILDINGS[i];
+        var rgb = hexToRGB(b.color);
+        var buildingHeight = Math.max(b.w, b.h) * 0.35;
+
+        // Building body - semi-transparent dark with colored tint
+        var bodyMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(rgb.r * 0.15, rgb.g * 0.15, rgb.b * 0.15),
+          roughness: 0.7,
+          metalness: 0.3,
+          transparent: true,
+          opacity: 0.9
+        });
+        var bodyGeo = new THREE.BoxGeometry(b.w, buildingHeight, b.h);
+        var bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        bodyMesh.position.set(b.x + b.w / 2, buildingHeight / 2, b.y + b.h / 2);
+        bodyMesh.castShadow = true;
+        bodyMesh.receiveShadow = true;
+        this._scene.add(bodyMesh);
+        this._buildingMeshes.push(bodyMesh);
+
+        // Neon edge wireframe
+        var edgeGeo = new THREE.EdgesGeometry(bodyGeo);
+        var edgeMat = new THREE.LineBasicMaterial({
+          color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+          transparent: true,
+          opacity: 0.6
+        });
+        var edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
+        edgeMesh.position.copy(bodyMesh.position);
+        this._scene.add(edgeMesh);
+        this._buildingEdgeMeshes.push(edgeMesh);
+
+        // Roof accent - glowing top plane
+        var roofGeo = new THREE.PlaneGeometry(b.w - 2, b.h - 2);
+        var roofMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(rgb.r * 0.3, rgb.g * 0.3, rgb.b * 0.3),
+          transparent: true,
+          opacity: 0.4
+        });
+        var roofMesh = new THREE.Mesh(roofGeo, roofMat);
+        roofMesh.rotation.x = -Math.PI / 2;
+        roofMesh.position.set(b.x + b.w / 2, buildingHeight + 0.5, b.y + b.h / 2);
+        this._scene.add(roofMesh);
+
+        // Emoji sprite above building
+        var emojiSprite = makeEmojiSprite(b.emoji, 56);
+        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + 28, b.y + b.h / 2);
+        this._scene.add(emojiSprite);
+
+        // Name label sprite below emoji
+        var labelSprite = makeTextSprite(b.name, { fontSize: 36, color: '#e8e8f0', bold: true });
+        labelSprite.position.set(b.x + b.w / 2, buildingHeight + 10, b.y + b.h / 2);
+        this._scene.add(labelSprite);
+
+        // Ground glow (subtle colored light at building base)
+        var glow = new THREE.PointLight(new THREE.Color(rgb.r, rgb.g, rgb.b), 0.15, Math.max(b.w, b.h) * 1.2);
+        glow.position.set(b.x + b.w / 2, 5, b.y + b.h / 2);
+        this._scene.add(glow);
+      }
+    },
+
+    _buildAvatar: function() {
+      this._avatarGroup = new THREE.Group();
+
+      // Body - cone (pointing up)
+      var bodyGeo = new THREE.ConeGeometry(8, 20, 8);
+      var bodyMat = new THREE.MeshStandardMaterial({
+        color: 0xf7931a,
+        roughness: 0.5,
+        metalness: 0.4,
+        emissive: 0xf7931a,
+        emissiveIntensity: 0.15
+      });
+      this._avatarBody = new THREE.Mesh(bodyGeo, bodyMat);
+      this._avatarBody.position.y = 12;
+      this._avatarBody.castShadow = true;
+      this._avatarGroup.add(this._avatarBody);
+
+      // Head - sphere
+      var headGeo = new THREE.SphereGeometry(7, 12, 8);
+      var headMat = new THREE.MeshStandardMaterial({
+        color: 0xffcc88,
+        roughness: 0.6,
+        metalness: 0.1
+      });
+      this._avatarHead = new THREE.Mesh(headGeo, headMat);
+      this._avatarHead.position.y = 28;
+      this._avatarHead.castShadow = true;
+      this._avatarGroup.add(this._avatarHead);
+
+      // Shadow disc on ground
+      var shadowGeo = new THREE.CircleGeometry(10, 16);
+      var shadowMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.4
+      });
+      var shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+      shadowMesh.rotation.x = -Math.PI / 2;
+      shadowMesh.position.y = 0.3;
+      this._avatarGroup.add(shadowMesh);
+
+      // Name sprite (created on first render when avatar exists)
+      this._avatarNameSprite = null;
+
+      this._scene.add(this._avatarGroup);
+      this._avatarGroup.visible = false;
+    },
+
+    _buildMoveTarget: function() {
+      var ringGeo = new THREE.RingGeometry(6, 9, 16);
+      var ringMat = new THREE.MeshBasicMaterial({
+        color: 0xf7931a,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      });
+      this._moveTargetMesh = new THREE.Mesh(ringGeo, ringMat);
+      this._moveTargetMesh.rotation.x = -Math.PI / 2;
+      this._moveTargetMesh.position.y = 0.5;
+      this._moveTargetMesh.visible = false;
+      this._scene.add(this._moveTargetMesh);
+    },
+
+    _buildPrompt: function() {
+      this._promptSprite = makeTextSprite('Press Enter', { fontSize: 40, color: '#f7931a', bold: true });
+      this._promptSprite.visible = false;
+      this._scene.add(this._promptSprite);
+    },
+
+    // ── Resize ──
+
+    resize: function() {
+      if (!this._renderer) return;
+      var w = this.canvas.clientWidth;
+      var h = this.canvas.clientHeight;
+      this._renderer.setSize(w, h);
+      this._camera3.aspect = w / h;
+      this._camera3.updateProjectionMatrix();
+    },
+
+    // ── Update Avatar (same logic, x/y mapped to x/z) ──
 
     updateAvatar: function(dt, keys) {
       var av = Game.state.avatar;
@@ -105,29 +480,24 @@
 
       var dx = 0, dy = 0;
 
-      // Keyboard input
       if (keys.left)  dx -= 1;
       if (keys.right) dx += 1;
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
-      // Cancel click-to-move if keyboard is used
       if (dx !== 0 || dy !== 0) {
         this.moveTarget = null;
       }
 
-      // Click-to-move
       if (this.moveTarget && dx === 0 && dy === 0) {
         var tdx = this.moveTarget.x - av.x;
         var tdy = this.moveTarget.y - av.y;
         var dist = Math.sqrt(tdx * tdx + tdy * tdy);
         if (dist < 12) {
           this.moveTarget = null;
-          // Auto-enter building if we walked to one
           if (this.autoEnterBuilding && !UI.panelOpen) {
             var ab = this.autoEnterBuilding;
             this.autoEnterBuilding = null;
-            // Check if we're actually nearby
             if (this.getNearbyBuilding() === ab) {
               setTimeout(function() { UI.showPanel(ab); }, 100);
             }
@@ -138,7 +508,6 @@
         }
       }
 
-      // Normalize diagonal for keyboard
       if (this.moveTarget === null && dx !== 0 && dy !== 0) {
         dx *= 0.707;
         dy *= 0.707;
@@ -153,11 +522,10 @@
       var newX = av.x + dx * speed * dt;
       var newY = av.y + dy * speed * dt;
 
-      // Axis-separated collision (sliding)
       if (!this.collidesBuilding(newX, av.y)) {
         av.x = newX;
       } else {
-        this.moveTarget = null; // Stop click-to-move on collision
+        this.moveTarget = null;
       }
       if (!this.collidesBuilding(av.x, newY)) {
         av.y = newY;
@@ -165,11 +533,9 @@
         this.moveTarget = null;
       }
 
-      // Clamp to world
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));
       av.y = Math.max(AVATAR_SIZE, Math.min(WORLD_H - AVATAR_SIZE, av.y));
 
-      // Check nearby building
       this.nearbyBuilding = this.getNearbyBuilding();
     },
 
@@ -193,7 +559,6 @@
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         var b = BUILDINGS[i];
-        // Distance from avatar center to building edge
         var cx = Math.max(b.x, Math.min(av.x, b.x + b.w));
         var cy = Math.max(b.y, Math.min(av.y, b.y + b.h));
         var dist = Math.sqrt((av.x - cx) * (av.x - cx) + (av.y - cy) * (av.y - cy));
@@ -204,218 +569,139 @@
       return null;
     },
 
+    // ── Camera ──
+
     updateCamera: function(dt) {
       var av = Game.state.avatar;
       if (!av) return;
 
+      // Target in 2D (same as before)
       var vw = this.canvas.clientWidth;
       var vh = this.canvas.clientHeight;
       var targetX = av.x - vw / 2;
       var targetY = av.y - vh / 2;
-
-      // Clamp target
       targetX = Math.max(0, Math.min(WORLD_W - vw, targetX));
       targetY = Math.max(0, Math.min(WORLD_H - vh, targetY));
 
-      // Smooth lerp
       this.camera.x += (targetX - this.camera.x) * 0.1;
       this.camera.y += (targetY - this.camera.y) * 0.1;
+
+      // Position 3D camera looking at avatar from above+behind
+      var camHeight = 450;
+      var camDist = 350;
+      var lookX = av.x;
+      var lookZ = av.y;
+
+      this._camera3.position.x += (lookX - this._camera3.position.x) * 0.08;
+      this._camera3.position.z += (lookZ + camDist - this._camera3.position.z) * 0.08;
+      this._camera3.position.y += (camHeight - this._camera3.position.y) * 0.08;
+      this._camera3.lookAt(lookX, 0, lookZ);
     },
+
+    // ── Render ──
 
     render: function() {
-      var ctx = this.ctx;
-      var vw = this.canvas.clientWidth;
-      var vh = this.canvas.clientHeight;
+      if (!this._renderer) return;
 
-      // Clear
-      ctx.fillStyle = '#0a0a18';
-      ctx.fillRect(0, 0, vw, vh);
+      this._time += 0.016; // ~60fps increment
 
-      ctx.save();
-      ctx.translate(-this.camera.x, -this.camera.y);
+      var av = Game.state.avatar;
 
-      // Draw ground pattern (subtle grid)
-      ctx.strokeStyle = '#0f0f22';
-      ctx.lineWidth = 1;
-      for (var gx = 0; gx < WORLD_W; gx += 64) {
-        ctx.beginPath();
-        ctx.moveTo(gx, 0);
-        ctx.lineTo(gx, WORLD_H);
-        ctx.stroke();
-      }
-      for (var gy = 0; gy < WORLD_H; gy += 64) {
-        ctx.beginPath();
-        ctx.moveTo(0, gy);
-        ctx.lineTo(WORLD_W, gy);
-        ctx.stroke();
-      }
+      // Update avatar 3D position
+      if (av) {
+        this._avatarGroup.visible = true;
+        this._avatarGroup.position.x = av.x;
+        this._avatarGroup.position.z = av.y;
 
-      // Draw roads
-      ctx.fillStyle = '#0d0d20';
-      for (var ri = 0; ri < H_ROADS.length; ri++) {
-        var hr = H_ROADS[ri];
-        ctx.fillRect(0, hr.y, WORLD_W, hr.h);
-        // Road markings
-        ctx.strokeStyle = '#1a1a30';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([20, 15]);
-        ctx.beginPath();
-        ctx.moveTo(0, hr.y + hr.h / 2);
-        ctx.lineTo(WORLD_W, hr.y + hr.h / 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-      for (var vi = 0; vi < V_ROADS.length; vi++) {
-        var vr = V_ROADS[vi];
-        ctx.fillRect(vr.x, 0, vr.w, WORLD_H);
-        ctx.strokeStyle = '#1a1a30';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([20, 15]);
-        ctx.beginPath();
-        ctx.moveTo(vr.x + vr.w / 2, 0);
-        ctx.lineTo(vr.x + vr.w / 2, WORLD_H);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Gentle bob
+        this._avatarBody.position.y = 12 + Math.sin(this._time * 3) * 1.5;
+        this._avatarHead.position.y = 28 + Math.sin(this._time * 3) * 1.5;
+
+        // Create/update name sprite
+        if (!this._avatarNameSprite && av.name) {
+          this._avatarNameSprite = makeTextSprite(av.name, { fontSize: 32, color: '#f7931a', bold: true });
+          this._avatarGroup.add(this._avatarNameSprite);
+        }
+        if (this._avatarNameSprite) {
+          this._avatarNameSprite.position.y = 40;
+        }
+      } else {
+        this._avatarGroup.visible = false;
       }
 
-      // Draw buildings
-      for (var bi = 0; bi < BUILDINGS.length; bi++) {
-        this.drawBuilding(BUILDINGS[bi]);
-      }
-
-      // Draw avatar
-      this.drawAvatar();
-
-      // Draw click-to-move target
+      // Move target ring
       if (this.moveTarget) {
-        ctx.strokeStyle = 'rgba(247,147,26,0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.moveTarget.x, this.moveTarget.y, 8, 0, Math.PI * 2);
-        ctx.stroke();
+        this._moveTargetMesh.visible = true;
+        this._moveTargetMesh.position.x = this.moveTarget.x;
+        this._moveTargetMesh.position.z = this.moveTarget.y;
+        this._moveTargetMesh.rotation.z = this._time * 2;
+      } else {
+        this._moveTargetMesh.visible = false;
       }
 
-      // Draw interaction prompt
-      if (this.nearbyBuilding && !UI.panelOpen) {
-        this.drawPrompt(this.nearbyBuilding);
+      // Interaction prompt
+      if (this.nearbyBuilding && !UI.panelOpen && av) {
+        this._promptSprite.visible = true;
+        this._promptSprite.position.set(av.x, 55, av.y);
+      } else {
+        this._promptSprite.visible = false;
       }
 
-      // Draw floating texts
-      for (var fi = 0; fi < Game.floatingTexts.length; fi++) {
-        var ft = Game.floatingTexts[fi];
-        var alpha = 1 - ft.age;
-        ctx.globalAlpha = alpha;
-        ctx.font = 'bold 14px -apple-system, system-ui, sans-serif';
-        ctx.fillStyle = ft.color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(ft.text, ft.x, ft.y);
+      // Update building edge highlights for nearby building
+      for (var bi = 0; bi < BUILDINGS.length; bi++) {
+        var isNearby = (this.nearbyBuilding === BUILDINGS[bi]);
+        var edgeMesh = this._buildingEdgeMeshes[bi];
+        if (edgeMesh) {
+          if (isNearby) {
+            edgeMesh.material.color.setHex(0xf7931a);
+            edgeMesh.material.opacity = 0.9;
+          } else {
+            var rgb = hexToRGB(BUILDINGS[bi].color);
+            edgeMesh.material.color.setRGB(rgb.r, rgb.g, rgb.b);
+            edgeMesh.material.opacity = 0.6;
+          }
+        }
       }
-      ctx.globalAlpha = 1;
 
-      ctx.restore();
+      // Floating texts - render as temporary sprites
+      this._updateFloatingTexts();
+
+      // Render
+      this._renderer.render(this._scene, this._camera3);
     },
 
-    drawBuilding: function(b) {
-      var ctx = this.ctx;
-      var isNearby = (this.nearbyBuilding === b);
-      var r = 8;
+    _updateFloatingTexts: function() {
+      // Remove expired sprites
+      for (var i = this._floatingTextSprites.length - 1; i >= 0; i--) {
+        var entry = this._floatingTextSprites[i];
+        if (entry.age > 1) {
+          this._scene.remove(entry.sprite);
+          this._floatingTextSprites.splice(i, 1);
+        }
+      }
 
-      // Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      this.roundRect(ctx, b.x + 4, b.y + 4, b.w, b.h, r);
-      ctx.fill();
+      // Sync with Game.floatingTexts
+      var gTexts = Game.floatingTexts;
+      for (var fi = 0; fi < gTexts.length; fi++) {
+        var ft = gTexts[fi];
+        // Check if we already have a sprite for this floating text
+        if (!ft._spriteCreated) {
+          var sprite = makeTextSprite(ft.text, { fontSize: 42, color: ft.color, bold: true });
+          sprite.position.set(ft.x, 50, ft.y);
+          this._scene.add(sprite);
+          this._floatingTextSprites.push({ sprite: sprite, ref: ft, age: 0 });
+          ft._spriteCreated = true;
+        }
+      }
 
-      // Building body
-      ctx.fillStyle = b.color + '22';
-      this.roundRect(ctx, b.x, b.y, b.w, b.h, r);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = isNearby ? '#f7931a' : (b.color + '88');
-      ctx.lineWidth = isNearby ? 3 : 2;
-      this.roundRect(ctx, b.x, b.y, b.w, b.h, r);
-      ctx.stroke();
-
-      // Roof accent line
-      ctx.fillStyle = b.color + '44';
-      ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, 6);
-
-      // Emoji
-      ctx.font = '32px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(b.emoji, b.x + b.w / 2, b.y + b.h / 2 - 10);
-
-      // Label
-      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#e8e8f0';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(b.name, b.x + b.w / 2, b.y + b.h / 2 + 14);
-    },
-
-    drawAvatar: function() {
-      var av = Game.state.avatar;
-      if (!av) return;
-      var ctx = this.ctx;
-
-      // Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath();
-      ctx.ellipse(av.x, av.y + 14, 10, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Sprite emoji
-      ctx.font = '26px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(av.sprite, av.x, av.y);
-
-      // Name tag
-      ctx.font = 'bold 9px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#f7931a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(av.name, av.x, av.y + 16);
-    },
-
-    drawPrompt: function(b) {
-      var av = Game.state.avatar;
-      var ctx = this.ctx;
-      var text = 'Press Enter';
-      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
-      var tw = ctx.measureText(text).width;
-
-      // Background pill
-      ctx.fillStyle = 'rgba(16,16,37,0.85)';
-      this.roundRect(ctx, av.x - tw / 2 - 10, av.y - 36, tw + 20, 22, 11);
-      ctx.fill();
-
-      ctx.strokeStyle = '#f7931a';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, av.x - tw / 2 - 10, av.y - 36, tw + 20, 22, 11);
-      ctx.stroke();
-
-      ctx.fillStyle = '#f7931a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, av.x, av.y - 25);
-    },
-
-    roundRect: function(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    },
+      // Update positions and opacity
+      for (var si = 0; si < this._floatingTextSprites.length; si++) {
+        var s = this._floatingTextSprites[si];
+        s.age = s.ref.age;
+        s.sprite.position.y = 50 + s.age * 40;
+        s.sprite.material.opacity = 1 - s.age;
+      }
+    }
   };
 
   window.Town = Town;

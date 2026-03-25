@@ -319,11 +319,10 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale to fit building footprint (models are ~1 unit, world is ~2400 units)
-            var targetScale = Math.min(b.w, b.h) * 0.012;
-            var scaleX = targetScale;
-            var scaleZ = targetScale;
-            var scaleY = targetScale * 1.2;
+            // Scale model (1x1 unit) to fit building footprint (128-256 units)
+            var scaleX = b.w;
+            var scaleZ = b.h;
+            var scaleY = Math.min(b.w, b.h) * 0.8;
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location
@@ -391,7 +390,7 @@
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
-            var sc = 1.5 + sr() * 1.0;
+            var sc = 30 + sr() * 20;
             root.scaling = new BABYLON.Vector3(sc, sc, sc);
             root.position.set(x, 0, z);
             root.rotation.y = sr() * Math.PI * 2;

@@ -211,85 +211,83 @@
     return false;
   }
 
+  // ── Building Style Data ──
+  var WALL_COLORS = {
+    mine:'#c4956a', hardware:'#b8a88a', exchange:'#d4c8b0', bank:'#e8dcc8',
+    diner:'#cc6655', coffee:'#8b7355', university:'#c8b8a0', hospital:'#e0d8d0',
+    internet_cafe:'#7a8878', casino:'#9a6688', post_office:'#b0a898', gym:'#bb8844',
+    real_estate:'#a8b898', car_dealer:'#c0b8b0', pet_shop:'#d8b8a0', pawn_shop:'#998866',
+    utility:'#8899aa', apartment:'#c0b0a0'
+  };
+  var BLDG_HEIGHTS = {
+    mine:65, hardware:50, exchange:55, bank:95, diner:32, coffee:30,
+    university:70, hospital:65, internet_cafe:40, casino:55, post_office:45,
+    gym:38, real_estate:35, car_dealer:30, pet_shop:32, pawn_shop:30,
+    utility:45, apartment:40
+  };
+  var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
+  var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
+  var STONE_TYPES = ['bank','university','post_office','hospital'];
+
   // ── Town Object ──
   var Town = {
     canvas: null,
     camera: { x: 0, y: 0 },
     nearbyBuilding: null,
     moveTarget: null,
-    _pathWaypoints: null, // Array of {x,y} waypoints for road navigation
+    _pathWaypoints: null,
     autoEnterBuilding: null,
     BUILDINGS: BUILDINGS,
 
-    // Three.js objects
-    _renderer: null,
+    // Babylon.js objects
+    _engine: null,
     _scene: null,
     _camera3: null,
-    _raycaster: null,
-    _groundPlane: null,
-    _avatarGroup: null,
+    _groundMesh: null,
+    _avatarRoot: null,
     _avatarBody: null,
     _avatarHead: null,
-    _avatarNameSprite: null,
+    _avatarLabelTex: null,
+    _avatarLastName: null,
     _moveTargetMesh: null,
-    _promptSprite: null,
+    _promptMesh: null,
     _buildingMeshes: [],
-    _buildingEdgeMeshes: [],
-    _floatingTextSprites: [],
     _time: 0,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
 
-      // Set up Three.js renderer using the existing canvas
-      this._renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
-      this._renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      this._renderer.setSize(canvasEl.clientWidth, canvasEl.clientHeight);
-      this._renderer.setClearColor(0x1a1520, 1);
-      this._renderer.shadowMap.enabled = true;
-      this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Babylon.js engine + scene
+      this._engine = new BABYLON.Engine(canvasEl, true);
+      this._scene = new BABYLON.Scene(this._engine);
+      this._scene.clearColor = new BABYLON.Color4(0.35, 0.2, 0.25, 1);
+      this._scene.ambientColor = new BABYLON.Color3(0.3, 0.25, 0.2);
+      this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+      this._scene.fogDensity = 0.00015;
+      this._scene.fogColor = new BABYLON.Color3(0.35, 0.2, 0.25);
 
-      // Scene
-      this._scene = new THREE.Scene();
-      this._scene.fog = new THREE.FogExp2(0x2a1a25, 0.0002);
-
-      // Camera - isometric-like perspective
-      var aspect = canvasEl.clientWidth / canvasEl.clientHeight;
-      this._camera3 = new THREE.PerspectiveCamera(45, aspect, 10, 5000);
-      // Initial position; will be updated by updateCamera
-      this._camera3.position.set(WORLD_W / 2, 600, WORLD_H / 2 + 500);
-      this._camera3.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
+      // Camera
+      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 500,
+        new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
+      this._camera3.inputs.clear();
 
       // Lighting
-      var ambient = new THREE.AmbientLight(0x8877aa, 0.4);
-      this._scene.add(ambient);
+      var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
+      hemi.intensity = 0.5;
+      hemi.diffuse = new BABYLON.Color3(1, 0.9, 0.7);
+      hemi.groundColor = new BABYLON.Color3(0.2, 0.25, 0.3);
 
-      var hemiLight = new THREE.HemisphereLight(0xffeedd, 0x223344, 0.3);
-      this._scene.add(hemiLight);
+      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-1,-2,-0.5), this._scene);
+      sun.intensity = 0.8;
+      sun.diffuse = new BABYLON.Color3(1, 0.8, 0.5);
+      sun.position = new BABYLON.Vector3(2000, 800, -200);
 
-      var dirLight = new THREE.DirectionalLight(0xffcc88, 0.8);
-      dirLight.position.set(-300, 600, -200);
-      dirLight.castShadow = true;
-      dirLight.shadow.mapSize.width = 2048;
-      dirLight.shadow.mapSize.height = 2048;
-      dirLight.shadow.camera.near = 1;
-      dirLight.shadow.camera.far = 2000;
-      dirLight.shadow.camera.left = -1500;
-      dirLight.shadow.camera.right = 1500;
-      dirLight.shadow.camera.top = 1500;
-      dirLight.shadow.camera.bottom = -1500;
-      this._scene.add(dirLight);
+      var shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+      shadowGen.useBlurExponentialShadowMap = true;
+      shadowGen.blurKernel = 8;
+      this._shadowGen = shadowGen;
 
-      // Warm point light
-      var pointLight = new THREE.PointLight(0xffaa44, 0.4, 2000);
-      pointLight.position.set(WORLD_W / 2, 300, WORLD_H / 2);
-      this._scene.add(pointLight);
-
-      // Raycaster for click-to-move
-      this._raycaster = new THREE.Raycaster();
-
-      // Build the scene
-      this._buildSky();
+      // Build scene
       this._buildGround();
       this._buildRoads();
       this._buildBuildings();
@@ -298,32 +296,17 @@
       this._buildMoveTarget();
       this._buildPrompt();
 
-      // Resize handler
+      // Resize
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
 
-      // Click/tap-to-move
-      function handleMapTap(clientX, clientY) {
+      // Click-to-move using Babylon picking
+      function handleMapTap(evt) {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
-        var rect = canvasEl.getBoundingClientRect();
-
-        // Normalize mouse to NDC
-        var mouse = new THREE.Vector2();
-        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-        // Raycast to ground plane (y=0)
-        self._raycaster.setFromCamera(mouse, self._camera3);
-        var planeNormal = new THREE.Vector3(0, 1, 0);
-        var plane = new THREE.Plane(planeNormal, 0);
-        var intersection = new THREE.Vector3();
-        var hit = self._raycaster.ray.intersectPlane(plane, intersection);
-
-        if (!hit) return;
-
-        // intersection.x = worldX, intersection.z = worldY (2D mapping)
-        var worldX = intersection.x;
-        var worldY = intersection.z;
+        var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY, function(m) { return m === self._groundMesh; });
+        if (!pick.hit) return;
+        var worldX = pick.pickedPoint.x;
+        var worldY = pick.pickedPoint.z;
 
         // Check if tapped on a building
         var tappedBuilding = null;
@@ -345,12 +328,7 @@
         }
       }
 
-      canvasEl.addEventListener('click', function(e) { handleMapTap(e.clientX, e.clientY); });
-      canvasEl.addEventListener('touchend', function(e) {
-        if (e.changedTouches.length !== 1) return;
-        var t = e.changedTouches[0];
-        handleMapTap(t.clientX, t.clientY);
-      });
+      canvasEl.addEventListener('pointerup', handleMapTap);
     },
 
     // ── Scene Construction ──

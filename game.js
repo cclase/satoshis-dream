@@ -62,16 +62,16 @@
   var MAX_OFFLINE_SECS = 8 * 3600; // 8 hours cap
 
   var PRESTIGE_UPGRADES = [
-    { id: 'pu_automine',   name: 'Auto-Mine',        desc: '+1 sat/s base (no hardware needed)', cost: 1,  icon: '\u2699\uFE0F' },
-    { id: 'pu_headstart',  name: 'Head Start',        desc: 'Start each run with a Laptop',       cost: 2,  icon: '\u{1F4BB}' },
-    { id: 'pu_efficient',  name: 'Efficient Cooling',  desc: '-25% electricity costs permanently', cost: 3,  icon: '\u2744\uFE0F' },
-    { id: 'pu_haggle',     name: 'Haggle',            desc: '-10% hardware costs',                cost: 3,  icon: '\u{1F4B0}' },
-    { id: 'pu_sprint',     name: 'Sprint Boots',       desc: '+50% walk speed',                   cost: 2,  icon: '\u{1F45F}' },
-    { id: 'pu_autosell',   name: 'Auto-Sell',          desc: 'Auto-sell sats at 50% capacity',    cost: 5,  icon: '\u{1F4B1}' },
-    { id: 'pu_double_tap', name: 'Double Tap',         desc: '2x sats per manual tap',            cost: 4,  icon: '\u{1F446}' },
-    { id: 'pu_offline',    name: 'Offline+',           desc: 'Offline earnings from 50% to 75%',  cost: 3,  icon: '\u{1F4F4}' },
-    { id: 'pu_lucky',      name: 'Lucky Streak',       desc: '+5% casino win rate',               cost: 4,  icon: '\u{1F340}' },
-    { id: 'pu_megaprod',   name: 'Mega Production',    desc: '+50% all production',               cost: 8,  icon: '\u{1F680}' },
+    { id: 'pu_automine',   name: 'Auto-Mine',        desc: '+1 sat/s base (no hardware needed)', cost: 2,  icon: '\u2699\uFE0F' },
+    { id: 'pu_headstart',  name: 'Head Start',        desc: 'Start each run with a Laptop',       cost: 3,  icon: '\u{1F4BB}' },
+    { id: 'pu_efficient',  name: 'Efficient Cooling',  desc: '-25% electricity costs permanently', cost: 5,  icon: '\u2744\uFE0F' },
+    { id: 'pu_haggle',     name: 'Haggle',            desc: '-10% hardware costs',                cost: 5,  icon: '\u{1F4B0}' },
+    { id: 'pu_sprint',     name: 'Sprint Boots',       desc: '+50% walk speed',                   cost: 3,  icon: '\u{1F45F}' },
+    { id: 'pu_autosell',   name: 'Auto-Sell',          desc: 'Auto-sell sats at 50% capacity',    cost: 8,  icon: '\u{1F4B1}' },
+    { id: 'pu_double_tap', name: 'Double Tap',         desc: '2x sats per manual tap',            cost: 6,  icon: '\u{1F446}' },
+    { id: 'pu_offline',    name: 'Offline+',           desc: 'Offline earnings from 50% to 75%',  cost: 5,  icon: '\u{1F4F4}' },
+    { id: 'pu_lucky',      name: 'Lucky Streak',       desc: '+5% casino win rate',               cost: 7,  icon: '\u{1F340}' },
+    { id: 'pu_megaprod',   name: 'Mega Production',    desc: '+50% all production',               cost: 12, icon: '\u{1F680}' },
   ];
 
   var ACHIEVEMENTS = [
@@ -672,8 +672,9 @@
 
     // ── Prestige ──
     getPrestigeTokens: function() {
-      // Earn 1 token per 100K lifetime sats, minimum 1 to prestige
-      return Math.floor(this.state.lifetimeSats / 100000);
+      // Earn tokens on a scaling curve: first at 100K, then increasingly harder
+      // sqrt(lifetimeSats / 50000) gives ~1 at 50K, ~3 at 500K, ~10 at 5M, ~14 at 10M
+      return Math.floor(Math.sqrt(this.state.lifetimeSats / 50000));
     },
 
     canPrestige: function() {
@@ -686,10 +687,12 @@
       var tokens = newTokens;
       var upgrades = this.state.prestigeUpgrades || {};
       var achievements = this.state.achievements || {};
+      var avatar = this.state.avatar; // Preserve avatar identity
       var def = defaultState();
       def.tokens = tokens;
       def.prestigeUpgrades = upgrades;
       def.achievements = achievements;
+      def.avatar = avatar; // Keep same character
       def.lastTick = Date.now();
       this.state = def;
       this.floatingTexts = [];

@@ -169,7 +169,7 @@
         '<div class="hud-right">' +
           '<div class="hud-item hud-price">BTC <span id="hudPrice">$65,000</span></div>' +
           '<div class="hud-item hud-rate"><span id="hudRate">0</span>/s</div>' +
-          '<div class="hud-item hud-reset" id="hudReset">\u{1FA99}</div>' +
+          '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
@@ -252,8 +252,9 @@
         modal.classList.remove('active'); modal.innerHTML = '';
         UI.hidePanel();
         UI.setupHUD();
-        UI.showAvatarCreation();
-        UI.toast('\u{1FA99} Prestiged! ' + tokens + ' tokens (+' + (tokens * 10) + '% income)');
+        // Avatar is preserved through prestige, just restart the game
+        UI.startGame();
+        UI.toast('\u{1FA99} Prestiged! ' + tokens + ' tokens - all progress reset, upgrades kept!');
       });
     },
 

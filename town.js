@@ -109,12 +109,106 @@
     return v + 1;
   }
 
+  // ── Road Pathfinding ──
+  // Build waypoint graph from road intersections + building entrances
+  var ROAD_CENTERS_H = H_ROADS.map(function(r) { return r.y + r.h / 2; });
+  var ROAD_CENTERS_V = V_ROADS.map(function(r) { return r.x + r.w / 2; });
+
+  // Waypoints: all road intersections + road endpoints
+  var WAYPOINTS = [];
+  // Road intersections
+  for (var hi = 0; hi < ROAD_CENTERS_H.length; hi++) {
+    // Add endpoints on horizontal roads
+    WAYPOINTS.push({ x: 20, y: ROAD_CENTERS_H[hi] });
+    WAYPOINTS.push({ x: WORLD_W - 20, y: ROAD_CENTERS_H[hi] });
+    for (var vi = 0; vi < ROAD_CENTERS_V.length; vi++) {
+      WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: ROAD_CENTERS_H[hi] });
+      if (hi === 0) {
+        WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: 20 });
+        WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: WORLD_H - 20 });
+      }
+    }
+  }
+
+  function findNearestRoadPoint(px, py) {
+    // Find nearest point on road grid
+    var bestDist = Infinity, bestX = px, bestY = py;
+    // Check horizontal roads
+    for (var i = 0; i < ROAD_CENTERS_H.length; i++) {
+      var d = Math.abs(py - ROAD_CENTERS_H[i]);
+      if (d < bestDist) { bestDist = d; bestX = px; bestY = ROAD_CENTERS_H[i]; }
+    }
+    // Check vertical roads
+    for (var j = 0; j < ROAD_CENTERS_V.length; j++) {
+      var d2 = Math.abs(px - ROAD_CENTERS_V[j]);
+      if (d2 < bestDist) { bestDist = d2; bestX = ROAD_CENTERS_V[j]; bestY = py; }
+    }
+    return { x: bestX, y: bestY };
+  }
+
+  function findPath(sx, sy, ex, ey) {
+    // Simple waypoint path: go to nearest road, travel along roads, exit to destination
+    var startRoad = findNearestRoadPoint(sx, sy);
+    var endRoad = findNearestRoadPoint(ex, ey);
+    var path = [];
+
+    // Step 1: walk to nearest road
+    if (Math.abs(sx - startRoad.x) > 5 || Math.abs(sy - startRoad.y) > 5) {
+      path.push(startRoad);
+    }
+
+    // Step 2: navigate on road grid (L-shaped: first horizontal, then vertical, or vice versa)
+    // Try both orderings, pick the one that doesn't cut through buildings
+    var midA = { x: endRoad.x, y: startRoad.y }; // go horizontal first
+    var midB = { x: startRoad.x, y: endRoad.y }; // go vertical first
+
+    // Use whichever intermediate point is closer to a road center
+    var useA = isOnRoad(midA.x, midA.y);
+    var useB = isOnRoad(midB.x, midB.y);
+    if (useA) {
+      path.push(midA);
+    } else if (useB) {
+      path.push(midB);
+    } else {
+      // Find nearest intersection as intermediate
+      var bestWp = null, bestD = Infinity;
+      for (var w = 0; w < WAYPOINTS.length; w++) {
+        var wp = WAYPOINTS[w];
+        var d = Math.abs(wp.x - startRoad.x) + Math.abs(wp.y - startRoad.y) +
+                Math.abs(wp.x - endRoad.x) + Math.abs(wp.y - endRoad.y);
+        if (d < bestD) { bestD = d; bestWp = wp; }
+      }
+      if (bestWp) path.push(bestWp);
+    }
+
+    // Step 3: go to road point near destination
+    if (Math.abs(endRoad.x - (path.length > 0 ? path[path.length-1].x : sx)) > 5 ||
+        Math.abs(endRoad.y - (path.length > 0 ? path[path.length-1].y : sy)) > 5) {
+      path.push(endRoad);
+    }
+
+    // Step 4: walk to destination
+    path.push({ x: ex, y: ey });
+    return path;
+  }
+
+  function isOnRoad(px, py) {
+    for (var i = 0; i < H_ROADS.length; i++) {
+      if (py >= H_ROADS[i].y && py <= H_ROADS[i].y + H_ROADS[i].h) return true;
+    }
+    for (var j = 0; j < V_ROADS.length; j++) {
+      if (px >= V_ROADS[j].x && px <= V_ROADS[j].x + V_ROADS[j].w) return true;
+    }
+    return false;
+  }
+
   // ── Town Object ──
   var Town = {
     canvas: null,
     camera: { x: 0, y: 0 },
     nearbyBuilding: null,
     moveTarget: null,
+    _pathWaypoints: null, // Array of {x,y} waypoints for road navigation
     autoEnterBuilding: null,
     BUILDINGS: BUILDINGS,
 
@@ -227,6 +321,7 @@
           }
         }
 
+        self._pathWaypoints = null; // Clear existing path
         if (tappedBuilding) {
           self.moveTarget = { x: tappedBuilding.x + tappedBuilding.w / 2, y: tappedBuilding.y + tappedBuilding.h + 30 };
           self.autoEnterBuilding = tappedBuilding;
@@ -330,64 +425,126 @@
       this._buildingMeshes = [];
       this._buildingEdgeMeshes = [];
 
+      // Height variation per building type
+      var heightScale = { mine: 0.5, hardware: 0.4, exchange: 0.55, bank: 0.6,
+        diner: 0.25, coffee: 0.2, university: 0.5, hospital: 0.55,
+        internet_cafe: 0.3, casino: 0.45, post_office: 0.3, gym: 0.35,
+        real_estate: 0.3, car_dealer: 0.25, pet_shop: 0.25, pawn_shop: 0.25,
+        utility: 0.4, apartment: 0.35 };
+
       for (var i = 0; i < BUILDINGS.length; i++) {
         var b = BUILDINGS[i];
         var rgb = hexToRGB(b.color);
-        var buildingHeight = Math.max(b.w, b.h) * 0.35;
+        var hs = heightScale[b.panelType] || 0.35;
+        var buildingHeight = Math.max(b.w, b.h) * hs;
 
-        // Building body - semi-transparent dark with colored tint
+        // Building group
+        var bGroup = new THREE.Group();
+
+        // Main building body - darker, more realistic
         var bodyMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(rgb.r * 0.15, rgb.g * 0.15, rgb.b * 0.15),
-          roughness: 0.7,
-          metalness: 0.3,
-          transparent: true,
-          opacity: 0.9
+          color: new THREE.Color(rgb.r * 0.12 + 0.04, rgb.g * 0.12 + 0.04, rgb.b * 0.12 + 0.04),
+          roughness: 0.85,
+          metalness: 0.15
         });
         var bodyGeo = new THREE.BoxGeometry(b.w, buildingHeight, b.h);
         var bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
         bodyMesh.position.set(b.x + b.w / 2, buildingHeight / 2, b.y + b.h / 2);
         bodyMesh.castShadow = true;
         bodyMesh.receiveShadow = true;
-        this._scene.add(bodyMesh);
+        bGroup.add(bodyMesh);
         this._buildingMeshes.push(bodyMesh);
 
         // Neon edge wireframe
         var edgeGeo = new THREE.EdgesGeometry(bodyGeo);
         var edgeMat = new THREE.LineBasicMaterial({
-          color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+          color: new THREE.Color(rgb.r * 0.7, rgb.g * 0.7, rgb.b * 0.7),
           transparent: true,
-          opacity: 0.6
+          opacity: 0.4
         });
         var edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
         edgeMesh.position.copy(bodyMesh.position);
-        this._scene.add(edgeMesh);
+        bGroup.add(edgeMesh);
         this._buildingEdgeMeshes.push(edgeMesh);
 
-        // Roof accent - glowing top plane
-        var roofGeo = new THREE.PlaneGeometry(b.w - 2, b.h - 2);
-        var roofMat = new THREE.MeshBasicMaterial({
-          color: new THREE.Color(rgb.r * 0.3, rgb.g * 0.3, rgb.b * 0.3),
-          transparent: true,
-          opacity: 0.4
+        // Windows - rows of small glowing rectangles on front face
+        var winColor = new THREE.Color(rgb.r * 0.5 + 0.3, rgb.g * 0.5 + 0.3, rgb.b * 0.5 + 0.1);
+        var winMat = new THREE.MeshBasicMaterial({ color: winColor, transparent: true, opacity: 0.6 });
+        var floors = Math.max(1, Math.floor(buildingHeight / 25));
+        var cols = Math.max(1, Math.floor(b.w / 40));
+        var winW = 12, winH = 10;
+        for (var fl = 0; fl < floors; fl++) {
+          for (var wc = 0; wc < cols; wc++) {
+            var wGeo = new THREE.PlaneGeometry(winW, winH);
+            // Front face windows
+            var wMesh = new THREE.Mesh(wGeo, winMat);
+            var wx = b.x + 20 + wc * (b.w - 40) / Math.max(1, cols - 1);
+            if (cols === 1) wx = b.x + b.w / 2;
+            var wy = 12 + fl * 25;
+            wMesh.position.set(wx, wy, b.y + b.h + 0.5);
+            bGroup.add(wMesh);
+            // Back face windows
+            var wBack = new THREE.Mesh(wGeo, winMat);
+            wBack.position.set(wx, wy, b.y - 0.5);
+            wBack.rotation.y = Math.PI;
+            bGroup.add(wBack);
+          }
+        }
+        // Side windows
+        var sideCols = Math.max(1, Math.floor(b.h / 40));
+        for (var fl2 = 0; fl2 < floors; fl2++) {
+          for (var sc = 0; sc < sideCols; sc++) {
+            var sGeo = new THREE.PlaneGeometry(winW, winH);
+            var sz = b.y + 20 + sc * (b.h - 40) / Math.max(1, sideCols - 1);
+            if (sideCols === 1) sz = b.y + b.h / 2;
+            var sy = 12 + fl2 * 25;
+            var sRight = new THREE.Mesh(sGeo, winMat);
+            sRight.position.set(b.x + b.w + 0.5, sy, sz);
+            sRight.rotation.y = Math.PI / 2;
+            bGroup.add(sRight);
+            var sLeft = new THREE.Mesh(sGeo, winMat);
+            sLeft.position.set(b.x - 0.5, sy, sz);
+            sLeft.rotation.y = -Math.PI / 2;
+            bGroup.add(sLeft);
+          }
+        }
+
+        // Roof - slightly darker with subtle color
+        var roofGeo = new THREE.PlaneGeometry(b.w + 4, b.h + 4);
+        var roofMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(rgb.r * 0.08 + 0.02, rgb.g * 0.08 + 0.02, rgb.b * 0.08 + 0.02),
+          roughness: 0.9, metalness: 0.1
         });
         var roofMesh = new THREE.Mesh(roofGeo, roofMat);
         roofMesh.rotation.x = -Math.PI / 2;
         roofMesh.position.set(b.x + b.w / 2, buildingHeight + 0.5, b.y + b.h / 2);
-        this._scene.add(roofMesh);
+        bGroup.add(roofMesh);
+
+        // Neon sign strip at top of building (colored band)
+        var signGeo = new THREE.BoxGeometry(b.w + 1, 3, b.h + 1);
+        var signMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+          transparent: true, opacity: 0.3
+        });
+        var signMesh = new THREE.Mesh(signGeo, signMat);
+        signMesh.position.set(b.x + b.w / 2, buildingHeight - 1, b.y + b.h / 2);
+        bGroup.add(signMesh);
 
         // Emoji sprite above building
         var emojiSprite = makeEmojiSprite(b.emoji, 56);
-        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + 28, b.y + b.h / 2);
-        this._scene.add(emojiSprite);
+        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + 32, b.y + b.h / 2);
+        bGroup.add(emojiSprite);
 
-        // Name label sprite below emoji
+        // Name label sprite
         var labelSprite = makeTextSprite(b.name, { fontSize: 36, color: '#e8e8f0', bold: true });
-        labelSprite.position.set(b.x + b.w / 2, buildingHeight + 10, b.y + b.h / 2);
-        this._scene.add(labelSprite);
+        labelSprite.position.set(b.x + b.w / 2, buildingHeight + 14, b.y + b.h / 2);
+        bGroup.add(labelSprite);
 
-        // Ground glow (subtle colored light at building base)
-        var glow = new THREE.PointLight(new THREE.Color(rgb.r, rgb.g, rgb.b), 0.15, Math.max(b.w, b.h) * 1.2);
-        glow.position.set(b.x + b.w / 2, 5, b.y + b.h / 2);
+        this._scene.add(bGroup);
+
+        // Ground glow
+        var glow = new THREE.PointLight(new THREE.Color(rgb.r, rgb.g, rgb.b), 0.2, Math.max(b.w, b.h) * 1.5);
+        glow.position.set(b.x + b.w / 2, 3, b.y + b.h / 2);
         this._scene.add(glow);
       }
     },
@@ -487,19 +644,30 @@
 
       if (dx !== 0 || dy !== 0) {
         this.moveTarget = null;
+        this._pathWaypoints = null;
       }
 
       if (this.moveTarget && dx === 0 && dy === 0) {
-        var tdx = this.moveTarget.x - av.x;
-        var tdy = this.moveTarget.y - av.y;
+        // Initialize path if needed
+        if (!this._pathWaypoints) {
+          this._pathWaypoints = findPath(av.x, av.y, this.moveTarget.x, this.moveTarget.y);
+        }
+        // Follow waypoints
+        var currentWP = this._pathWaypoints.length > 0 ? this._pathWaypoints[0] : this.moveTarget;
+        var tdx = currentWP.x - av.x;
+        var tdy = currentWP.y - av.y;
         var dist = Math.sqrt(tdx * tdx + tdy * tdy);
         if (dist < 12) {
-          this.moveTarget = null;
-          if (this.autoEnterBuilding && !UI.panelOpen) {
-            var ab = this.autoEnterBuilding;
-            this.autoEnterBuilding = null;
-            if (this.getNearbyBuilding() === ab) {
-              setTimeout(function() { UI.showPanel(ab); }, 100);
+          if (this._pathWaypoints.length > 0) this._pathWaypoints.shift();
+          if (this._pathWaypoints.length === 0) {
+            this.moveTarget = null;
+            this._pathWaypoints = null;
+            if (this.autoEnterBuilding && !UI.panelOpen) {
+              var ab = this.autoEnterBuilding;
+              this.autoEnterBuilding = null;
+              if (this.getNearbyBuilding() === ab) {
+                setTimeout(function() { UI.showPanel(ab); }, 100);
+              }
             }
           }
         } else {
@@ -524,13 +692,19 @@
 
       if (!this.collidesBuilding(newX, av.y)) {
         av.x = newX;
+      } else if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+        this._pathWaypoints.shift(); // Skip to next waypoint on collision
       } else {
         this.moveTarget = null;
+        this._pathWaypoints = null;
       }
       if (!this.collidesBuilding(av.x, newY)) {
         av.y = newY;
+      } else if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+        this._pathWaypoints.shift();
       } else {
         this.moveTarget = null;
+        this._pathWaypoints = null;
       }
 
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));

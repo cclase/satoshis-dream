@@ -42,71 +42,80 @@
   ];
 
   // ── Helpers ──
-  function hexToRGB(hex) {
+  function hexToColor3(hex) {
     hex = hex.replace('#', '');
     if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-    return {
-      r: parseInt(hex.substring(0,2), 16) / 255,
-      g: parseInt(hex.substring(2,4), 16) / 255,
-      b: parseInt(hex.substring(4,6), 16) / 255
-    };
+    return new BABYLON.Color3(
+      parseInt(hex.substring(0,2), 16) / 255,
+      parseInt(hex.substring(2,4), 16) / 255,
+      parseInt(hex.substring(4,6), 16) / 255
+    );
   }
 
-  function makeTextSprite(text, opts) {
-    opts = opts || {};
-    var fontSize = opts.fontSize || 48;
-    var color = opts.color || '#e8e8f0';
-    var bold = opts.bold !== false;
-
-    var canvas = document.createElement('canvas');
-    var ctx = canvas.getContext('2d');
-    var font = (bold ? 'bold ' : '') + fontSize + 'px -apple-system, system-ui, sans-serif';
-    ctx.font = font;
-    var metrics = ctx.measureText(text);
-    var tw = Math.ceil(metrics.width) + 16;
-    var th = fontSize + 16;
-    // Power-of-two sizing for texture
-    canvas.width = nextPow2(tw);
-    canvas.height = nextPow2(th);
-
-    ctx.font = font;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = color;
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
-    var tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter;
-    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-    var sprite = new THREE.Sprite(mat);
-    sprite.scale.set(canvas.width / 4, canvas.height / 4, 1);
-    sprite._canvasEl = canvas;
-    return sprite;
+  function makeBrickCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    var ctx = c.getContext('2d');
+    var r = parseInt(baseHex.substr(1,2),16), g = parseInt(baseHex.substr(3,2),16), bl = parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle = '#a09080'; ctx.fillRect(0,0,128,128);
+    var bw = 28, bh = 12, gap = 3;
+    for (var row = 0; row * (bh+gap) < 128; row++) {
+      var off = (row%2) * (bw/2);
+      for (var col = -1; col * (bw+gap) < 140; col++) {
+        var v = (Math.random()-0.5)*25;
+        ctx.fillStyle = 'rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(off + col*(bw+gap), row*(bh+gap), bw, bh);
+      }
+    }
+    return c;
   }
 
-  function makeEmojiSprite(emoji, size) {
-    size = size || 64;
-    var canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    var ctx = canvas.getContext('2d');
-    ctx.font = size + 'px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, 64, 64);
-
-    var tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter;
-    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-    var sprite = new THREE.Sprite(mat);
-    sprite.scale.set(32, 32, 1);
-    return sprite;
+  function makeStuccoCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = baseHex; ctx.fillRect(0,0,128,128);
+    var id = ctx.getImageData(0,0,128,128);
+    for (var i = 0; i < id.data.length; i+=4) {
+      var n = (Math.random()-0.5)*18;
+      id.data[i] = Math.max(0,Math.min(255,id.data[i]+n));
+      id.data[i+1] = Math.max(0,Math.min(255,id.data[i+1]+n));
+      id.data[i+2] = Math.max(0,Math.min(255,id.data[i+2]+n));
+    }
+    ctx.putImageData(id,0,0);
+    return c;
   }
 
-  function nextPow2(v) {
-    v--;
-    v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16;
-    return v + 1;
+  function makeStoneCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    var ctx = c.getContext('2d');
+    var r = parseInt(baseHex.substr(1,2),16), g = parseInt(baseHex.substr(3,2),16), bl = parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle = '#888880'; ctx.fillRect(0,0,128,128);
+    var rowH = 22, gap2 = 3;
+    for (var row = 0; row * (rowH+gap2) < 140; row++) {
+      var off = (row%2) * 20; var x = -off;
+      while (x < 128) {
+        var sw = 28 + Math.floor(Math.random()*20);
+        var v = (Math.random()-0.5)*20;
+        ctx.fillStyle = 'rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(x+gap2, row*(rowH+gap2)+gap2, sw-gap2, rowH-gap2); x += sw;
+      }
+    }
+    return c;
+  }
+
+  function makeRoofCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = baseHex; ctx.fillRect(0,0,128,128);
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+    for (var row = 0; row < 13; row++) {
+      var y = row * 10;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(128,y); ctx.stroke();
+      var off = (row%2)*14;
+      for (var x = off; x < 128; x += 28) {
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+10); ctx.stroke();
+      }
+    }
+    return c;
   }
 
   // ── Road Pathfinding ──

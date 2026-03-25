@@ -79,49 +79,64 @@
   }
 
   function findPath(sx, sy, ex, ey) {
-    // Simple waypoint path: go to nearest road, travel along roads, exit to destination
-    var startRoad = findNearestRoadPoint(sx, sy);
-    var endRoad = findNearestRoadPoint(ex, ey);
+    // Route through nearest road intersections to avoid buildings
+    // Find nearest intersection to start and end
+    var startInt = nearestIntersection(sx, sy);
+    var endInt = nearestIntersection(ex, ey);
     var path = [];
 
-    // Step 1: walk to nearest road
-    if (Math.abs(sx - startRoad.x) > 5 || Math.abs(sy - startRoad.y) > 5) {
-      path.push(startRoad);
-    }
+    // Step 1: walk to nearest intersection
+    path.push(startInt);
 
-    // Step 2: navigate on road grid (L-shaped: first horizontal, then vertical, or vice versa)
-    // Try both orderings, pick the one that doesn't cut through buildings
-    var midA = { x: endRoad.x, y: startRoad.y }; // go horizontal first
-    var midB = { x: startRoad.x, y: endRoad.y }; // go vertical first
-
-    // Use whichever intermediate point is closer to a road center
-    var useA = isOnRoad(midA.x, midA.y);
-    var useB = isOnRoad(midB.x, midB.y);
-    if (useA) {
-      path.push(midA);
-    } else if (useB) {
-      path.push(midB);
+    // Step 2: travel along road grid via intersections
+    // If start and end are on same H road or same V road, go direct
+    if (startInt.x === endInt.x || startInt.y === endInt.y) {
+      // Same axis, go direct
+      if (startInt.x !== endInt.x || startInt.y !== endInt.y) path.push(endInt);
     } else {
-      // Find nearest intersection as intermediate
-      var bestWp = null, bestD = Infinity;
-      for (var w = 0; w < WAYPOINTS.length; w++) {
-        var wp = WAYPOINTS[w];
-        var d = Math.abs(wp.x - startRoad.x) + Math.abs(wp.y - startRoad.y) +
-                Math.abs(wp.x - endRoad.x) + Math.abs(wp.y - endRoad.y);
-        if (d < bestD) { bestD = d; bestWp = wp; }
+      // Need an L-shaped turn through a shared intersection
+      // Option A: go horizontal on startInt.y, turn at endInt.x
+      var cornerA = { x: endInt.x, y: startInt.y };
+      // Option B: go vertical on startInt.x, turn at endInt.y
+      var cornerB = { x: startInt.x, y: endInt.y };
+      // Pick the corner that's an actual intersection (both coords on roads)
+      var aValid = isIntersection(cornerA.x, cornerA.y);
+      var bValid = isIntersection(cornerB.x, cornerB.y);
+      if (aValid) { path.push(cornerA); }
+      else if (bValid) { path.push(cornerB); }
+      else {
+        // Neither is a clean intersection — route through closest real intersection
+        var best = null, bestD = Infinity;
+        for (var w = 0; w < WAYPOINTS.length; w++) {
+          var wp = WAYPOINTS[w];
+          var d = Math.abs(wp.x - startInt.x) + Math.abs(wp.y - startInt.y) +
+                  Math.abs(wp.x - endInt.x) + Math.abs(wp.y - endInt.y);
+          if (d < bestD) { bestD = d; best = wp; }
+        }
+        if (best) path.push(best);
       }
-      if (bestWp) path.push(bestWp);
+      path.push(endInt);
     }
 
-    // Step 3: go to road point near destination
-    if (Math.abs(endRoad.x - (path.length > 0 ? path[path.length-1].x : sx)) > 5 ||
-        Math.abs(endRoad.y - (path.length > 0 ? path[path.length-1].y : sy)) > 5) {
-      path.push(endRoad);
-    }
-
-    // Step 4: walk to destination
+    // Step 3: walk from last intersection to destination
     path.push({ x: ex, y: ey });
     return path;
+  }
+
+  function nearestIntersection(px, py) {
+    var best = WAYPOINTS[0], bestD = Infinity;
+    for (var i = 0; i < WAYPOINTS.length; i++) {
+      var d = Math.abs(WAYPOINTS[i].x - px) + Math.abs(WAYPOINTS[i].y - py);
+      if (d < bestD) { bestD = d; best = WAYPOINTS[i]; }
+    }
+    return { x: best.x, y: best.y };
+  }
+
+  function isIntersection(px, py) {
+    var onH = false, onV = false;
+    for (var i = 0; i < ROAD_CENTERS_H.length; i++) { if (Math.abs(py - ROAD_CENTERS_H[i]) < 5) { onH = true; break; } }
+    for (var j = 0; j < ROAD_CENTERS_V.length; j++) { if (Math.abs(px - ROAD_CENTERS_V[j]) < 5) { onV = true; break; } }
+    return onH && onV;
   }
 
   function isOnRoad(px, py) {

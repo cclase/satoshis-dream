@@ -172,6 +172,7 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1FA99}</div>' +
           '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
+          '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
           '<div class="heat-bar"><div class="heat-fill" id="heatFill"></div></div>' +
@@ -185,6 +186,7 @@
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
+      document.getElementById('hudSaveSlots').addEventListener('click', function() { UI.showSaveSlotsModal(); });
     },
 
     updateHUD: function() {
@@ -1086,6 +1088,84 @@
             UI.toast('\u{1FA99} Unlocked: ' + (pu ? pu.name : id));
             UI.showPrestigeShopPanel(); // refresh
           }
+        });
+      });
+    },
+
+    // ═══════════════════════════════════════
+    // SAVE SLOTS MODAL
+    // ═══════════════════════════════════════
+    showSaveSlotsModal: function() {
+      var modal = document.getElementById('modal');
+      modal.classList.add('active');
+      this._renderSaveSlots(modal);
+    },
+    _renderSaveSlots: function(modal) {
+      var slots = Game.getSaveSlots();
+      var html = '<div class="modal-card">' +
+        '<div class="modal-title">\u{1F4BE} Save Slots</div>' +
+        '<p style="color:var(--dim);text-align:center;margin-bottom:16px;font-size:12px;">Save or load your game to any slot</p>';
+
+      for (var i = 0; i < 4; i++) {
+        var slot = slots[i];
+        var isEmpty = !slot || !slot.name;
+        var timeStr = '';
+        if (slot && slot.savedAt) {
+          var d = new Date(slot.savedAt);
+          timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        }
+        html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:800;font-size:13px;color:var(--text);">Slot ' + (i + 1) + (isEmpty ? ' <span style="color:var(--dim);font-weight:400;">- Empty</span>' : '') + '</div>' +
+            (isEmpty ? '' :
+              '<div style="font-size:11px;color:var(--dim);margin-top:2px;">' + slot.name + ' \u2022 ' + Game.formatNumber(slot.sats) + ' lifetime sats \u2022 \u{1FA99} ' + slot.tokens + '</div>' +
+              '<div style="font-size:10px;color:var(--dim);">' + timeStr + '</div>') +
+          '</div>' +
+          '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+            '<button class="slot-btn slot-save" data-slot-save="' + i + '" style="background:var(--green);color:var(--bg);border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Save</button>' +
+            (isEmpty ? '' : '<button class="slot-btn slot-load" data-slot-load="' + i + '" style="background:var(--blue);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">Load</button>') +
+            (isEmpty ? '' : '<button class="slot-btn slot-del" data-slot-del="' + i + '" style="background:var(--red);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">\u2715</button>') +
+          '</div>' +
+        '</div>';
+      }
+
+      html += '<button class="modal-btn" id="slotClose" style="background:var(--card);color:var(--text);border:1px solid var(--border);margin-top:8px;">Close</button></div>';
+      modal.innerHTML = html;
+
+      document.getElementById('slotClose').addEventListener('click', function() {
+        modal.classList.remove('active'); modal.innerHTML = '';
+      });
+
+      var self = this;
+      modal.querySelectorAll('[data-slot-save]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.slotSave);
+          Game.saveToSlot(idx);
+          self.toast('\u{1F4BE} Saved to Slot ' + (idx + 1));
+          self._renderSaveSlots(modal);
+        });
+      });
+      modal.querySelectorAll('[data-slot-load]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.slotLoad);
+          if (Game.loadFromSlot(idx)) {
+            modal.classList.remove('active'); modal.innerHTML = '';
+            Game.running = false;
+            Game.floatingTexts = [];
+            Game.init();
+            self.hidePanel();
+            self.setupHUD();
+            if (!Game.state.avatar) self.showAvatarCreation();
+            else { self.startGame(); self.toast('\u{1F4BE} Loaded Slot ' + (idx + 1)); }
+          }
+        });
+      });
+      modal.querySelectorAll('[data-slot-del]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.slotDel);
+          Game.deleteSlot(idx);
+          self.toast('Slot ' + (idx + 1) + ' deleted');
+          self._renderSaveSlots(modal);
         });
       });
     },

@@ -208,6 +208,49 @@
 
     save: function() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.state)); },
 
+    // ── Save Slots ──
+    getSaveSlots: function() {
+      var slots = [];
+      for (var i = 0; i < 4; i++) {
+        var data = localStorage.getItem('sd_slot_' + i);
+        if (data) {
+          try {
+            var parsed = JSON.parse(data);
+            slots.push({ index: i, name: parsed.avatar ? parsed.avatar.name : 'Unknown', sats: parsed.lifetimeSats || 0, tokens: parsed.tokens || 0, savedAt: parsed._savedAt || 0 });
+          } catch(e) { slots.push(null); }
+        } else { slots.push(null); }
+      }
+      return slots;
+    },
+
+    saveToSlot: function(index) {
+      if (index < 0 || index > 3) return false;
+      var data = JSON.parse(JSON.stringify(this.state));
+      data._savedAt = Date.now();
+      localStorage.setItem('sd_slot_' + index, JSON.stringify(data));
+      return true;
+    },
+
+    loadFromSlot: function(index) {
+      if (index < 0 || index > 3) return false;
+      var data = localStorage.getItem('sd_slot_' + index);
+      if (!data) return false;
+      try {
+        var parsed = JSON.parse(data);
+        var def = defaultState();
+        for (var k in def) { if (parsed[k] === undefined) parsed[k] = def[k]; }
+        this.state = parsed;
+        this.state.lastTick = Date.now();
+        this.save();
+        return true;
+      } catch(e) { return false; }
+    },
+
+    deleteSlot: function(index) {
+      if (index < 0 || index > 3) return;
+      localStorage.removeItem('sd_slot_' + index);
+    },
+
     // ── Economy ──
     getBulkCost: function(item, count) {
       var total = 0, owned = this.state.owned[item.id] || 0;

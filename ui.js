@@ -886,8 +886,8 @@
       return '<div class="panel-body">' +
         '<p style="margin-bottom:8px;font-weight:800;">' + (h ? h.name : 'Studio') + '</p>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Rig Slots</span><span>' + Game.getUsedSlots() + ' / ' + Game.getMaxSlots() + '</span></div>' +
-        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Vehicle</span><span>' + (s.vehicle ? Game.VEHICLES.find(function(v){return v.id===s.vehicle;}).name : 'None') + '</span></div>' +
-        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Pet</span><span>' + (s.pet ? Game.PETS.find(function(p){return p.id===s.pet;}).name : 'None') + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Vehicle</span><span>' + (s.vehicle ? (Game.VEHICLES.find(function(v){return v.id===s.vehicle;}) || {}).name || 'Unknown' : 'None') + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Pet</span><span>' + (s.pet ? (Game.PETS.find(function(p){return p.id===s.pet;}) || {}).name || 'Unknown' : 'None') + '</span></div>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Research</span><span>' + Object.keys(s.research).length + '/' + Game.RESEARCH.length + '</span></div>' +
         '</div>';
     },
@@ -939,7 +939,7 @@
       });
       var self = this;
       startBtn.addEventListener('click', function() {
-        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 1024, y: 1560 };
+        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 750, y: 1560 };
         if (selectedBonus === 'trustfund') Game.state.usd += 50;
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();

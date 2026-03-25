@@ -1130,11 +1130,38 @@
         '</div>';
       }
 
-      html += '<button class="modal-btn" id="slotClose" style="background:var(--card);color:var(--text);border:1px solid var(--border);margin-top:8px;">Close</button></div>';
+      html += '<div style="display:flex;gap:8px;margin-top:8px;">' +
+        '<button class="modal-btn" id="slotClose" style="flex:1;background:var(--card);color:var(--text);border:1px solid var(--border);">Close</button>' +
+        '<button class="modal-btn" id="slotReset" style="flex:0 0 auto;background:var(--red);color:white;padding:14px 20px;">\u{1F5D1} Reset All</button>' +
+        '</div></div>';
       modal.innerHTML = html;
 
       document.getElementById('slotClose').addEventListener('click', function() {
         modal.classList.remove('active'); modal.innerHTML = '';
+      });
+      document.getElementById('slotReset').addEventListener('click', function() {
+        modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
+          '<div class="modal-title" style="color:var(--red);">\u{1F5D1} Reset Everything?</div>' +
+          '<p style="color:var(--dim);margin-bottom:20px;font-size:14px;">This will delete ALL progress, tokens, upgrades, and achievements.<br>Cannot be undone.</p>' +
+          '<div style="display:flex;gap:10px;">' +
+            '<button class="modal-btn" id="hardResetCancel" style="background:var(--card);color:var(--text);border:1px solid var(--border);">Cancel</button>' +
+            '<button class="modal-btn" id="hardResetConfirm" style="background:var(--red);color:white;">Delete Everything</button>' +
+          '</div></div>';
+        document.getElementById('hardResetCancel').addEventListener('click', function() { modal.classList.remove('active'); modal.innerHTML = ''; });
+        document.getElementById('hardResetConfirm').addEventListener('click', function() {
+          localStorage.removeItem('sd_town_v1');
+          for (var i = 0; i < 4; i++) localStorage.removeItem('sd_slot_' + i);
+          Game.running = false;
+          Game.state = Game.state.__proto__ && Game.state.__proto__.constructor ? new (Game.state.__proto__.constructor)() : {};
+          Object.assign(Game.state, {avatar:null,sats:0,usd:0,totalSats:0,lifetimeSats:0,heat:0,owned:{},tokens:0,price:65000,buyMulti:1,priceEvent:null,nextEventAt:0,housing:'studio',vehicle:null,pet:null,energy:100,research:{},loans:[],loanTime:0,electricityBill:0,electricitySolar:0,policeRisk:0,mailOrders:[],gymLevel:0,health:100,casinoLock:0,prestigeUpgrades:{},achievements:{},version:3,lastTick:Date.now()});
+          Game.floatingTexts = [];
+          Game.init();
+          modal.classList.remove('active'); modal.innerHTML = '';
+          UI.hidePanel();
+          UI.setupHUD();
+          UI.showAvatarCreation();
+          UI.toast('Game reset completely');
+        });
       });
 
       var self = this;

@@ -509,18 +509,19 @@
           }
         }
 
-        // Roof - slightly darker with subtle color
+        // Roof - slightly darker with subtle color, raised to avoid Z-fighting
         var roofGeo = new THREE.PlaneGeometry(b.w + 4, b.h + 4);
         var roofMat = new THREE.MeshStandardMaterial({
           color: new THREE.Color(rgb.r * 0.08 + 0.02, rgb.g * 0.08 + 0.02, rgb.b * 0.08 + 0.02),
-          roughness: 0.9, metalness: 0.1
+          roughness: 0.9, metalness: 0.1,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
         });
         var roofMesh = new THREE.Mesh(roofGeo, roofMat);
         roofMesh.rotation.x = -Math.PI / 2;
-        roofMesh.position.set(b.x + b.w / 2, buildingHeight + 0.5, b.y + b.h / 2);
+        roofMesh.position.set(b.x + b.w / 2, buildingHeight + 2, b.y + b.h / 2);
         bGroup.add(roofMesh);
 
-        // Neon sign strip at top of building (colored band)
+        // Neon sign strip at top of building (colored band), offset down from roof
         var signGeo = new THREE.BoxGeometry(b.w + 1, 3, b.h + 1);
         var signMat = new THREE.MeshBasicMaterial({
           color: new THREE.Color(rgb.r, rgb.g, rgb.b),

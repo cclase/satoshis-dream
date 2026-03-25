@@ -236,13 +236,13 @@
       this._renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: false });
       this._renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       this._renderer.setSize(canvasEl.clientWidth, canvasEl.clientHeight);
-      this._renderer.setClearColor(0x050510, 1);
+      this._renderer.setClearColor(0x1a1520, 1);
       this._renderer.shadowMap.enabled = true;
       this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       // Scene
       this._scene = new THREE.Scene();
-      this._scene.fog = new THREE.FogExp2(0x050510, 0.00025);
+      this._scene.fog = new THREE.FogExp2(0x2a1a25, 0.0002);
 
       // Camera - isometric-like perspective
       var aspect = canvasEl.clientWidth / canvasEl.clientHeight;
@@ -252,11 +252,14 @@
       this._camera3.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
 
       // Lighting
-      var ambient = new THREE.AmbientLight(0x222244, 0.6);
+      var ambient = new THREE.AmbientLight(0x8877aa, 0.4);
       this._scene.add(ambient);
 
-      var dirLight = new THREE.DirectionalLight(0x8888cc, 0.5);
-      dirLight.position.set(400, 800, 200);
+      var hemiLight = new THREE.HemisphereLight(0xffeedd, 0x223344, 0.3);
+      this._scene.add(hemiLight);
+
+      var dirLight = new THREE.DirectionalLight(0xffcc88, 0.8);
+      dirLight.position.set(-300, 600, -200);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.width = 2048;
       dirLight.shadow.mapSize.height = 2048;
@@ -268,8 +271,8 @@
       dirLight.shadow.camera.bottom = -1500;
       this._scene.add(dirLight);
 
-      // Subtle point light for cyberpunk glow
-      var pointLight = new THREE.PointLight(0xf7931a, 0.3, 2000);
+      // Warm point light
+      var pointLight = new THREE.PointLight(0xffaa44, 0.4, 2000);
       pointLight.position.set(WORLD_W / 2, 300, WORLD_H / 2);
       this._scene.add(pointLight);
 
@@ -277,9 +280,11 @@
       this._raycaster = new THREE.Raycaster();
 
       // Build the scene
+      this._buildSky();
       this._buildGround();
       this._buildRoads();
       this._buildBuildings();
+      this._buildTrees();
       this._buildAvatar();
       this._buildMoveTarget();
       this._buildPrompt();
@@ -345,7 +350,7 @@
       // Main ground plane
       var groundGeo = new THREE.PlaneGeometry(WORLD_W + 200, WORLD_H + 200);
       var groundMat = new THREE.MeshStandardMaterial({
-        color: 0x0a0a18,
+        color: 0x3a3530,
         roughness: 0.95,
         metalness: 0.1
       });
@@ -355,8 +360,8 @@
       this._groundPlane.receiveShadow = true;
       this._scene.add(this._groundPlane);
 
-      // Grid lines on ground
-      var gridMat = new THREE.LineBasicMaterial({ color: 0x0f0f22, transparent: true, opacity: 0.5 });
+      // Subtle grid lines on ground
+      var gridMat = new THREE.LineBasicMaterial({ color: 0x4a4540, transparent: true, opacity: 0.25 });
       var gridGeo = new THREE.BufferGeometry();
       var gridVerts = [];
       for (var gx = 0; gx <= WORLD_W; gx += 64) {
@@ -368,22 +373,54 @@
       gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridVerts, 3));
       var grid = new THREE.LineSegments(gridGeo, gridMat);
       this._scene.add(grid);
+
+      // Green grass patches between buildings
+      var grassMat = new THREE.MeshStandardMaterial({ color: 0x3a6630, roughness: 0.95, metalness: 0.0 });
+      var rng = function(seed) { return ((Math.sin(seed * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1; };
+      for (var gi = 0; gi < 20; gi++) {
+        var gpx = rng(gi * 3 + 1) * WORLD_W;
+        var gpz = rng(gi * 3 + 2) * WORLD_H;
+        // Skip if on a building or road
+        var onBuilding = false;
+        for (var bi = 0; bi < BUILDINGS.length; bi++) {
+          var bb = BUILDINGS[bi];
+          if (gpx >= bb.x - 20 && gpx <= bb.x + bb.w + 20 && gpz >= bb.y - 20 && gpz <= bb.y + bb.h + 20) { onBuilding = true; break; }
+        }
+        if (onBuilding) continue;
+        var onRoad = false;
+        for (var ri = 0; ri < H_ROADS.length; ri++) { if (gpz >= H_ROADS[ri].y - 10 && gpz <= H_ROADS[ri].y + H_ROADS[ri].h + 10) { onRoad = true; break; } }
+        for (var vi = 0; vi < V_ROADS.length; vi++) { if (gpx >= V_ROADS[vi].x - 10 && gpx <= V_ROADS[vi].x + V_ROADS[vi].w + 10) { onRoad = true; break; } }
+        if (onRoad) continue;
+        var gSize = 30 + rng(gi * 7) * 50;
+        var grassGeo = new THREE.PlaneGeometry(gSize, gSize);
+        var grassMesh = new THREE.Mesh(grassGeo, grassMat);
+        grassMesh.rotation.x = -Math.PI / 2;
+        grassMesh.position.set(gpx, 0.15, gpz);
+        this._scene.add(grassMesh);
+      }
     },
 
     _buildRoads: function() {
       var roadMat = new THREE.MeshStandardMaterial({
-        color: 0x0d0d20,
+        color: 0x555550,
         roughness: 0.9,
         metalness: 0.05
       });
+      var sidewalkMat = new THREE.MeshStandardMaterial({
+        color: 0x998877,
+        roughness: 0.85,
+        metalness: 0.02
+      });
 
-      // Dashed center-line material
+      // Dashed yellow center-line material
       var lineMat = new THREE.LineDashedMaterial({
-        color: 0x1a1a30,
+        color: 0xcccc99,
         dashSize: 20,
         gapSize: 15,
         linewidth: 1
       });
+
+      var sidewalkW = 10;
 
       for (var ri = 0; ri < H_ROADS.length; ri++) {
         var hr = H_ROADS[ri];
@@ -392,6 +429,18 @@
         rMesh.rotation.x = -Math.PI / 2;
         rMesh.position.set(WORLD_W / 2, 0.2, hr.y + hr.h / 2);
         this._scene.add(rMesh);
+
+        // Sidewalks along both sides
+        var swGeoTop = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
+        var swTop = new THREE.Mesh(swGeoTop, sidewalkMat);
+        swTop.rotation.x = -Math.PI / 2;
+        swTop.position.set(WORLD_W / 2, 0.25, hr.y - sidewalkW / 2);
+        this._scene.add(swTop);
+        var swGeoBot = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
+        var swBot = new THREE.Mesh(swGeoBot, sidewalkMat);
+        swBot.rotation.x = -Math.PI / 2;
+        swBot.position.set(WORLD_W / 2, 0.25, hr.y + hr.h + sidewalkW / 2);
+        this._scene.add(swBot);
 
         // Center line
         var lineGeo = new THREE.BufferGeometry();
@@ -410,6 +459,18 @@
         vrMesh.rotation.x = -Math.PI / 2;
         vrMesh.position.set(vr.x + vr.w / 2, 0.2, WORLD_H / 2);
         this._scene.add(vrMesh);
+
+        // Sidewalks along both sides
+        var vswGeoL = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
+        var vswL = new THREE.Mesh(vswGeoL, sidewalkMat);
+        vswL.rotation.x = -Math.PI / 2;
+        vswL.position.set(vr.x - sidewalkW / 2, 0.25, WORLD_H / 2);
+        this._scene.add(vswL);
+        var vswGeoR = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
+        var vswR = new THREE.Mesh(vswGeoR, sidewalkMat);
+        vswR.rotation.x = -Math.PI / 2;
+        vswR.position.set(vr.x + vr.w + sidewalkW / 2, 0.25, WORLD_H / 2);
+        this._scene.add(vswR);
 
         var vlGeo = new THREE.BufferGeometry();
         vlGeo.setAttribute('position', new THREE.Float32BufferAttribute([

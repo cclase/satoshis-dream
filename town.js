@@ -209,9 +209,11 @@
       this._scene.fogDensity = 0.00015;
       this._scene.fogColor = new BABYLON.Color3(0.35, 0.2, 0.25);
 
-      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 500,
+      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
       this._camera3.inputs.clear();
+      this._camera3.lowerRadiusLimit = 300;
+      this._camera3.upperRadiusLimit = 1500;
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.5; hemi.diffuse = new BABYLON.Color3(1,0.9,0.7);
@@ -293,107 +295,107 @@
     },
 
     _buildBuildings: function() {
-      var s=this._scene; this._buildingMeshes=[];
-      var winMat=new BABYLON.StandardMaterial('winM',s);
-      winMat.emissiveColor=new BABYLON.Color3(1,0.93,0.8); winMat.diffuseColor=new BABYLON.Color3(0.1,0.1,0.1);
-      var doorMat=new BABYLON.StandardMaterial('doorM',s); doorMat.diffuseColor=new BABYLON.Color3(0.25,0.15,0.08);
+      var s = this._scene;
+      this._buildingMeshes = [];
+      // Map each building to a Kenney model (cycle through 5 models)
+      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      var self = this;
 
-      for(var i=0;i<BUILDINGS.length;i++){
-        var b=BUILDINGS[i]; var bt=b.panelType;
-        var bh=BLDG_HEIGHTS[bt]||40; var wallHex=WALL_COLORS[bt]||'#c0b0a0';
-        var roofHex=ROOF_COLORS[i%ROOF_COLORS.length];
+      for (var i = 0; i < BUILDINGS.length; i++) {
+        (function(idx) {
+          var b = BUILDINGS[idx];
+          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
 
-        // Wall texture
-        var wc; if(BRICK_TYPES.indexOf(bt)!==-1) wc=makeBrickCanvas(wallHex);
-        else if(STONE_TYPES.indexOf(bt)!==-1) wc=makeStoneCanvas(wallHex);
-        else wc=makeStuccoCanvas(wallHex);
-        var wmat=new BABYLON.StandardMaterial('wm'+b.id,s);
-        var wtex=new BABYLON.Texture(wc.toDataURL(),s); wmat.diffuseTexture=wtex;
+          // Load glb model
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+            if (!meshes.length) return;
+            var root = meshes[0];
+            // Get bounding info to scale properly
+            var bounds = root.getHierarchyBoundingVectors(true);
+            var modelW = bounds.max.x - bounds.min.x;
+            var modelH = bounds.max.y - bounds.min.y;
+            var modelD = bounds.max.z - bounds.min.z;
+            if (modelW < 0.01) modelW = 1;
+            if (modelH < 0.01) modelH = 1;
+            if (modelD < 0.01) modelD = 1;
 
-        // Body
-        var body=BABYLON.MeshBuilder.CreateBox('b'+b.id,{width:b.w,height:bh,depth:b.h},s);
-        body.position.set(b.x+b.w/2, bh/2, b.y+b.h/2);
-        body.material=wmat; body.receiveShadows=true;
-        this._shadowGen.addShadowCaster(body);
-        this._buildingMeshes.push(body);
+            // Scale model (1x1 unit) to fit building footprint (128-256 units)
+            var scaleX = b.w;
+            var scaleZ = b.h;
+            var scaleY = Math.min(b.w, b.h) * 0.8;
+            root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
-        // Peaked roof (pyramid)
-        var roof=BABYLON.MeshBuilder.CreateCylinder('r'+b.id,{diameterTop:0,diameterBottom:1,height:1,tessellation:4},s);
-        roof.scaling.set(b.w*1.1, bh*0.35, b.h*1.1);
-        roof.rotation.y=Math.PI/4;
-        roof.position.set(b.x+b.w/2, bh+(bh*0.35)/2, b.y+b.h/2);
-        var rc=makeRoofCanvas(roofHex);
-        var rmat=new BABYLON.StandardMaterial('rm'+b.id,s);
-        rmat.diffuseTexture=new BABYLON.Texture(rc.toDataURL(),s);
-        roof.material=rmat; roof.receiveShadows=true;
+            // Position at building location
+            root.position.x = b.x + b.w / 2;
+            root.position.z = b.y + b.h / 2;
+            root.position.y = 0;
 
-        // Windows
-        var floors=Math.max(1,Math.floor(bh*0.75/18));
-        var cols=Math.max(1,Math.floor(b.w/20));
-        var colStart=(b.x+b.w/2)-((cols-1)*20)/2;
-        for(var fl=0;fl<floors;fl++){for(var wci=0;wci<cols;wci++){
-          var wx=colStart+wci*20, wy=10+fl*18;
-          var wf=BABYLON.MeshBuilder.CreatePlane('wf'+b.id+fl+wci,{width:12,height:10},s);
-          wf.position.set(wx,wy,b.y+b.h+0.5); wf.material=winMat;
-          var wb=BABYLON.MeshBuilder.CreatePlane('wb'+b.id+fl+wci,{width:12,height:10},s);
-          wb.position.set(wx,wy,b.y-0.5); wb.rotation.y=Math.PI; wb.material=winMat;
-        }}
+            // Enable shadows on all child meshes
+            for (var mi = 0; mi < meshes.length; mi++) {
+              meshes[mi].receiveShadows = true;
+              if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
+            }
+            self._buildingMeshes.push(root);
+          });
 
-        // Door
-        var door=BABYLON.MeshBuilder.CreatePlane('d'+b.id,{width:14,height:20},s);
-        door.position.set(b.x+b.w/2,10,b.y+b.h+0.5); door.material=doorMat;
+          // Floating label (always visible, doesn't need model to load)
+          var bh = BLDG_HEIGHTS[b.panelType] || 40;
+          var ltex = new BABYLON.DynamicTexture('lt' + b.id, {width: 512, height: 128}, s, false);
+          var lctx = ltex.getContext();
+          lctx.font = 'bold 48px sans-serif'; lctx.fillStyle = '#ffffff';
+          lctx.textAlign = 'center'; lctx.fillText(b.name, 256, 80);
+          ltex.update(); ltex.hasAlpha = true;
+          var lmat = new BABYLON.StandardMaterial('lm' + b.id, s);
+          lmat.diffuseTexture = ltex; lmat.emissiveColor = new BABYLON.Color3(1, 1, 1); lmat.backFaceCulling = false;
+          var lp = BABYLON.MeshBuilder.CreatePlane('lp' + b.id, {width: 60, height: 15}, s);
+          lp.position.set(b.x + b.w / 2, bh * 1.3 + 15, b.y + b.h / 2);
+          lp.material = lmat; lp.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-        // Label
-        var ltex=new BABYLON.DynamicTexture('lt'+b.id,{width:256,height:64},s,false);
-        var lctx=ltex.getContext(); lctx.font='bold 28px sans-serif'; lctx.fillStyle='#ffffff';
-        lctx.textAlign='center'; lctx.fillText(b.name,128,40); ltex.update(); ltex.hasAlpha=true;
-        var lmat2=new BABYLON.StandardMaterial('lm'+b.id,s);
-        lmat2.diffuseTexture=ltex; lmat2.emissiveColor=new BABYLON.Color3(1,1,1); lmat2.backFaceCulling=false;
-        var lp=BABYLON.MeshBuilder.CreatePlane('lp'+b.id,{width:40,height:10},s);
-        lp.position.set(b.x+b.w/2, bh+bh*0.35+8, b.y+b.h/2);
-        lp.material=lmat2; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
-
-        // Emoji
-        var etex=new BABYLON.DynamicTexture('et'+b.id,{width:128,height:128},s,false);
-        var ectx=etex.getContext(); ectx.font='72px sans-serif'; ectx.textAlign='center';
-        ectx.textBaseline='middle'; ectx.fillText(b.emoji||'',64,64); etex.update(); etex.hasAlpha=true;
-        var emat=new BABYLON.StandardMaterial('em'+b.id,s);
-        emat.diffuseTexture=etex; emat.emissiveColor=new BABYLON.Color3(1,1,1); emat.backFaceCulling=false;
-        var ep=BABYLON.MeshBuilder.CreatePlane('ep'+b.id,{width:14,height:14},s);
-        ep.position.set(b.x+b.w/2, bh+bh*0.35+20, b.y+b.h/2);
-        ep.material=emat; ep.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+          // Emoji above label
+          var etex = new BABYLON.DynamicTexture('et' + b.id, {width: 128, height: 128}, s, false);
+          var ectx = etex.getContext(); ectx.font = '80px sans-serif'; ectx.textAlign = 'center';
+          ectx.textBaseline = 'middle'; ectx.fillText(b.emoji || '', 64, 64);
+          etex.update(); etex.hasAlpha = true;
+          var emat = new BABYLON.StandardMaterial('em' + b.id, s);
+          emat.diffuseTexture = etex; emat.emissiveColor = new BABYLON.Color3(1, 1, 1); emat.backFaceCulling = false;
+          var ep = BABYLON.MeshBuilder.CreatePlane('ep' + b.id, {width: 20, height: 20}, s);
+          ep.position.set(b.x + b.w / 2, bh * 1.3 + 30, b.y + b.h / 2);
+          ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+        })(i);
       }
     },
 
     _buildTrees: function() {
-      var s=this._scene; var seed=12345;
-      function sr(){seed=(seed*16807)%2147483647;return(seed-1)/2147483646;}
-      var greens=['#336633','#447744','#2a5a2a','#558855','#3a7a3a'];
-      var placed=0, attempts=0;
-      while(placed<30 && attempts<500){attempts++;
-        var tx=sr()*WORLD_W, tz=sr()*WORLD_H, valid=true;
-        for(var i=0;i<BUILDINGS.length;i++){var bb=BUILDINGS[i];
-          if(tx>bb.x-30&&tx<bb.x+bb.w+30&&tz>bb.y-30&&tz<bb.y+bb.h+30){valid=false;break;}}
-        if(!valid)continue;
-        for(var j=0;j<H_ROADS.length;j++){if(tz>H_ROADS[j].y-10&&tz<H_ROADS[j].y+H_ROADS[j].h+10){valid=false;break;}}
-        if(!valid)continue;
-        for(var k=0;k<V_ROADS.length;k++){if(tx>V_ROADS[k].x-10&&tx<V_ROADS[k].x+V_ROADS[k].w+10){valid=false;break;}}
-        if(!valid)continue;
-        var th=15+sr()*10;
-        var trunk=BABYLON.MeshBuilder.CreateCylinder('tt'+placed,{diameter:5,height:th,tessellation:6},s);
-        var tmat=new BABYLON.StandardMaterial('ttm'+placed,s); tmat.diffuseColor=hexToColor3('#5a3a1a');
-        trunk.material=tmat; trunk.position.set(tx,th/2,tz);
-        var gHex=greens[Math.floor(sr()*greens.length)];
-        var cmat=new BABYLON.StandardMaterial('tcm'+placed,s); cmat.diffuseColor=hexToColor3(gHex);
-        var canopy; if(sr()>0.5){
-          canopy=BABYLON.MeshBuilder.CreateSphere('tc'+placed,{diameter:22+sr()*8,segments:6},s);
-          canopy.position.y=th+8;
-        } else {
-          canopy=BABYLON.MeshBuilder.CreateCylinder('tc'+placed,{diameterTop:0,diameterBottom:20+sr()*8,height:25+sr()*10,tessellation:6},s);
-          canopy.position.y=th+12;
-        }
-        canopy.material=cmat; canopy.position.x=tx; canopy.position.z=tz;
-        placed++;
+      var s = this._scene;
+      var TREE_MODELS = ['grass-trees.glb', 'grass-trees-tall.glb'];
+      var seed = 12345;
+      function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+      for (var ti = 0; ti < 25; ti++) {
+        var tx, tz, valid;
+        var attempts = 0;
+        do {
+          tx = sr() * WORLD_W; tz = sr() * WORLD_H; valid = true; attempts++;
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            if (tx > bb.x - 30 && tx < bb.x + bb.w + 30 && tz > bb.y - 30 && tz < bb.y + bb.h + 30) { valid = false; break; }
+          }
+          if (valid) for (var ri = 0; ri < H_ROADS.length; ri++) { if (tz > H_ROADS[ri].y - 10 && tz < H_ROADS[ri].y + H_ROADS[ri].h + 10) { valid = false; break; } }
+          if (valid) for (var vi = 0; vi < V_ROADS.length; vi++) { if (tx > V_ROADS[vi].x - 10 && tx < V_ROADS[vi].x + V_ROADS[vi].w + 10) { valid = false; break; } }
+        } while (!valid && attempts < 20);
+        if (!valid) continue;
+
+        (function(x, z, idx) {
+          var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+            if (!meshes.length) return;
+            var root = meshes[0];
+            var sc = 30 + sr() * 20;
+            root.scaling = new BABYLON.Vector3(sc, sc, sc);
+            root.position.set(x, 0, z);
+            root.rotation.y = sr() * Math.PI * 2;
+          });
+        })(tx, tz, ti);
       }
     },
 

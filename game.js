@@ -59,6 +59,41 @@
   var SAVE_KEY = 'sd_town_v1';
   var OLD_SAVE_KEY = 'sd_v2_5';
   var COST_SCALE = 1.18;
+  var MAX_OFFLINE_SECS = 8 * 3600; // 8 hours cap
+
+  var PRESTIGE_UPGRADES = [
+    { id: 'pu_automine',   name: 'Auto-Mine',        desc: '+1 sat/s base (no hardware needed)', cost: 1,  icon: '\u2699\uFE0F' },
+    { id: 'pu_headstart',  name: 'Head Start',        desc: 'Start each run with a Laptop',       cost: 2,  icon: '\u{1F4BB}' },
+    { id: 'pu_efficient',  name: 'Efficient Cooling',  desc: '-25% electricity costs permanently', cost: 3,  icon: '\u2744\uFE0F' },
+    { id: 'pu_haggle',     name: 'Haggle',            desc: '-10% hardware costs',                cost: 3,  icon: '\u{1F4B0}' },
+    { id: 'pu_sprint',     name: 'Sprint Boots',       desc: '+50% walk speed',                   cost: 2,  icon: '\u{1F45F}' },
+    { id: 'pu_autosell',   name: 'Auto-Sell',          desc: 'Auto-sell sats at 50% capacity',    cost: 5,  icon: '\u{1F4B1}' },
+    { id: 'pu_double_tap', name: 'Double Tap',         desc: '2x sats per manual tap',            cost: 4,  icon: '\u{1F446}' },
+    { id: 'pu_offline',    name: 'Offline+',           desc: 'Offline earnings from 50% to 75%',  cost: 3,  icon: '\u{1F4F4}' },
+    { id: 'pu_lucky',      name: 'Lucky Streak',       desc: '+5% casino win rate',               cost: 4,  icon: '\u{1F340}' },
+    { id: 'pu_megaprod',   name: 'Mega Production',    desc: '+50% all production',               cost: 8,  icon: '\u{1F680}' },
+  ];
+
+  var ACHIEVEMENTS = [
+    { id: 'a_first_sat',    name: 'First Sat',       desc: 'Mine your first sat',           icon: '\u{1F947}', reward: 10,    check: function(s){ return s.lifetimeSats >= 1; } },
+    { id: 'a_100_sats',     name: 'Stacking',        desc: 'Earn 100 lifetime sats',        icon: '\u{1F4B0}', reward: 50,    check: function(s){ return s.lifetimeSats >= 100; } },
+    { id: 'a_10k_sats',     name: 'Ten Thousand',    desc: 'Earn 10K lifetime sats',        icon: '\u{1F4B5}', reward: 500,   check: function(s){ return s.lifetimeSats >= 10000; } },
+    { id: 'a_100k_sats',    name: 'Whale Alert',     desc: 'Earn 100K lifetime sats',       icon: '\u{1F40B}', reward: 5000,  check: function(s){ return s.lifetimeSats >= 100000; } },
+    { id: 'a_1m_sats',      name: 'Millionaire',     desc: 'Earn 1M lifetime sats',         icon: '\u{1F451}', reward: 25000, check: function(s){ return s.lifetimeSats >= 1000000; } },
+    { id: 'a_first_hw',     name: 'Miner',           desc: 'Buy your first hardware',       icon: '\u{1F527}', reward: 20,    check: function(s){ var t=0; for(var k in s.owned) t+=s.owned[k]; return t > 0; } },
+    { id: 'a_gpu',          name: 'GPU Gang',        desc: 'Own a GPU Rig',                 icon: '\u{1F3AE}', reward: 200,   check: function(s){ return (s.owned.u3||0) > 0; } },
+    { id: 'a_asic',         name: 'ASIC Army',       desc: 'Own an ASIC Miner',             icon: '\u26A1',    reward: 2000,  check: function(s){ return (s.owned.u4||0) > 0; } },
+    { id: 'a_farm',         name: 'Farm Life',       desc: 'Own a Mining Farm',             icon: '\u{1F3ED}', reward: 10000, check: function(s){ return (s.owned.u5||0) > 0; } },
+    { id: 'a_first_sell',   name: 'Trader',          desc: 'Sell sats for USD',             icon: '\u{1F4C8}', reward: 25,    check: function(s){ return s.usd > 0; } },
+    { id: 'a_house',        name: 'Homeowner',       desc: 'Upgrade to a House',            icon: '\u{1F3E0}', reward: 1000,  check: function(s){ return s.housing === 'house' || s.housing === 'warehouse' || s.housing === 'solar'; } },
+    { id: 'a_vehicle',      name: 'Road Warrior',    desc: 'Buy any vehicle',               icon: '\u{1F697}', reward: 100,   check: function(s){ return !!s.vehicle; } },
+    { id: 'a_pet',          name: 'Pet Parent',      desc: 'Adopt a pet',                   icon: '\u{1F43E}', reward: 100,   check: function(s){ return !!s.pet; } },
+    { id: 'a_research',     name: 'Scholar',         desc: 'Complete any research',         icon: '\u{1F393}', reward: 500,   check: function(s){ return Object.keys(s.research).length > 0; } },
+    { id: 'a_all_research', name: 'Genius',          desc: 'Complete all research',         icon: '\u{1F9E0}', reward: 10000, check: function(s){ return Object.keys(s.research).length >= 5; } },
+    { id: 'a_prestige1',    name: 'Rebirth',         desc: 'Prestige for the first time',   icon: '\u{1FA99}', reward: 0,     check: function(s){ return s.tokens > 0; } },
+    { id: 'a_prestige5',    name: 'Veteran',         desc: 'Earn 5+ prestige tokens',       icon: '\u2B50',    reward: 0,     check: function(s){ return s.tokens >= 5; } },
+    { id: 'a_darkweb',      name: 'Dark Side',       desc: 'Buy from the dark web',         icon: '\u{1F480}', reward: 500,   check: function(s){ return (s.owned.d1||0)+(s.owned.d2||0)+(s.owned.d3||0) > 0; } },
+  ];
 
   function defaultState() {
     return {
@@ -81,7 +116,11 @@
       gymLevel: 0,
       health: 100,
       casinoLock: 0,
-      version: 2,
+      // Prestige upgrades (persist through prestige)
+      prestigeUpgrades: {},
+      // Achievements (persist through prestige)
+      achievements: {},
+      version: 3,
       lastTick: Date.now(),
     };
   }
@@ -90,8 +129,10 @@
     state: defaultState(),
     HARDWARE: HARDWARE, DARK_WEB: DARK_WEB, HOUSING: HOUSING,
     VEHICLES: VEHICLES, PETS: PETS, RESEARCH: RESEARCH, LOANS: LOANS,
+    PRESTIGE_UPGRADES: PRESTIGE_UPGRADES, ACHIEVEMENTS: ACHIEVEMENTS,
     COST_SCALE: COST_SCALE,
     lastFrame: 0, running: false, floatingTexts: [],
+    _offlineReport: null, // set after offline calc
 
     init: function() {
       this.load();
@@ -99,7 +140,43 @@
       for (var i = 0; i < all.length; i++) {
         if (this.state.owned[all[i].id] === undefined) this.state.owned[all[i].id] = 0;
       }
+      if (!this.state.achievements) this.state.achievements = {};
+      if (!this.state.prestigeUpgrades) this.state.prestigeUpgrades = {};
       if (!this.state.nextEventAt) this.scheduleNextEvent();
+      // Apply head-start upgrade
+      if (this.state.prestigeUpgrades.pu_headstart && (!this.state.owned.u1 || this.state.owned.u1 === 0) && this.state.lifetimeSats === 0) {
+        this.state.owned.u1 = 1;
+      }
+      // Offline progress
+      this.calcOffline();
+    },
+
+    calcOffline: function() {
+      var s = this.state;
+      if (!s.avatar || !s.lastTick) return;
+      var elapsed = (Date.now() - s.lastTick) / 1000;
+      if (elapsed < 10) return; // less than 10s, skip
+      elapsed = Math.min(elapsed, MAX_OFFLINE_SECS);
+      var rate = this.getProductionRate();
+      if (rate <= 0 && !this.hasPrestigeUpgrade('pu_automine')) return;
+      var mul = this.getMultiplier();
+      // Remove heat/energy penalties for offline calc (use base mult)
+      var offlineMul = mul;
+      if (s.heat > 90) offlineMul /= 0.1; // undo heat penalty
+      if (s.energy <= 0) offlineMul /= 0.05; // undo energy penalty
+      var baseRate = rate;
+      if (this.hasPrestigeUpgrade('pu_automine')) baseRate += 1;
+      var efficiency = this.hasPrestigeUpgrade('pu_offline') ? 0.75 : 0.5;
+      var gain = Math.floor(baseRate * offlineMul * elapsed * efficiency);
+      if (gain <= 0) return;
+      s.sats += gain;
+      s.totalSats += gain;
+      s.lifetimeSats += gain;
+      // Reset heat/energy to reasonable levels after being away
+      s.heat = Math.max(0, s.heat - elapsed * 2);
+      s.energy = Math.min(this.getEnergyMax(), s.energy + elapsed * 0.5);
+      s.lastTick = Date.now();
+      this._offlineReport = { sats: gain, seconds: Math.floor(elapsed), efficiency: Math.round(efficiency * 100) };
     },
 
     load: function() {
@@ -134,7 +211,8 @@
     // ── Economy ──
     getBulkCost: function(item, count) {
       var total = 0, owned = this.state.owned[item.id] || 0;
-      for (var i = 0; i < count; i++) total += Math.floor(item.base * Math.pow(COST_SCALE, owned + i));
+      var discount = (item.cur === 'sats' && this.hasPrestigeUpgrade('pu_haggle')) ? 0.9 : 1;
+      for (var i = 0; i < count; i++) total += Math.floor(item.base * Math.pow(COST_SCALE, owned + i) * discount);
       return total;
     },
 
@@ -181,6 +259,7 @@
       var rate = 0;
       for (var i = 0; i < HARDWARE.length; i++) rate += (this.state.owned[HARDWARE[i].id] || 0) * HARDWARE[i].rate;
       for (var j = 0; j < DARK_WEB.length; j++) rate += (this.state.owned[DARK_WEB[j].id] || 0) * DARK_WEB[j].rate;
+      if (this.hasPrestigeUpgrade('pu_automine')) rate += 1;
       return rate;
     },
 
@@ -192,9 +271,23 @@
       if (s.research.quantum) mul *= 2.0;
       if (s.pet === 'dog') mul *= 1.05;
       if (s.pet === 'snake') mul *= 1.25;
+      if (this.hasPrestigeUpgrade('pu_megaprod')) mul *= 1.5;
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
+    },
+
+    hasPrestigeUpgrade: function(id) {
+      return !!(this.state.prestigeUpgrades && this.state.prestigeUpgrades[id]);
+    },
+
+    buyPrestigeUpgrade: function(id) {
+      var pu = PRESTIGE_UPGRADES.find(function(u) { return u.id === id; });
+      if (!pu || this.hasPrestigeUpgrade(id)) return false;
+      if (this.state.tokens < pu.cost) return false;
+      this.state.tokens -= pu.cost;
+      this.state.prestigeUpgrades[id] = true;
+      return true;
     },
 
     getHeatMultiplier: function() {
@@ -214,9 +307,13 @@
     },
 
     getSpeedMultiplier: function() {
-      if (!this.state.vehicle) return 1.0;
-      var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
-      return v ? v.speed : 1.0;
+      var base = 1.0;
+      if (this.state.vehicle) {
+        var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
+        if (v) base = v.speed;
+      }
+      if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
+      return base;
     },
 
     getElectricityCost: function() {
@@ -227,6 +324,7 @@
       }
       if (this.state.housing === 'solar') return 0;
       if (this.state.research.solar_int) cost *= 0.5;
+      if (this.hasPrestigeUpgrade('pu_efficient')) cost *= 0.75;
       if (this.state.pet === 'lizard') cost *= 0.9;
       cost -= this.state.electricitySolar * 0.1;
       return Math.max(0, cost);
@@ -244,6 +342,7 @@
       var gain = 1;
       if (this.state.avatar && this.state.avatar.bonus === 'quickhands') gain += 5;
       if (this.state.pet === 'hamster') gain += 10;
+      if (this.hasPrestigeUpgrade('pu_double_tap')) gain *= 2;
       gain *= (1 + (this.state.tokens * 0.1));
       this.state.sats += gain;
       this.state.totalSats += gain;
@@ -327,7 +426,8 @@
     coinFlip: function(bet) {
       if (bet <= 0 || bet > this.state.sats) return null;
       this.state.sats -= bet;
-      var win = Math.random() > 0.5;
+      var threshold = this.hasPrestigeUpgrade('pu_lucky') ? 0.45 : 0.5;
+      var win = Math.random() > threshold;
       if (win) { this.state.sats += bet * 2; return bet; }
       return -bet;
     },
@@ -336,11 +436,12 @@
       if (bet <= 0 || bet > this.state.sats) return null;
       this.state.sats -= bet;
       var r = Math.random();
+      var bonus = this.hasPrestigeUpgrade('pu_lucky') ? 0.05 : 0;
       var mult = 0;
-      if (r < 0.01) mult = 10;       // Jackpot 1%
-      else if (r < 0.05) mult = 5;   // Big win 4%
-      else if (r < 0.15) mult = 3;   // Medium 10%
-      else if (r < 0.40) mult = 1.5; // Small 25%
+      if (r < 0.01 + bonus) mult = 10;
+      else if (r < 0.05 + bonus) mult = 5;
+      else if (r < 0.15 + bonus) mult = 3;
+      else if (r < 0.40 + bonus) mult = 1.5;
       // 60% lose
       var win = Math.floor(bet * mult);
       this.state.sats += win;
@@ -443,6 +544,18 @@
       // Police risk decay
       if (s.policeRisk > 0) s.policeRisk = Math.max(0, s.policeRisk - 0.01 * dt);
 
+      // Auto-sell (prestige upgrade)
+      if (this.hasPrestigeUpgrade('pu_autosell') && s.sats > 10000) {
+        if (!s._lastAutoSell) s._lastAutoSell = now;
+        if (now - s._lastAutoSell > 30000) { // every 30s
+          this.sellSats(0.5);
+          s._lastAutoSell = now;
+        }
+      }
+
+      // Check achievements
+      this.checkAchievements();
+
       // BTC price random walk
       s.price *= (1 + (Math.random() - 0.499) * 0.0005);
       s.price = Math.max(1000, s.price);
@@ -494,6 +607,26 @@
       }
     },
 
+    // ── Achievements ──
+    checkAchievements: function() {
+      var s = this.state;
+      if (!s.achievements) s.achievements = {};
+      for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+        var a = ACHIEVEMENTS[i];
+        if (s.achievements[a.id]) continue;
+        if (a.check(s)) {
+          s.achievements[a.id] = Date.now();
+          if (a.reward > 0) s.sats += a.reward;
+          if (UI && UI.toast) UI.toast(a.icon + ' Achievement: ' + a.name + (a.reward > 0 ? ' (+' + Game.formatNumber(a.reward) + ' sats)' : ''));
+        }
+      }
+    },
+
+    getAchievementCount: function() {
+      if (!this.state.achievements) return 0;
+      return Object.keys(this.state.achievements).length;
+    },
+
     // ── Prestige ──
     getPrestigeTokens: function() {
       // Earn 1 token per 100K lifetime sats, minimum 1 to prestige
@@ -508,8 +641,12 @@
       var newTokens = this.getPrestigeTokens();
       if (newTokens <= this.state.tokens) return false;
       var tokens = newTokens;
+      var upgrades = this.state.prestigeUpgrades || {};
+      var achievements = this.state.achievements || {};
       var def = defaultState();
       def.tokens = tokens;
+      def.prestigeUpgrades = upgrades;
+      def.achievements = achievements;
       def.lastTick = Date.now();
       this.state = def;
       this.floatingTexts = [];

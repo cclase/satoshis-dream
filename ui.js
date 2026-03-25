@@ -15,7 +15,32 @@
       this.setupNavMenu();
       this.setupHUD();
       if (!Game.state.avatar) this.showAvatarCreation();
-      else this.startGame();
+      else {
+        this.startGame();
+        // Show offline earnings if any
+        if (Game._offlineReport) this.showOfflineReport(Game._offlineReport);
+      }
+    },
+
+    showOfflineReport: function(report) {
+      var modal = document.getElementById('modal');
+      modal.classList.add('active');
+      var mins = Math.floor(report.seconds / 60);
+      var hrs = Math.floor(mins / 60);
+      var timeStr = hrs > 0 ? hrs + 'h ' + (mins % 60) + 'm' : mins + 'm ' + (report.seconds % 60) + 's';
+      modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
+        '<div class="modal-title" style="color:var(--gold);">\u{1F44B} Welcome Back!</div>' +
+        '<p style="color:var(--dim);margin-bottom:16px;font-size:14px;">You were away for <strong style="color:var(--text);">' + timeStr + '</strong></p>' +
+        '<div style="background:rgba(247,147,26,0.1);border:1px solid rgba(247,147,26,0.3);border-radius:10px;padding:16px;margin-bottom:16px;">' +
+          '<div style="font-size:12px;color:var(--dim);margin-bottom:4px;">OFFLINE EARNINGS (' + report.efficiency + '% efficiency)</div>' +
+          '<div style="font-size:28px;font-weight:900;color:var(--gold);">+' + Game.formatNumber(report.sats) + ' sats</div>' +
+        '</div>' +
+        '<button class="modal-btn" id="offlineDismiss">Continue</button></div>';
+      document.getElementById('offlineDismiss').addEventListener('click', function() {
+        modal.classList.remove('active'); modal.innerHTML = '';
+        document.getElementById('town').focus();
+      });
+      Game._offlineReport = null;
     },
 
     // ── Input ──
@@ -144,7 +169,9 @@
         '<div class="hud-right">' +
           '<div class="hud-item hud-price">BTC <span id="hudPrice">$65,000</span></div>' +
           '<div class="hud-item hud-rate"><span id="hudRate">0</span>/s</div>' +
-          '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
+          '<div class="hud-item hud-reset" id="hudReset">\u{1FA99}</div>' +
+          '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
+          '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
           '<div class="heat-bar"><div class="heat-fill" id="heatFill"></div></div>' +
@@ -156,6 +183,8 @@
         '</div>' +
         '<div class="event-bar" id="eventBar"></div>';
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
+      document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
+      document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
     },
 
     updateHUD: function() {
@@ -984,6 +1013,82 @@
     },
 
     startGame: function() { Game.start(); },
+
+    // ═══════════════════════════════════════
+    // ACHIEVEMENTS PANEL (HUD button)
+    // ═══════════════════════════════════════
+    showAchievementsPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block';
+      this.panelOpen = true;
+      this.currentPanel = 'achievements';
+      this.currentBuilding = null;
+
+      var s = Game.state;
+      var earned = Game.getAchievementCount();
+      var total = Game.ACHIEVEMENTS.length;
+      var html = '<div class="panel-header">' +
+        '<div class="panel-title">\u{1F3C6} Achievements (' + earned + '/' + total + ')</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div>' +
+        '<div class="panel-body">';
+
+      Game.ACHIEVEMENTS.forEach(function(a) {
+        var done = !!(s.achievements && s.achievements[a.id]);
+        html += '<div class="hw-card' + (done ? '' : ' locked') + '">' +
+          '<div class="hw-icon">' + (done ? a.icon : '\u{1F512}') + '</div>' +
+          '<div class="hw-info"><div class="hw-name">' + a.name + '</div><div class="hw-sub">' + a.desc + '</div></div>' +
+          '<div class="hw-cost" style="color:' + (done ? 'var(--green)' : 'var(--dim)') + ';">' + (done ? '\u2705' : (a.reward > 0 ? '+' + Game.formatNumber(a.reward) : '')) + '</div></div>';
+      });
+      html += '</div>';
+      panel.innerHTML = html;
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+    },
+
+    // ═══════════════════════════════════════
+    // PRESTIGE SHOP PANEL (HUD button)
+    // ═══════════════════════════════════════
+    showPrestigeShopPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block';
+      this.panelOpen = true;
+      this.currentPanel = 'prestige_shop';
+      this.currentBuilding = null;
+
+      var s = Game.state;
+      var html = '<div class="panel-header">' +
+        '<div class="panel-title">\u{1F6D2} Prestige Shop</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div>' +
+        '<div class="panel-body">' +
+        '<div style="text-align:center;margin-bottom:12px;">' +
+          '<span style="font-size:12px;color:var(--dim);">AVAILABLE TOKENS</span><br>' +
+          '<span style="font-size:24px;font-weight:900;color:var(--purple);">\u{1FA99} ' + s.tokens + '</span>' +
+        '</div>';
+
+      Game.PRESTIGE_UPGRADES.forEach(function(pu) {
+        var owned = Game.hasPrestigeUpgrade(pu.id);
+        var canAfford = s.tokens >= pu.cost;
+        html += '<div class="hw-card' + (owned ? '' : (!canAfford ? ' locked' : '')) + '" data-pu="' + pu.id + '">' +
+          '<div class="hw-icon">' + pu.icon + '</div>' +
+          '<div class="hw-info"><div class="hw-name">' + pu.name + '</div><div class="hw-sub">' + pu.desc + '</div></div>' +
+          '<div class="hw-cost" style="color:' + (owned ? 'var(--green)' : 'var(--purple)') + ';">' + (owned ? '\u2705 Owned' : '\u{1FA99} ' + pu.cost) + '</div></div>';
+      });
+      html += '</div>';
+      panel.innerHTML = html;
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+      this.wirePrestigeShopPanel();
+    },
+    wirePrestigeShopPanel: function() {
+      document.querySelectorAll('[data-pu]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var id = el.dataset.pu;
+          if (Game.buyPrestigeUpgrade(id)) {
+            var pu = Game.PRESTIGE_UPGRADES.find(function(u) { return u.id === id; });
+            UI.toast('\u{1FA99} Unlocked: ' + (pu ? pu.name : id));
+            UI.showPrestigeShopPanel(); // refresh
+          }
+        });
+      });
+    },
 
     toast: function(msg) {
       var el = document.getElementById('toast');

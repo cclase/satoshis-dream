@@ -209,9 +209,11 @@
       this._scene.fogDensity = 0.00015;
       this._scene.fogColor = new BABYLON.Color3(0.35, 0.2, 0.25);
 
-      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 500,
+      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
       this._camera3.inputs.clear();
+      this._camera3.lowerRadiusLimit = 300;
+      this._camera3.upperRadiusLimit = 1500;
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.5; hemi.diffuse = new BABYLON.Color3(1,0.9,0.7);
@@ -317,10 +319,11 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale to fit building footprint
-            var scaleX = b.w / modelW;
-            var scaleZ = b.h / modelD;
-            var scaleY = Math.min(scaleX, scaleZ) * 1.2; // slightly taller
+            // Scale to fit building footprint (models are ~1 unit, world is ~2400 units)
+            var targetScale = Math.min(b.w, b.h) * 0.012;
+            var scaleX = targetScale;
+            var scaleZ = targetScale;
+            var scaleY = targetScale * 1.2;
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location
@@ -388,7 +391,7 @@
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
-            var sc = 0.3 + sr() * 0.2;
+            var sc = 1.5 + sr() * 1.0;
             root.scaling = new BABYLON.Vector3(sc, sc, sc);
             root.position.set(x, 0, z);
             root.rotation.y = sr() * Math.PI * 2;

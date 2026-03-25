@@ -320,6 +320,8 @@
         case 'hospital': return this.buildHospitalPanel();
         case 'pawn_shop': return this.buildPawnShopPanel();
         case 'apartment': return this.buildApartmentPanel();
+        case 'clothing': return this.buildClothingPanel();
+        case 'homegoods': return this.buildHomegoodsPanel();
         default: return '<div class="panel-body"><p style="color:var(--dim);">Nothing here yet.</p></div>';
       }
     },
@@ -344,6 +346,8 @@
         case 'hospital': this.wireHospitalPanel(); break;
         case 'pawn_shop': this.wirePawnShopPanel(); break;
         case 'apartment': this.wireApartmentPanel(); break;
+        case 'clothing': this.wireClothingPanel(); break;
+        case 'homegoods': this.wireHomegoodsPanel(); break;
       }
     },
 
@@ -943,18 +947,90 @@
     },
 
     // ═══════════════════════════════════════
-    // STUDIO APARTMENT (home)
+    // CLOTHING STORE
+    // ═══════════════════════════════════════
+    buildClothingPanel: function() {
+      var s = Game.state, html = '<div class="panel-body">';
+      html += '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Buy clothing for permanent stat bonuses!</p>';
+      Game.CLOTHING.forEach(function(c) {
+        var owned = !!(s.clothing && s.clothing[c.id]);
+        html += '<div class="hw-card' + (owned ? '' : (s.usd < c.cost ? ' locked' : '')) + '" data-cloth="' + c.id + '">' +
+          '<div class="hw-icon">' + c.icon + '</div>' +
+          '<div class="hw-info"><div class="hw-name">' + c.name + '</div><div class="hw-sub">' + c.desc + '</div></div>' +
+          '<div class="hw-cost">' + (owned ? '\u2705 Wearing' : '$' + Game.formatNumber(c.cost)) + '</div></div>';
+      });
+      return html + '</div>';
+    },
+    wireClothingPanel: function() {
+      document.querySelectorAll('[data-cloth]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var c = Game.CLOTHING.find(function(x) { return x.id === el.dataset.cloth; });
+          if (!c || (Game.state.clothing && Game.state.clothing[c.id]) || Game.state.usd < c.cost) return;
+          Game.state.usd -= c.cost;
+          if (!Game.state.clothing) Game.state.clothing = {};
+          Game.state.clothing[c.id] = true;
+          UI.toast('\u{1F455} Bought ' + c.name + '!');
+          UI.showPanel(UI.currentBuilding);
+        });
+      });
+    },
+
+    // ═══════════════════════════════════════
+    // HOME GOODS STORE
+    // ═══════════════════════════════════════
+    buildHomegoodsPanel: function() {
+      var s = Game.state, html = '<div class="panel-body">';
+      html += '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Furnish your home for permanent bonuses! View your home to see your items.</p>';
+      Game.FURNITURE.forEach(function(f) {
+        var owned = !!(s.furniture && s.furniture[f.id]);
+        html += '<div class="hw-card' + (owned ? '' : (s.usd < f.cost ? ' locked' : '')) + '" data-furn="' + f.id + '">' +
+          '<div class="hw-icon">' + f.icon + '</div>' +
+          '<div class="hw-info"><div class="hw-name">' + f.name + '</div><div class="hw-sub">' + f.desc + '</div></div>' +
+          '<div class="hw-cost">' + (owned ? '\u2705 Placed' : '$' + Game.formatNumber(f.cost)) + '</div></div>';
+      });
+      return html + '</div>';
+    },
+    wireHomegoodsPanel: function() {
+      document.querySelectorAll('[data-furn]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var f = Game.FURNITURE.find(function(x) { return x.id === el.dataset.furn; });
+          if (!f || (Game.state.furniture && Game.state.furniture[f.id]) || Game.state.usd < f.cost) return;
+          Game.state.usd -= f.cost;
+          if (!Game.state.furniture) Game.state.furniture = {};
+          Game.state.furniture[f.id] = true;
+          UI.toast('\u{1F6CB}\uFE0F Placed ' + f.name + '!');
+          UI.showPanel(UI.currentBuilding);
+        });
+      });
+    },
+
+    // ═══════════════════════════════════════
+    // YOUR HOME (apartment)
     // ═══════════════════════════════════════
     buildApartmentPanel: function() {
       var s = Game.state;
       var h = Game.HOUSING.find(function(x){return x.id===s.housing;});
-      return '<div class="panel-body">' +
-        '<p style="margin-bottom:8px;font-weight:800;">' + (h ? h.name : 'Studio') + '</p>' +
+      var html = '<div class="panel-body">' +
+        '<p style="margin-bottom:8px;font-weight:800;">\u{1F3E0} ' + (h ? h.name : 'Studio') + '</p>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Rig Slots</span><span>' + Game.getUsedSlots() + ' / ' + Game.getMaxSlots() + '</span></div>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Vehicle</span><span>' + (s.vehicle ? (Game.VEHICLES.find(function(v){return v.id===s.vehicle;}) || {}).name || 'Unknown' : 'None') + '</span></div>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Pet</span><span>' + (s.pet ? (Game.PETS.find(function(p){return p.id===s.pet;}) || {}).name || 'Unknown' : 'None') + '</span></div>' +
-        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Research</span><span>' + Object.keys(s.research).length + '/' + Game.RESEARCH.length + '</span></div>' +
-        '</div>';
+        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Research</span><span>' + Object.keys(s.research).length + '/' + Game.RESEARCH.length + '</span></div>';
+      // Show owned clothing
+      var ownedClothing = Game.CLOTHING.filter(function(c) { return s.clothing && s.clothing[c.id]; });
+      if (ownedClothing.length > 0) {
+        html += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">WARDROBE</div>';
+        ownedClothing.forEach(function(c) { html += '<span style="font-size:20px;" title="' + c.name + '">' + c.icon + '</span> '; });
+        html += '</div>';
+      }
+      // Show owned furniture
+      var ownedFurn = Game.FURNITURE.filter(function(f) { return s.furniture && s.furniture[f.id]; });
+      if (ownedFurn.length > 0) {
+        html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">FURNITURE</div>';
+        ownedFurn.forEach(function(f) { html += '<span style="font-size:20px;" title="' + f.name + ' - ' + f.desc + '">' + f.icon + '</span> '; });
+        html += '</div>';
+      }
+      return html + '</div>';
     },
     wireApartmentPanel: function() {},
 

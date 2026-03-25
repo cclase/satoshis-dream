@@ -25,7 +25,9 @@
     { id: 'pet_shop',     name: 'Pet Shop',        emoji: '\u{1F43E}',    x: 960,  y: 1088, w: 128, h: 128, color: '#ffaacc', panelType: 'pet_shop' },
     { id: 'pawn_shop',    name: 'Pawn Shop',       emoji: '\u{1F48D}',    x: 1344, y: 1088, w: 128, h: 128, color: '#aa8833', panelType: 'pawn_shop' },
     { id: 'utility',      name: 'Utility Co.',     emoji: '\u26A1',       x: 128,  y: 1408, w: 192, h: 128, color: '#66aaff', panelType: 'utility' },
+    { id: 'clothing',     name: 'Clothing Store',  emoji: '\u{1F455}',    x: 576,  y: 1408, w: 192, h: 128, color: '#dd88aa', panelType: 'clothing' },
     { id: 'apartment',    name: 'Your Home',       emoji: '\u{1F3E0}', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
+    { id: 'homegoods',    name: 'Home Goods',      emoji: '\u{1F6CB}\uFE0F', x: 1344, y: 1408, w: 192, h: 128, color: '#88aa66', panelType: 'homegoods' },
   ];
 
   // Road definitions
@@ -197,8 +199,8 @@
   }
 
   // ── Building Style Data ──
-  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',apartment:'#c0b0a0'};
-  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,apartment:40};
+  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',clothing:'#d8a8b8',apartment:'#c0b0a0',homegoods:'#a8b890'};
+  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,clothing:35,apartment:40,homegoods:38};
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];

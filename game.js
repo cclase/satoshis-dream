@@ -56,6 +56,25 @@
     { id: 'large',  name: 'Large Loan',  amount: 10000, rate: 0.12 },
   ];
 
+  var CLOTHING = [
+    { id: 'cl_hat',     name: 'Bitcoin Cap',     icon: '\u{1F9E2}', cost: 50,    cur: 'usd', desc: '+2% income',     bonus: 'income', val: 0.02 },
+    { id: 'cl_jacket',  name: 'Hoodie',          icon: '\u{1F9E5}', cost: 200,   cur: 'usd', desc: '-3% heat',       bonus: 'heat',   val: 0.03 },
+    { id: 'cl_shoes',   name: 'Running Shoes',   icon: '\u{1F45F}', cost: 500,   cur: 'usd', desc: '+10% speed',     bonus: 'speed',  val: 0.1 },
+    { id: 'cl_suit',    name: 'Business Suit',   icon: '\u{1F454}', cost: 2000,  cur: 'usd', desc: '+5% sell price', bonus: 'sell',   val: 0.05 },
+    { id: 'cl_watch',   name: 'Gold Watch',      icon: '\u231A',    cost: 10000, cur: 'usd', desc: '+8% income',     bonus: 'income', val: 0.08 },
+  ];
+
+  var FURNITURE = [
+    { id: 'fu_desk',    name: 'Mining Desk',     icon: '\u{1F5A5}\uFE0F', cost: 100,   cur: 'usd', desc: '+3% production', bonus: 'prod', val: 0.03 },
+    { id: 'fu_chair',   name: 'Gaming Chair',    icon: '\u{1FA91}', cost: 300,   cur: 'usd', desc: '+5 max energy',  bonus: 'energy', val: 5 },
+    { id: 'fu_plant',   name: 'House Plant',     icon: '\u{1FAB4}', cost: 150,   cur: 'usd', desc: '-2% heat',       bonus: 'heat',   val: 0.02 },
+    { id: 'fu_poster',  name: 'BTC Poster',      icon: '\u{1F5BC}\uFE0F', cost: 75,    cur: 'usd', desc: '+1% income',     bonus: 'income', val: 0.01 },
+    { id: 'fu_lamp',    name: 'Neon Lamp',       icon: '\u{1F4A1}', cost: 200,   cur: 'usd', desc: '+2% production', bonus: 'prod',   val: 0.02 },
+    { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
+    { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+3 energy regen',bonus: 'eregen', val: 3 },
+    { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
+  ];
+
   var SAVE_KEY = 'sd_town_v1';
   var OLD_SAVE_KEY = 'sd_v2_5';
   var COST_SCALE = 1.18;
@@ -100,6 +119,7 @@
       avatar: null,
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
+      clothing: {}, furniture: {},
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -130,7 +150,7 @@
     HARDWARE: HARDWARE, DARK_WEB: DARK_WEB, HOUSING: HOUSING,
     VEHICLES: VEHICLES, PETS: PETS, RESEARCH: RESEARCH, LOANS: LOANS,
     PRESTIGE_UPGRADES: PRESTIGE_UPGRADES, ACHIEVEMENTS: ACHIEVEMENTS,
-    COST_SCALE: COST_SCALE,
+    COST_SCALE: COST_SCALE, CLOTHING: CLOTHING, FURNITURE: FURNITURE,
     lastFrame: 0, running: false, floatingTexts: [],
     _offlineReport: null, // set after offline calc
 
@@ -306,6 +326,15 @@
       return rate;
     },
 
+    // Sum bonuses from clothing + furniture for a given type
+    _getItemBonus: function(bonusType) {
+      var s = this.state; var total = 0;
+      var cl = s.clothing || {}, fu = s.furniture || {};
+      CLOTHING.forEach(function(c) { if (cl[c.id] && c.bonus === bonusType) total += c.val; });
+      FURNITURE.forEach(function(f) { if (fu[f.id] && f.bonus === bonusType) total += f.val; });
+      return total;
+    },
+
     getMultiplier: function() {
       var s = this.state;
       var mul = 1 + (s.tokens * 0.1);
@@ -315,6 +344,8 @@
       if (s.pet === 'dog') mul *= 1.05;
       if (s.pet === 'snake') mul *= 1.25;
       if (this.hasPrestigeUpgrade('pu_megaprod')) mul *= 1.5;
+      mul *= (1 + this._getItemBonus('income'));
+      mul *= (1 + this._getItemBonus('prod'));
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
@@ -339,13 +370,15 @@
       if (s.avatar && s.avatar.bonus === 'coolrunner') mul *= 0.8;
       if (s.research.heatsink) mul *= 0.7;
       if (s.pet === 'cat') mul *= 0.95;
-      return mul;
+      mul *= (1 - this._getItemBonus('heat'));
+      return Math.max(0.1, mul);
     },
 
     getSellMultiplier: function() {
       var mul = 1.0;
       if (this.state.research.algo_trade) mul *= 1.10;
       if (this.state.pet === 'parrot') mul *= 1.15;
+      mul *= (1 + this._getItemBonus('sell'));
       return mul;
     },
 
@@ -356,6 +389,7 @@
         if (v) base = v.speed;
       }
       if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
+      base *= (1 + this._getItemBonus('speed'));
       return base;
     },
 
@@ -374,7 +408,7 @@
     },
 
     getEnergyMax: function() {
-      return 100 + (this.state.gymLevel * 20);
+      return 100 + (this.state.gymLevel * 20) + this._getItemBonus('energy');
     },
 
     getEnergyRegen: function() {

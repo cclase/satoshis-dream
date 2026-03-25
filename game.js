@@ -12,9 +12,9 @@
   ];
 
   var DARK_WEB = [
-    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 100,   rate: 1200,  heat: 0,    cur: 'usd', desc: 'Passive hash' },
-    { id: 'd2', name: 'Coolant', icon: '\u2744\uFE0F', base: 500,   rate: 0,     heat: -0.05, cur: 'usd', desc: '-Heat gen' },
-    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 10000, rate: 25000, heat: 15,   cur: 'usd', desc: 'Deep-web nodes' },
+    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 500,    rate: 50,    heat: 2,    cur: 'usd', desc: '+50/s, +heat, +risk' },
+    { id: 'd2', name: 'Coolant', icon: '\u2744\uFE0F', base: 1000,  rate: 0,     heat: -0.05, cur: 'usd', desc: '-Heat gen' },
+    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 25000, rate: 500,   heat: 8,    cur: 'usd', desc: '+500/s, high heat+risk' },
   ];
 
   var HOUSING = [
@@ -26,11 +26,11 @@
   ];
 
   var VEHICLES = [
-    { id: 'bicycle',   name: 'Bicycle',     icon: '\u{1F6B2}', speed: 1.25, cost: 50,     cur: 'usd' },
-    { id: 'scooter',   name: 'Scooter',     icon: '\u{1F6F5}', speed: 1.5,  cost: 200,    cur: 'usd' },
-    { id: 'car',       name: 'Car',         icon: '\u{1F697}', speed: 2.0,  cost: 2000,   cur: 'usd' },
-    { id: 'sports',    name: 'Sports Car',  icon: '\u{1F3CE}\uFE0F', speed: 3.0,  cost: 25000,  cur: 'usd' },
-    { id: 'heli',      name: 'Helicopter',  icon: '\u{1F681}', speed: 5.0,  cost: 500000, cur: 'usd' },
+    { id: 'bicycle',   name: 'Bicycle',     icon: '\u{1F6B2}', speed: 1.2,  cost: 50,     cur: 'usd' },
+    { id: 'scooter',   name: 'Scooter',     icon: '\u{1F6F5}', speed: 1.4,  cost: 200,    cur: 'usd' },
+    { id: 'car',       name: 'Car',         icon: '\u{1F697}', speed: 1.6,  cost: 2000,   cur: 'usd' },
+    { id: 'sports',    name: 'Sports Car',  icon: '\u{1F3CE}\uFE0F', speed: 1.8,  cost: 25000,  cur: 'usd' },
+    { id: 'heli',      name: 'Helicopter',  icon: '\u{1F681}', speed: 2.5,  cost: 500000, cur: 'usd' },
   ];
 
   var PETS = [
@@ -155,7 +155,7 @@
       var s = this.state;
       if (!s.avatar || !s.lastTick) return;
       var elapsed = (Date.now() - s.lastTick) / 1000;
-      if (elapsed < 10) return; // less than 10s, skip
+      if (elapsed < 60) return; // less than 60s, skip (prevents refresh exploit)
       elapsed = Math.min(elapsed, MAX_OFFLINE_SECS);
       var rate = this.getProductionRate();
       if (rate <= 0 && !this.hasPrestigeUpgrade('pu_automine')) return;
@@ -495,6 +495,7 @@
     tick: function(dt) {
       var s = this.state;
       var now = Date.now();
+      s.lastTick = now; // Update every tick so offline calc is accurate
 
       // Production
       var rate = this.getProductionRate();
@@ -510,7 +511,8 @@
       for (var j = 0; j < DARK_WEB.length; j++) {
         if (DARK_WEB[j].id !== 'd2') hGen += (s.owned[DARK_WEB[j].id] || 0) * DARK_WEB[j].heat;
       }
-      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 15 * dt) - (4 * dt)));
+      // Heat gen scaled by /8 (was /15), passive cooling at 1.5/s (was 4/s)
+      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 8 * dt) - (1.5 * dt)));
 
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.15; // per second base
@@ -532,21 +534,36 @@
         }
       }
 
-      // Loan interest (compounds daily, check every 60s)
+      // Loan interest (compounds every 30s, auto-deducts payment)
       if (s.loans.length > 0) {
         if (!s.loanTime) s.loanTime = now;
-        if (now - s.loanTime > 60000) {
+        if (now - s.loanTime > 30000) {
           var loan = s.loans[0];
           var loanDef = LOANS.find(function(l) { return l.id === loan.id; });
           if (loanDef) {
-            loan.owed *= (1 + loanDef.rate * 0.001); // Small compound per minute
+            loan.owed *= (1 + loanDef.rate * 0.01); // 1% of rate per 30s — much faster compound
+          }
+          // Auto-deduct minimum payment (2% of owed) from USD
+          var minPayment = loan.owed * 0.02;
+          if (s.usd >= minPayment) {
+            s.usd -= minPayment;
+            loan.owed -= minPayment;
+          } else {
+            // Can't pay — add penalty interest
+            loan.owed *= 1.02;
           }
           s.loanTime = now;
-          // Default: if owed > 5x original
-          if (loan.owed > loan.amount * 5) {
+          // Fully paid off
+          if (loan.owed <= 1) {
             s.loans = [];
-            s.sats = Math.floor(s.sats * 0.5); // Penalty
-            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost 50% sats!');
+            if (UI && UI.toast) UI.toast('\u2705 Loan fully paid off!');
+          }
+          // Default: if owed > 3x original (was 5x, now stricter)
+          if (loan.owed > loan.amount * 3) {
+            s.loans = [];
+            s.sats = Math.floor(s.sats * 0.5);
+            s.usd = Math.max(0, s.usd - loan.amount * 0.5); // Also lose USD
+            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost 50% sats and $' + Game.formatNumber(loan.amount * 0.5) + '!');
           }
         }
       }

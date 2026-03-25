@@ -1,0 +1,22 @@
+{
+  "name": "Satoshi's Dream - Idle Bitcoin Miner",
+  "short_name": "Satoshi's Dream",
+  "description": "Mine your way from a rusty laptop to a quantum mining empire!",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0a1a",
+  "theme_color": "#f7931a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

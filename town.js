@@ -41,83 +41,6 @@
     { x: 1216, w: 50 },
   ];
 
-  // ── Helpers ──
-  function hexToColor3(hex) {
-    hex = hex.replace('#', '');
-    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-    return new BABYLON.Color3(
-      parseInt(hex.substring(0,2), 16) / 255,
-      parseInt(hex.substring(2,4), 16) / 255,
-      parseInt(hex.substring(4,6), 16) / 255
-    );
-  }
-
-  function makeBrickCanvas(baseHex) {
-    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    var ctx = c.getContext('2d');
-    var r = parseInt(baseHex.substr(1,2),16), g = parseInt(baseHex.substr(3,2),16), bl = parseInt(baseHex.substr(5,2),16);
-    ctx.fillStyle = '#a09080'; ctx.fillRect(0,0,128,128);
-    var bw = 28, bh = 12, gap = 3;
-    for (var row = 0; row * (bh+gap) < 128; row++) {
-      var off = (row%2) * (bw/2);
-      for (var col = -1; col * (bw+gap) < 140; col++) {
-        var v = (Math.random()-0.5)*25;
-        ctx.fillStyle = 'rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
-        ctx.fillRect(off + col*(bw+gap), row*(bh+gap), bw, bh);
-      }
-    }
-    return c;
-  }
-
-  function makeStuccoCanvas(baseHex) {
-    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = baseHex; ctx.fillRect(0,0,128,128);
-    var id = ctx.getImageData(0,0,128,128);
-    for (var i = 0; i < id.data.length; i+=4) {
-      var n = (Math.random()-0.5)*18;
-      id.data[i] = Math.max(0,Math.min(255,id.data[i]+n));
-      id.data[i+1] = Math.max(0,Math.min(255,id.data[i+1]+n));
-      id.data[i+2] = Math.max(0,Math.min(255,id.data[i+2]+n));
-    }
-    ctx.putImageData(id,0,0);
-    return c;
-  }
-
-  function makeStoneCanvas(baseHex) {
-    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    var ctx = c.getContext('2d');
-    var r = parseInt(baseHex.substr(1,2),16), g = parseInt(baseHex.substr(3,2),16), bl = parseInt(baseHex.substr(5,2),16);
-    ctx.fillStyle = '#888880'; ctx.fillRect(0,0,128,128);
-    var rowH = 22, gap2 = 3;
-    for (var row = 0; row * (rowH+gap2) < 140; row++) {
-      var off = (row%2) * 20; var x = -off;
-      while (x < 128) {
-        var sw = 28 + Math.floor(Math.random()*20);
-        var v = (Math.random()-0.5)*20;
-        ctx.fillStyle = 'rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
-        ctx.fillRect(x+gap2, row*(rowH+gap2)+gap2, sw-gap2, rowH-gap2); x += sw;
-      }
-    }
-    return c;
-  }
-
-  function makeRoofCanvas(baseHex) {
-    var c = document.createElement('canvas'); c.width = 128; c.height = 128;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = baseHex; ctx.fillRect(0,0,128,128);
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
-    for (var row = 0; row < 13; row++) {
-      var y = row * 10;
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(128,y); ctx.stroke();
-      var off = (row%2)*14;
-      for (var x = off; x < 128; x += 28) {
-        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+10); ctx.stroke();
-      }
-    }
-    return c;
-  }
-
   // ── Road Pathfinding ──
   // Build waypoint graph from road intersections + building entrances
   var ROAD_CENTERS_H = H_ROADS.map(function(r) { return r.y + r.h / 2; });
@@ -211,53 +134,73 @@
     return false;
   }
 
+
+  // ── Babylon.js Helpers ──
+  function hexToColor3(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    return new BABYLON.Color3(parseInt(hex.substring(0,2),16)/255, parseInt(hex.substring(2,4),16)/255, parseInt(hex.substring(4,6),16)/255);
+  }
+  function makeBrickCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d');
+    var r=parseInt(baseHex.substr(1,2),16), g=parseInt(baseHex.substr(3,2),16), bl=parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle='#a09080'; ctx.fillRect(0,0,128,128);
+    for(var row=0;row*15<128;row++){var off=(row%2)*14;
+      for(var col=-1;col*31<140;col++){var v=(Math.random()-0.5)*25;
+        ctx.fillStyle='rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(off+col*31, row*15, 28, 12);}}
+    return c;
+  }
+  function makeStuccoCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d'); ctx.fillStyle=baseHex; ctx.fillRect(0,0,128,128);
+    var id=ctx.getImageData(0,0,128,128);
+    for(var i=0;i<id.data.length;i+=4){var n=(Math.random()-0.5)*18;
+      id.data[i]=Math.max(0,Math.min(255,id.data[i]+n));id.data[i+1]=Math.max(0,Math.min(255,id.data[i+1]+n));id.data[i+2]=Math.max(0,Math.min(255,id.data[i+2]+n));}
+    ctx.putImageData(id,0,0); return c;
+  }
+  function makeStoneCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d');
+    var r=parseInt(baseHex.substr(1,2),16), g=parseInt(baseHex.substr(3,2),16), bl=parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle='#888880'; ctx.fillRect(0,0,128,128);
+    for(var row=0;row*25<140;row++){var off=(row%2)*20; var x=-off;
+      while(x<128){var sw=28+Math.floor(Math.random()*20); var v=(Math.random()-0.5)*20;
+        ctx.fillStyle='rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(x+3,row*25+3,sw-3,22); x+=sw;}}
+    return c;
+  }
+  function makeRoofCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d'); ctx.fillStyle=baseHex; ctx.fillRect(0,0,128,128);
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
+    for(var row=0;row<13;row++){var y=row*10;
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();
+      var off=(row%2)*14;for(var x=off;x<128;x+=28){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+10);ctx.stroke();}}
+    return c;
+  }
+
   // ── Building Style Data ──
-  var WALL_COLORS = {
-    mine:'#c4956a', hardware:'#b8a88a', exchange:'#d4c8b0', bank:'#e8dcc8',
-    diner:'#cc6655', coffee:'#8b7355', university:'#c8b8a0', hospital:'#e0d8d0',
-    internet_cafe:'#7a8878', casino:'#9a6688', post_office:'#b0a898', gym:'#bb8844',
-    real_estate:'#a8b898', car_dealer:'#c0b8b0', pet_shop:'#d8b8a0', pawn_shop:'#998866',
-    utility:'#8899aa', apartment:'#c0b0a0'
-  };
-  var BLDG_HEIGHTS = {
-    mine:65, hardware:50, exchange:55, bank:95, diner:32, coffee:30,
-    university:70, hospital:65, internet_cafe:40, casino:55, post_office:45,
-    gym:38, real_estate:35, car_dealer:30, pet_shop:32, pawn_shop:30,
-    utility:45, apartment:40
-  };
+  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',apartment:'#c0b0a0'};
+  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,apartment:40};
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
 
   // ── Town Object ──
   var Town = {
-    canvas: null,
-    camera: { x: 0, y: 0 },
-    nearbyBuilding: null,
-    moveTarget: null,
-    _pathWaypoints: null,
-    autoEnterBuilding: null,
-    BUILDINGS: BUILDINGS,
-
-    // Babylon.js objects
-    _engine: null,
-    _scene: null,
-    _camera3: null,
-    _groundMesh: null,
-    _avatarRoot: null,
-    _avatarBody: null,
-    _avatarHead: null,
-    _avatarLabelTex: null,
-    _avatarLastName: null,
-    _moveTargetMesh: null,
-    _promptMesh: null,
-    _buildingMeshes: [],
-    _time: 0,
+    canvas: null, camera: { x: 0, y: 0 },
+    nearbyBuilding: null, moveTarget: null, _pathWaypoints: null,
+    autoEnterBuilding: null, BUILDINGS: BUILDINGS,
+    _engine: null, _scene: null, _camera3: null, _groundMesh: null,
+    _avatarRoot: null, _avatarBody: null, _avatarHead: null,
+    _avatarLabelTex: null, _avatarLastName: null,
+    _moveTargetMesh: null, _promptMesh: null,
+    _buildingMeshes: [], _time: 0,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
-
-      // Babylon.js engine + scene
       this._engine = new BABYLON.Engine(canvasEl, true);
       this._scene = new BABYLON.Scene(this._engine);
       this._scene.clearColor = new BABYLON.Color4(0.35, 0.2, 0.25, 1);
@@ -266,591 +209,238 @@
       this._scene.fogDensity = 0.00015;
       this._scene.fogColor = new BABYLON.Color3(0.35, 0.2, 0.25);
 
-      // Camera
       this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 500,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
       this._camera3.inputs.clear();
 
-      // Lighting
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
-      hemi.intensity = 0.5;
-      hemi.diffuse = new BABYLON.Color3(1, 0.9, 0.7);
-      hemi.groundColor = new BABYLON.Color3(0.2, 0.25, 0.3);
+      hemi.intensity = 0.5; hemi.diffuse = new BABYLON.Color3(1,0.9,0.7);
+      hemi.groundColor = new BABYLON.Color3(0.2,0.25,0.3);
 
       var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-1,-2,-0.5), this._scene);
-      sun.intensity = 0.8;
-      sun.diffuse = new BABYLON.Color3(1, 0.8, 0.5);
-      sun.position = new BABYLON.Vector3(2000, 800, -200);
+      sun.intensity = 0.8; sun.diffuse = new BABYLON.Color3(1,0.8,0.5);
+      sun.position = new BABYLON.Vector3(2000,800,-200);
+      this._shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+      this._shadowGen.useBlurExponentialShadowMap = true;
 
-      var shadowGen = new BABYLON.ShadowGenerator(1024, sun);
-      shadowGen.useBlurExponentialShadowMap = true;
-      shadowGen.blurKernel = 8;
-      this._shadowGen = shadowGen;
+      this._buildGround(); this._buildRoads(); this._buildBuildings();
+      this._buildTrees(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
 
-      // Build scene
-      this._buildGround();
-      this._buildRoads();
-      this._buildBuildings();
-      this._buildTrees();
-      this._buildAvatar();
-      this._buildMoveTarget();
-      this._buildPrompt();
-
-      // Resize
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
 
-      // Click-to-move using Babylon picking
-      function handleMapTap(evt) {
+      canvasEl.addEventListener('pointerup', function() {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
         var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY, function(m) { return m === self._groundMesh; });
         if (!pick.hit) return;
-        var worldX = pick.pickedPoint.x;
-        var worldY = pick.pickedPoint.z;
-
-        // Check if tapped on a building
+        var worldX = pick.pickedPoint.x, worldY = pick.pickedPoint.z;
         var tappedBuilding = null;
         for (var i = 0; i < BUILDINGS.length; i++) {
           var b = BUILDINGS[i];
-          if (worldX >= b.x && worldX <= b.x + b.w && worldY >= b.y && worldY <= b.y + b.h) {
-            tappedBuilding = b;
-            break;
-          }
+          if (worldX >= b.x && worldX <= b.x+b.w && worldY >= b.y && worldY <= b.y+b.h) { tappedBuilding = b; break; }
         }
-
-        self._pathWaypoints = null; // Clear existing path
+        self._pathWaypoints = null;
         if (tappedBuilding) {
-          self.moveTarget = { x: tappedBuilding.x + tappedBuilding.w / 2, y: tappedBuilding.y + tappedBuilding.h + 30 };
+          self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
           self.autoEnterBuilding = tappedBuilding;
-        } else {
-          self.moveTarget = { x: worldX, y: worldY };
-          self.autoEnterBuilding = null;
-        }
-      }
-
-      canvasEl.addEventListener('pointerup', handleMapTap);
+        } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
+      });
     },
 
-    // ── Scene Construction ──
-
     _buildGround: function() {
-      // Main ground plane
-      var groundGeo = new THREE.PlaneGeometry(WORLD_W + 200, WORLD_H + 200);
-      var groundMat = new THREE.MeshStandardMaterial({
-        color: 0x3a3530,
-        roughness: 0.95,
-        metalness: 0.1
-      });
-      this._groundPlane = new THREE.Mesh(groundGeo, groundMat);
-      this._groundPlane.rotation.x = -Math.PI / 2;
-      this._groundPlane.position.set(WORLD_W / 2, -0.5, WORLD_H / 2);
-      this._groundPlane.receiveShadow = true;
-      this._scene.add(this._groundPlane);
-
-      // Subtle grid lines on ground
-      var gridMat = new THREE.LineBasicMaterial({ color: 0x4a4540, transparent: true, opacity: 0.25 });
-      var gridGeo = new THREE.BufferGeometry();
-      var gridVerts = [];
-      for (var gx = 0; gx <= WORLD_W; gx += 64) {
-        gridVerts.push(gx, 0.1, 0, gx, 0.1, WORLD_H);
-      }
-      for (var gy = 0; gy <= WORLD_H; gy += 64) {
-        gridVerts.push(0, 0.1, gy, WORLD_W, 0.1, gy);
-      }
-      gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridVerts, 3));
-      var grid = new THREE.LineSegments(gridGeo, gridMat);
-      this._scene.add(grid);
-
-      // Green grass patches between buildings
-      var grassMat = new THREE.MeshStandardMaterial({ color: 0x3a6630, roughness: 0.95, metalness: 0.0 });
-      var rng = function(seed) { return ((Math.sin(seed * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1; };
-      for (var gi = 0; gi < 20; gi++) {
-        var gpx = rng(gi * 3 + 1) * WORLD_W;
-        var gpz = rng(gi * 3 + 2) * WORLD_H;
-        // Skip if on a building or road
-        var onBuilding = false;
-        for (var bi = 0; bi < BUILDINGS.length; bi++) {
-          var bb = BUILDINGS[bi];
-          if (gpx >= bb.x - 20 && gpx <= bb.x + bb.w + 20 && gpz >= bb.y - 20 && gpz <= bb.y + bb.h + 20) { onBuilding = true; break; }
-        }
-        if (onBuilding) continue;
-        var onRoad = false;
-        for (var ri = 0; ri < H_ROADS.length; ri++) { if (gpz >= H_ROADS[ri].y - 10 && gpz <= H_ROADS[ri].y + H_ROADS[ri].h + 10) { onRoad = true; break; } }
-        for (var vi = 0; vi < V_ROADS.length; vi++) { if (gpx >= V_ROADS[vi].x - 10 && gpx <= V_ROADS[vi].x + V_ROADS[vi].w + 10) { onRoad = true; break; } }
-        if (onRoad) continue;
-        var gSize = 30 + rng(gi * 7) * 50;
-        var grassGeo = new THREE.PlaneGeometry(gSize, gSize);
-        var grassMesh = new THREE.Mesh(grassGeo, grassMat);
-        grassMesh.rotation.x = -Math.PI / 2;
-        grassMesh.position.set(gpx, 0.15, gpz);
-        this._scene.add(grassMesh);
-      }
+      var s = this._scene;
+      var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
+      ground.position.x=WORLD_W/2; ground.position.z=WORLD_H/2; ground.receiveShadows=true;
+      var gc=document.createElement('canvas'); gc.width=256; gc.height=256;
+      var gctx=gc.getContext('2d'); gctx.fillStyle='#7a6e5e'; gctx.fillRect(0,0,256,256);
+      var gid=gctx.getImageData(0,0,256,256);
+      for(var i=0;i<gid.data.length;i+=4){var n=(Math.random()-0.5)*30;gid.data[i]=Math.min(255,Math.max(0,gid.data[i]+n));gid.data[i+1]=Math.min(255,Math.max(0,gid.data[i+1]+n));gid.data[i+2]=Math.min(255,Math.max(0,gid.data[i+2]+n));}
+      gctx.putImageData(gid,0,0);
+      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=40; gtex.vScale=40;
+      var gmat=new BABYLON.StandardMaterial('gmat',s); gmat.diffuseTexture=gtex;
+      ground.material=gmat; this._groundMesh=ground;
     },
 
     _buildRoads: function() {
-      var roadMat = new THREE.MeshStandardMaterial({
-        color: 0x555550,
-        roughness: 0.9,
-        metalness: 0.05
-      });
-      var sidewalkMat = new THREE.MeshStandardMaterial({
-        color: 0x998877,
-        roughness: 0.85,
-        metalness: 0.02
-      });
-
-      // Dashed yellow center-line material
-      var lineMat = new THREE.LineDashedMaterial({
-        color: 0xcccc99,
-        dashSize: 20,
-        gapSize: 15,
-        linewidth: 1
-      });
-
-      var sidewalkW = 10;
-
-      for (var ri = 0; ri < H_ROADS.length; ri++) {
-        var hr = H_ROADS[ri];
-        var rGeo = new THREE.PlaneGeometry(WORLD_W, hr.h);
-        var rMesh = new THREE.Mesh(rGeo, roadMat);
-        rMesh.rotation.x = -Math.PI / 2;
-        rMesh.position.set(WORLD_W / 2, 0.2, hr.y + hr.h / 2);
-        this._scene.add(rMesh);
-
-        // Sidewalks along both sides
-        var swGeoTop = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
-        var swTop = new THREE.Mesh(swGeoTop, sidewalkMat);
-        swTop.rotation.x = -Math.PI / 2;
-        swTop.position.set(WORLD_W / 2, 0.25, hr.y - sidewalkW / 2);
-        this._scene.add(swTop);
-        var swGeoBot = new THREE.PlaneGeometry(WORLD_W, sidewalkW);
-        var swBot = new THREE.Mesh(swGeoBot, sidewalkMat);
-        swBot.rotation.x = -Math.PI / 2;
-        swBot.position.set(WORLD_W / 2, 0.25, hr.y + hr.h + sidewalkW / 2);
-        this._scene.add(swBot);
-
-        // Center line
-        var lineGeo = new THREE.BufferGeometry();
-        lineGeo.setAttribute('position', new THREE.Float32BufferAttribute([
-          0, 0.4, hr.y + hr.h / 2, WORLD_W, 0.4, hr.y + hr.h / 2
-        ], 3));
-        var line = new THREE.Line(lineGeo, lineMat);
-        line.computeLineDistances();
-        this._scene.add(line);
+      var s=this._scene;
+      var rmat=new BABYLON.StandardMaterial('rmat',s); rmat.diffuseColor=new BABYLON.Color3(0.27,0.27,0.25);
+      var swmat=new BABYLON.StandardMaterial('swmat',s); swmat.diffuseColor=new BABYLON.Color3(0.63,0.6,0.53);
+      var lmat=new BABYLON.StandardMaterial('lmat',s); lmat.diffuseColor=new BABYLON.Color3(0.8,0.8,0.4); lmat.emissiveColor=new BABYLON.Color3(0.2,0.2,0.1);
+      for(var ri=0;ri<H_ROADS.length;ri++){
+        var hr=H_ROADS[ri]; var cz=hr.y+hr.h/2;
+        var rd=BABYLON.MeshBuilder.CreateGround('hr'+ri,{width:2400,height:hr.h},s);
+        rd.position.x=1200;rd.position.y=0.15;rd.position.z=cz;rd.material=rmat;rd.receiveShadows=true;
+        var sw1=BABYLON.MeshBuilder.CreateGround('hsw1'+ri,{width:2400,height:12},s);
+        sw1.position.set(1200,0.3,hr.y-6);sw1.material=swmat;sw1.receiveShadows=true;
+        var sw2=BABYLON.MeshBuilder.CreateGround('hsw2'+ri,{width:2400,height:12},s);
+        sw2.position.set(1200,0.3,hr.y+hr.h+6);sw2.material=swmat;sw2.receiveShadows=true;
+        for(var d=0;d<30;d++){var dx=d*80+20;if(dx>2400)break;
+          var dash=BABYLON.MeshBuilder.CreateGround('hd'+ri+'_'+d,{width:40,height:3},s);
+          dash.position.set(dx,0.2,cz);dash.material=lmat;}
       }
-
-      for (var vi = 0; vi < V_ROADS.length; vi++) {
-        var vr = V_ROADS[vi];
-        var vrGeo = new THREE.PlaneGeometry(vr.w, WORLD_H);
-        var vrMesh = new THREE.Mesh(vrGeo, roadMat);
-        vrMesh.rotation.x = -Math.PI / 2;
-        vrMesh.position.set(vr.x + vr.w / 2, 0.2, WORLD_H / 2);
-        this._scene.add(vrMesh);
-
-        // Sidewalks along both sides
-        var vswGeoL = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
-        var vswL = new THREE.Mesh(vswGeoL, sidewalkMat);
-        vswL.rotation.x = -Math.PI / 2;
-        vswL.position.set(vr.x - sidewalkW / 2, 0.25, WORLD_H / 2);
-        this._scene.add(vswL);
-        var vswGeoR = new THREE.PlaneGeometry(sidewalkW, WORLD_H);
-        var vswR = new THREE.Mesh(vswGeoR, sidewalkMat);
-        vswR.rotation.x = -Math.PI / 2;
-        vswR.position.set(vr.x + vr.w + sidewalkW / 2, 0.25, WORLD_H / 2);
-        this._scene.add(vswR);
-
-        var vlGeo = new THREE.BufferGeometry();
-        vlGeo.setAttribute('position', new THREE.Float32BufferAttribute([
-          vr.x + vr.w / 2, 0.4, 0, vr.x + vr.w / 2, 0.4, WORLD_H
-        ], 3));
-        var vline = new THREE.Line(vlGeo, lineMat);
-        vline.computeLineDistances();
-        this._scene.add(vline);
-      }
-    },
-
-    _buildSky: function() {
-      // Large inverted sphere for sunset sky
-      var skyGeo = new THREE.SphereGeometry(3000, 32, 16);
-      var skyCanvas = document.createElement('canvas');
-      skyCanvas.width = 256;
-      skyCanvas.height = 256;
-      var skyCtx = skyCanvas.getContext('2d');
-      var grad = skyCtx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, '#1a1030');
-      grad.addColorStop(0.3, '#3a2040');
-      grad.addColorStop(0.5, '#884455');
-      grad.addColorStop(0.7, '#cc7744');
-      grad.addColorStop(0.85, '#ffaa66');
-      grad.addColorStop(1, '#ffddaa');
-      skyCtx.fillStyle = grad;
-      skyCtx.fillRect(0, 0, 256, 256);
-      var skyTex = new THREE.CanvasTexture(skyCanvas);
-      var skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false });
-      var skyMesh = new THREE.Mesh(skyGeo, skyMat);
-      skyMesh.position.set(WORLD_W / 2, 0, WORLD_H / 2);
-      this._scene.add(skyMesh);
-    },
-
-    _buildTrees: function() {
-      var greens = [0x336633, 0x447744, 0x2a5a2a, 0x558855];
-      var trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9, metalness: 0.0 });
-      var rng = function(seed) { return ((Math.sin(seed * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1; };
-
-      for (var ti = 0; ti < 30; ti++) {
-        var tx = rng(ti * 5 + 100) * WORLD_W;
-        var tz = rng(ti * 5 + 101) * WORLD_H;
-
-        // Skip if on a building
-        var onBuilding = false;
-        for (var bi = 0; bi < BUILDINGS.length; bi++) {
-          var bb = BUILDINGS[bi];
-          if (tx >= bb.x - 15 && tx <= bb.x + bb.w + 15 && tz >= bb.y - 15 && tz <= bb.y + bb.h + 15) { onBuilding = true; break; }
-        }
-        if (onBuilding) continue;
-
-        // Skip if on a road
-        var onRoad = false;
-        for (var ri = 0; ri < H_ROADS.length; ri++) { if (tz >= H_ROADS[ri].y - 5 && tz <= H_ROADS[ri].y + H_ROADS[ri].h + 5) { onRoad = true; break; } }
-        for (var vi = 0; vi < V_ROADS.length; vi++) { if (tx >= V_ROADS[vi].x - 5 && tx <= V_ROADS[vi].x + V_ROADS[vi].w + 5) { onRoad = true; break; } }
-        if (onRoad) continue;
-
-        var trunkH = 20 + rng(ti * 5 + 102) * 10;
-        var canopyR = 12 + rng(ti * 5 + 103) * 6;
-        var greenColor = greens[ti % greens.length];
-
-        // Trunk
-        var trunkGeo = new THREE.CylinderGeometry(3, 3, trunkH, 6);
-        var trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.set(tx, trunkH / 2, tz);
-        trunk.castShadow = true;
-        this._scene.add(trunk);
-
-        // Canopy - alternate between cone and sphere
-        var canopyMat = new THREE.MeshStandardMaterial({ color: greenColor, roughness: 0.9, metalness: 0.0 });
-        var canopy;
-        if (ti % 2 === 0) {
-          var coneGeo = new THREE.ConeGeometry(canopyR, canopyR * 1.8, 8);
-          canopy = new THREE.Mesh(coneGeo, canopyMat);
-        } else {
-          var sphereGeo = new THREE.SphereGeometry(canopyR, 8, 6);
-          canopy = new THREE.Mesh(sphereGeo, canopyMat);
-        }
-        canopy.position.set(tx, trunkH + canopyR * 0.6, tz);
-        canopy.castShadow = true;
-        this._scene.add(canopy);
+      for(var vi=0;vi<V_ROADS.length;vi++){
+        var vr=V_ROADS[vi]; var cx=vr.x+vr.w/2;
+        var vrd=BABYLON.MeshBuilder.CreateGround('vr'+vi,{width:vr.w,height:1700},s);
+        vrd.position.x=cx;vrd.position.y=0.15;vrd.position.z=850;vrd.material=rmat;vrd.receiveShadows=true;
+        var vsw1=BABYLON.MeshBuilder.CreateGround('vsw1'+vi,{width:12,height:1700},s);
+        vsw1.position.set(vr.x-6,0.3,850);vsw1.material=swmat;vsw1.receiveShadows=true;
+        var vsw2=BABYLON.MeshBuilder.CreateGround('vsw2'+vi,{width:12,height:1700},s);
+        vsw2.position.set(vr.x+vr.w+6,0.3,850);vsw2.material=swmat;vsw2.receiveShadows=true;
+        for(var vd=0;vd<22;vd++){var dz=vd*80+20;if(dz>1700)break;
+          var vdash=BABYLON.MeshBuilder.CreateGround('vd'+vi+'_'+vd,{width:3,height:40},s);
+          vdash.position.set(cx,0.2,dz);vdash.material=lmat;}
       }
     },
 
     _buildBuildings: function() {
-      this._buildingMeshes = [];
-      this._buildingEdgeMeshes = [];
+      var s=this._scene; this._buildingMeshes=[];
+      var winMat=new BABYLON.StandardMaterial('winM',s);
+      winMat.emissiveColor=new BABYLON.Color3(1,0.93,0.8); winMat.diffuseColor=new BABYLON.Color3(0.1,0.1,0.1);
+      var doorMat=new BABYLON.StandardMaterial('doorM',s); doorMat.diffuseColor=new BABYLON.Color3(0.25,0.15,0.08);
 
-      // Wall colors per building type
-      var wallColors = {
-        mine: '#c4956a', hardware: '#b8a88a', exchange: '#d4c8b0', bank: '#e8dcc8',
-        diner: '#cc6655', coffee: '#8b7355', university: '#c8b8a0', hospital: '#e0d8d0',
-        internet_cafe: '#7a8878', casino: '#9a6688', post_office: '#b0a898', gym: '#bb8844',
-        real_estate: '#a8b898', car_dealer: '#c0b8b0', pet_shop: '#d8b8a0', pawn_shop: '#998866',
-        utility: '#8899aa', apartment: '#c0b0a0'
-      };
+      for(var i=0;i<BUILDINGS.length;i++){
+        var b=BUILDINGS[i]; var bt=b.panelType;
+        var bh=BLDG_HEIGHTS[bt]||40; var wallHex=WALL_COLORS[bt]||'#c0b0a0';
+        var roofHex=ROOF_COLORS[i%ROOF_COLORS.length];
 
-      // Roof colors cycled per building
-      var roofColors = ['#9a5533', '#554433', '#667766', '#884444'];
+        // Wall texture
+        var wc; if(BRICK_TYPES.indexOf(bt)!==-1) wc=makeBrickCanvas(wallHex);
+        else if(STONE_TYPES.indexOf(bt)!==-1) wc=makeStoneCanvas(wallHex);
+        else wc=makeStuccoCanvas(wallHex);
+        var wmat=new BABYLON.StandardMaterial('wm'+b.id,s);
+        var wtex=new BABYLON.Texture(wc.toDataURL(),s); wmat.diffuseTexture=wtex;
 
-      // Building heights by category
-      var buildingHeights = {
-        mine: 70, hardware: 50, exchange: 55, bank: 95,
-        diner: 35, coffee: 30, university: 70, hospital: 75,
-        internet_cafe: 45, casino: 65, post_office: 48, gym: 50,
-        real_estate: 65, car_dealer: 60, pet_shop: 32, pawn_shop: 35,
-        utility: 52, apartment: 55
-      };
+        // Body
+        var body=BABYLON.MeshBuilder.CreateBox('b'+b.id,{width:b.w,height:bh,depth:b.h},s);
+        body.position.set(b.x+b.w/2, bh/2, b.y+b.h/2);
+        body.material=wmat; body.receiveShadows=true;
+        this._shadowGen.addShadowCaster(body);
+        this._buildingMeshes.push(body);
 
-      // Shop types that get awnings
-      var awningTypes = { diner: '#cc3333', coffee: '#664422', pet_shop: '#dd8866', pawn_shop: '#887744' };
+        // Peaked roof (pyramid)
+        var roof=BABYLON.MeshBuilder.CreateCylinder('r'+b.id,{diameterTop:0,diameterBottom:1,height:1,tessellation:4},s);
+        roof.scaling.set(b.w*1.1, bh*0.35, b.h*1.1);
+        roof.rotation.y=Math.PI/4;
+        roof.position.set(b.x+b.w/2, bh+(bh*0.35)/2, b.y+b.h/2);
+        var rc=makeRoofCanvas(roofHex);
+        var rmat=new BABYLON.StandardMaterial('rm'+b.id,s);
+        rmat.diffuseTexture=new BABYLON.Texture(rc.toDataURL(),s);
+        roof.material=rmat; roof.receiveShadows=true;
 
-      for (var i = 0; i < BUILDINGS.length; i++) {
-        var b = BUILDINGS[i];
-        var bGroup = new THREE.Group();
-        var wallHex = wallColors[b.panelType] || '#bbaa99';
-        var buildingHeight = buildingHeights[b.panelType] || 50;
+        // Windows
+        var floors=Math.max(1,Math.floor(bh*0.75/18));
+        var cols=Math.max(1,Math.floor(b.w/20));
+        var colStart=(b.x+b.w/2)-((cols-1)*20)/2;
+        for(var fl=0;fl<floors;fl++){for(var wci=0;wci<cols;wci++){
+          var wx=colStart+wci*20, wy=10+fl*18;
+          var wf=BABYLON.MeshBuilder.CreatePlane('wf'+b.id+fl+wci,{width:12,height:10},s);
+          wf.position.set(wx,wy,b.y+b.h+0.5); wf.material=winMat;
+          var wb=BABYLON.MeshBuilder.CreatePlane('wb'+b.id+fl+wci,{width:12,height:10},s);
+          wb.position.set(wx,wy,b.y-0.5); wb.rotation.y=Math.PI; wb.material=winMat;
+        }}
 
-        // 1. Main body
-        var bodyMat = new THREE.MeshStandardMaterial({
-          color: wallHex,
-          roughness: 0.8,
-          metalness: 0.05
-        });
-        var bodyGeo = new THREE.BoxGeometry(b.w, buildingHeight, b.h);
-        var bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-        bodyMesh.position.set(b.x + b.w / 2, buildingHeight / 2, b.y + b.h / 2);
-        bodyMesh.castShadow = true;
-        bodyMesh.receiveShadow = true;
-        bGroup.add(bodyMesh);
-        this._buildingMeshes.push(bodyMesh);
+        // Door
+        var door=BABYLON.MeshBuilder.CreatePlane('d'+b.id,{width:14,height:20},s);
+        door.position.set(b.x+b.w/2,10,b.y+b.h+0.5); door.material=doorMat;
 
-        // Edge highlight for nearby detection
-        var edgeGeo = new THREE.EdgesGeometry(bodyGeo);
-        var edgeMat = new THREE.LineBasicMaterial({
-          color: 0x887766,
-          transparent: true,
-          opacity: 0.6
-        });
-        var edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
-        edgeMesh.position.copy(bodyMesh.position);
-        bGroup.add(edgeMesh);
-        this._buildingEdgeMeshes.push(edgeMesh);
+        // Label
+        var ltex=new BABYLON.DynamicTexture('lt'+b.id,{width:256,height:64},s,false);
+        var lctx=ltex.getContext(); lctx.font='bold 28px sans-serif'; lctx.fillStyle='#ffffff';
+        lctx.textAlign='center'; lctx.fillText(b.name,128,40); ltex.update(); ltex.hasAlpha=true;
+        var lmat2=new BABYLON.StandardMaterial('lm'+b.id,s);
+        lmat2.diffuseTexture=ltex; lmat2.emissiveColor=new BABYLON.Color3(1,1,1); lmat2.backFaceCulling=false;
+        var lp=BABYLON.MeshBuilder.CreatePlane('lp'+b.id,{width:40,height:10},s);
+        lp.position.set(b.x+b.w/2, bh+bh*0.35+8, b.y+b.h/2);
+        lp.material=lmat2; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-        // 2. Peaked roof - triangular prism along longer axis
-        var roofHex = roofColors[i % roofColors.length];
-        var roofRGB = hexToRGB(roofHex);
-        var roofMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(roofRGB.r, roofRGB.g, roofRGB.b),
-          roughness: 0.85,
-          metalness: 0.05
-        });
-        var ridgeHeight = buildingHeight * 0.4;
-        var hw = b.w / 2;
-        var hd = b.h / 2;
-        var bx = b.x + b.w / 2;
-        var bz = b.y + b.h / 2;
-        var roofY = buildingHeight;
+        // Emoji
+        var etex=new BABYLON.DynamicTexture('et'+b.id,{width:128,height:128},s,false);
+        var ectx=etex.getContext(); ectx.font='72px sans-serif'; ectx.textAlign='center';
+        ectx.textBaseline='middle'; ectx.fillText(b.emoji||'',64,64); etex.update(); etex.hasAlpha=true;
+        var emat=new BABYLON.StandardMaterial('em'+b.id,s);
+        emat.diffuseTexture=etex; emat.emissiveColor=new BABYLON.Color3(1,1,1); emat.backFaceCulling=false;
+        var ep=BABYLON.MeshBuilder.CreatePlane('ep'+b.id,{width:14,height:14},s);
+        ep.position.set(b.x+b.w/2, bh+bh*0.35+20, b.y+b.h/2);
+        ep.material=emat; ep.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+      }
+    },
 
-        if (b.w >= b.h) {
-          // Ridge along X axis (width is longer)
-          var roofVerts = new Float32Array([
-            // Left triangle
-            bx - hw, roofY, bz - hd,
-            bx - hw, roofY, bz + hd,
-            bx - hw, roofY + ridgeHeight, bz,
-            // Right triangle
-            bx + hw, roofY, bz - hd,
-            bx + hw, roofY, bz + hd,
-            bx + hw, roofY + ridgeHeight, bz,
-            // Front slope
-            bx - hw, roofY, bz + hd,
-            bx + hw, roofY, bz + hd,
-            bx + hw, roofY + ridgeHeight, bz,
-            bx - hw, roofY, bz + hd,
-            bx + hw, roofY + ridgeHeight, bz,
-            bx - hw, roofY + ridgeHeight, bz,
-            // Back slope
-            bx - hw, roofY, bz - hd,
-            bx + hw, roofY + ridgeHeight, bz,
-            bx + hw, roofY, bz - hd,
-            bx - hw, roofY, bz - hd,
-            bx - hw, roofY + ridgeHeight, bz,
-            bx + hw, roofY + ridgeHeight, bz
-          ]);
+    _buildTrees: function() {
+      var s=this._scene; var seed=12345;
+      function sr(){seed=(seed*16807)%2147483647;return(seed-1)/2147483646;}
+      var greens=['#336633','#447744','#2a5a2a','#558855','#3a7a3a'];
+      var placed=0, attempts=0;
+      while(placed<30 && attempts<500){attempts++;
+        var tx=sr()*WORLD_W, tz=sr()*WORLD_H, valid=true;
+        for(var i=0;i<BUILDINGS.length;i++){var bb=BUILDINGS[i];
+          if(tx>bb.x-30&&tx<bb.x+bb.w+30&&tz>bb.y-30&&tz<bb.y+bb.h+30){valid=false;break;}}
+        if(!valid)continue;
+        for(var j=0;j<H_ROADS.length;j++){if(tz>H_ROADS[j].y-10&&tz<H_ROADS[j].y+H_ROADS[j].h+10){valid=false;break;}}
+        if(!valid)continue;
+        for(var k=0;k<V_ROADS.length;k++){if(tx>V_ROADS[k].x-10&&tx<V_ROADS[k].x+V_ROADS[k].w+10){valid=false;break;}}
+        if(!valid)continue;
+        var th=15+sr()*10;
+        var trunk=BABYLON.MeshBuilder.CreateCylinder('tt'+placed,{diameter:5,height:th,tessellation:6},s);
+        var tmat=new BABYLON.StandardMaterial('ttm'+placed,s); tmat.diffuseColor=hexToColor3('#5a3a1a');
+        trunk.material=tmat; trunk.position.set(tx,th/2,tz);
+        var gHex=greens[Math.floor(sr()*greens.length)];
+        var cmat=new BABYLON.StandardMaterial('tcm'+placed,s); cmat.diffuseColor=hexToColor3(gHex);
+        var canopy; if(sr()>0.5){
+          canopy=BABYLON.MeshBuilder.CreateSphere('tc'+placed,{diameter:22+sr()*8,segments:6},s);
+          canopy.position.y=th+8;
         } else {
-          // Ridge along Z axis (height/depth is longer)
-          var roofVerts = new Float32Array([
-            // Near triangle
-            bx - hw, roofY, bz - hd,
-            bx + hw, roofY, bz - hd,
-            bx, roofY + ridgeHeight, bz - hd,
-            // Far triangle
-            bx - hw, roofY, bz + hd,
-            bx + hw, roofY, bz + hd,
-            bx, roofY + ridgeHeight, bz + hd,
-            // Left slope
-            bx - hw, roofY, bz - hd,
-            bx, roofY + ridgeHeight, bz - hd,
-            bx, roofY + ridgeHeight, bz + hd,
-            bx - hw, roofY, bz - hd,
-            bx, roofY + ridgeHeight, bz + hd,
-            bx - hw, roofY, bz + hd,
-            // Right slope
-            bx + hw, roofY, bz - hd,
-            bx, roofY + ridgeHeight, bz + hd,
-            bx, roofY + ridgeHeight, bz - hd,
-            bx + hw, roofY, bz - hd,
-            bx + hw, roofY, bz + hd,
-            bx, roofY + ridgeHeight, bz + hd
-          ]);
+          canopy=BABYLON.MeshBuilder.CreateCylinder('tc'+placed,{diameterTop:0,diameterBottom:20+sr()*8,height:25+sr()*10,tessellation:6},s);
+          canopy.position.y=th+12;
         }
-
-        var roofGeo = new THREE.BufferGeometry();
-        roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(roofVerts, 3));
-        roofGeo.computeVertexNormals();
-        var roofMesh = new THREE.Mesh(roofGeo, roofMat);
-        roofMesh.castShadow = true;
-        bGroup.add(roofMesh);
-
-        // 3. Windows - warm yellow glow
-        var winMat = new THREE.MeshBasicMaterial({
-          color: '#ffeecc',
-          transparent: true,
-          opacity: 0.85
-        });
-        var winEmMat = new THREE.MeshStandardMaterial({
-          color: '#ffeecc',
-          emissive: '#ffeecc',
-          emissiveIntensity: 0.6,
-          roughness: 0.3,
-          metalness: 0.0
-        });
-        var floors = Math.max(1, Math.floor(buildingHeight / 25));
-        var cols = Math.max(1, Math.floor(b.w / 40));
-        var winW = 12, winH = 10;
-        for (var fl = 0; fl < floors; fl++) {
-          for (var wc = 0; wc < cols; wc++) {
-            var wGeo = new THREE.PlaneGeometry(winW, winH);
-            var wMesh = new THREE.Mesh(wGeo, winEmMat);
-            var wx = b.x + 20 + wc * (b.w - 40) / Math.max(1, cols - 1);
-            if (cols === 1) wx = b.x + b.w / 2;
-            var wy = 12 + fl * 25;
-            // Front face
-            wMesh.position.set(wx, wy, b.y + b.h + 0.5);
-            bGroup.add(wMesh);
-            // Back face
-            var wBack = new THREE.Mesh(wGeo, winEmMat);
-            wBack.position.set(wx, wy, b.y - 0.5);
-            wBack.rotation.y = Math.PI;
-            bGroup.add(wBack);
-          }
-        }
-        // Side windows
-        var sideCols = Math.max(1, Math.floor(b.h / 40));
-        for (var fl2 = 0; fl2 < floors; fl2++) {
-          for (var sc = 0; sc < sideCols; sc++) {
-            var sGeo = new THREE.PlaneGeometry(winW, winH);
-            var sz = b.y + 20 + sc * (b.h - 40) / Math.max(1, sideCols - 1);
-            if (sideCols === 1) sz = b.y + b.h / 2;
-            var sy = 12 + fl2 * 25;
-            var sRight = new THREE.Mesh(sGeo, winEmMat);
-            sRight.position.set(b.x + b.w + 0.5, sy, sz);
-            sRight.rotation.y = Math.PI / 2;
-            bGroup.add(sRight);
-            var sLeft = new THREE.Mesh(sGeo, winEmMat);
-            sLeft.position.set(b.x - 0.5, sy, sz);
-            sLeft.rotation.y = -Math.PI / 2;
-            bGroup.add(sLeft);
-          }
-        }
-
-        // 4. Door - dark rectangle on front face at ground level
-        var doorMat = new THREE.MeshStandardMaterial({ color: '#443322', roughness: 0.9, metalness: 0.05 });
-        var doorGeo = new THREE.PlaneGeometry(14, 20);
-        var doorMesh = new THREE.Mesh(doorGeo, doorMat);
-        doorMesh.position.set(b.x + b.w / 2, 10, b.y + b.h + 0.6);
-        bGroup.add(doorMesh);
-
-        // 5. Optional awning for shop types
-        if (awningTypes[b.panelType]) {
-          var awningMat = new THREE.MeshStandardMaterial({
-            color: awningTypes[b.panelType],
-            roughness: 0.7,
-            metalness: 0.0,
-            side: THREE.DoubleSide
-          });
-          var awningW = Math.min(b.w * 0.6, 80);
-          var awningGeo = new THREE.PlaneGeometry(awningW, 15);
-          var awning = new THREE.Mesh(awningGeo, awningMat);
-          awning.position.set(b.x + b.w / 2, 22, b.y + b.h + 7);
-          awning.rotation.x = -Math.PI * 0.15;
-          awning.castShadow = true;
-          bGroup.add(awning);
-        }
-
-        // 6. Emoji sprite above building
-        var emojiSprite = makeEmojiSprite(b.emoji, 56);
-        emojiSprite.position.set(b.x + b.w / 2, buildingHeight + ridgeHeight + 24, b.y + b.h / 2);
-        bGroup.add(emojiSprite);
-
-        // Name label sprite
-        var labelSprite = makeTextSprite(b.name, { fontSize: 36, color: '#e8e8f0', bold: true });
-        labelSprite.position.set(b.x + b.w / 2, buildingHeight + ridgeHeight + 8, b.y + b.h / 2);
-        bGroup.add(labelSprite);
-
-        this._scene.add(bGroup);
-
-        // Warm ground light per building
-        var glow = new THREE.PointLight(0xffddaa, 0.15, Math.max(b.w, b.h) * 1.2);
-        glow.position.set(b.x + b.w / 2, 3, b.y + b.h / 2);
-        this._scene.add(glow);
+        canopy.material=cmat; canopy.position.x=tx; canopy.position.z=tz;
+        placed++;
       }
     },
 
     _buildAvatar: function() {
-      this._avatarGroup = new THREE.Group();
-
-      // Body - cone (pointing up)
-      var bodyGeo = new THREE.ConeGeometry(8, 20, 8);
-      var bodyMat = new THREE.MeshStandardMaterial({
-        color: 0xf7931a,
-        roughness: 0.5,
-        metalness: 0.4,
-        emissive: 0xf7931a,
-        emissiveIntensity: 0.15
-      });
-      this._avatarBody = new THREE.Mesh(bodyGeo, bodyMat);
-      this._avatarBody.position.y = 12;
-      this._avatarBody.castShadow = true;
-      this._avatarGroup.add(this._avatarBody);
-
-      // Head - sphere
-      var headGeo = new THREE.SphereGeometry(7, 12, 8);
-      var headMat = new THREE.MeshStandardMaterial({
-        color: 0xffcc88,
-        roughness: 0.6,
-        metalness: 0.1
-      });
-      this._avatarHead = new THREE.Mesh(headGeo, headMat);
-      this._avatarHead.position.y = 28;
-      this._avatarHead.castShadow = true;
-      this._avatarGroup.add(this._avatarHead);
-
-      // Shadow disc on ground
-      var shadowGeo = new THREE.CircleGeometry(10, 16);
-      var shadowMat = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: true,
-        opacity: 0.4
-      });
-      var shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-      shadowMesh.rotation.x = -Math.PI / 2;
-      shadowMesh.position.y = 0.3;
-      this._avatarGroup.add(shadowMesh);
-
-      // Name sprite (created on first render when avatar exists)
-      this._avatarNameSprite = null;
-
-      this._scene.add(this._avatarGroup);
-      this._avatarGroup.visible = false;
+      var s=this._scene;
+      this._avatarRoot=new BABYLON.TransformNode('avRoot',s);
+      this._avatarBody=BABYLON.MeshBuilder.CreateCylinder('avBody',{diameterTop:10,diameterBottom:14,height:20,tessellation:8},s);
+      var bmat=new BABYLON.StandardMaterial('avBM',s); bmat.diffuseColor=new BABYLON.Color3(0.97,0.58,0.1);
+      this._avatarBody.material=bmat; this._avatarBody.position.y=10; this._avatarBody.parent=this._avatarRoot;
+      this._avatarHead=BABYLON.MeshBuilder.CreateSphere('avHead',{diameter:12,segments:8},s);
+      var hmat=new BABYLON.StandardMaterial('avHM',s); hmat.diffuseColor=new BABYLON.Color3(0.95,0.82,0.68);
+      this._avatarHead.material=hmat; this._avatarHead.position.y=24; this._avatarHead.parent=this._avatarRoot;
+      var shadow=BABYLON.MeshBuilder.CreateDisc('avSh',{radius:8,tessellation:16},s);
+      var smat=new BABYLON.StandardMaterial('avSM',s); smat.diffuseColor=new BABYLON.Color3(0,0,0); smat.alpha=0.3;
+      shadow.material=smat; shadow.rotation.x=Math.PI/2; shadow.position.y=0.2; shadow.parent=this._avatarRoot;
+      // Label
+      var lp=BABYLON.MeshBuilder.CreatePlane('avLabel',{width:40,height:10},s);
+      lp.position.y=35; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL; lp.parent=this._avatarRoot;
+      this._avatarLabelTex=new BABYLON.DynamicTexture('avLT',{width:256,height:64},s,false);
+      this._avatarLabelTex.hasAlpha=true;
+      var almat=new BABYLON.StandardMaterial('avLM',s);
+      almat.diffuseTexture=this._avatarLabelTex; almat.emissiveTexture=this._avatarLabelTex;
+      almat.opacityTexture=this._avatarLabelTex; almat.backFaceCulling=false;
+      lp.material=almat;
     },
 
     _buildMoveTarget: function() {
-      var ringGeo = new THREE.RingGeometry(6, 9, 16);
-      var ringMat = new THREE.MeshBasicMaterial({
-        color: 0xf7931a,
-        transparent: true,
-        opacity: 0.5,
-        side: THREE.DoubleSide
-      });
-      this._moveTargetMesh = new THREE.Mesh(ringGeo, ringMat);
-      this._moveTargetMesh.rotation.x = -Math.PI / 2;
-      this._moveTargetMesh.position.y = 0.5;
-      this._moveTargetMesh.visible = false;
-      this._scene.add(this._moveTargetMesh);
+      this._moveTargetMesh=BABYLON.MeshBuilder.CreateTorus('mt',{diameter:16,thickness:2,tessellation:16},this._scene);
+      var mmat=new BABYLON.StandardMaterial('mtM',this._scene); mmat.diffuseColor=new BABYLON.Color3(1,0.6,0); mmat.alpha=0.5;
+      this._moveTargetMesh.material=mmat; this._moveTargetMesh.rotation.x=Math.PI/2; this._moveTargetMesh.setEnabled(false);
     },
 
     _buildPrompt: function() {
-      this._promptSprite = makeTextSprite('Press Enter', { fontSize: 40, color: '#f7931a', bold: true });
-      this._promptSprite.visible = false;
-      this._scene.add(this._promptSprite);
+      var s=this._scene;
+      this._promptMesh=BABYLON.MeshBuilder.CreatePlane('prompt',{width:80,height:20},s);
+      var ptex=new BABYLON.DynamicTexture('ptex',{width:512,height:128},s,false);
+      ptex.hasAlpha=true; ptex.drawText('Press Enter',null,96,'bold 64px sans-serif','white','transparent',true,true);
+      var pmat=new BABYLON.StandardMaterial('pmat',s);
+      pmat.diffuseTexture=ptex; pmat.emissiveTexture=ptex; pmat.opacityTexture=ptex; pmat.backFaceCulling=false;
+      this._promptMesh.material=pmat; this._promptMesh.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+      this._promptMesh.setEnabled(false);
     },
 
     // ── Resize ──
 
     resize: function() {
-      if (!this._renderer) return;
-      var w = this.canvas.clientWidth;
-      var h = this.canvas.clientHeight;
-      this._renderer.setSize(w, h);
-      this._camera3.aspect = w / h;
-      this._camera3.updateProjectionMatrix();
+      if (this._engine) this._engine.resize();
     },
 
     // ── Update Avatar (same logic, x/y mapped to x/z) ──
@@ -872,11 +462,9 @@
       }
 
       if (this.moveTarget && dx === 0 && dy === 0) {
-        // Initialize path if needed
         if (!this._pathWaypoints) {
           this._pathWaypoints = findPath(av.x, av.y, this.moveTarget.x, this.moveTarget.y);
         }
-        // Follow waypoints
         var currentWP = this._pathWaypoints.length > 0 ? this._pathWaypoints[0] : this.moveTarget;
         var tdx = currentWP.x - av.x;
         var tdy = currentWP.y - av.y;
@@ -917,7 +505,7 @@
       if (!this.collidesBuilding(newX, av.y)) {
         av.x = newX;
       } else if (this._pathWaypoints && this._pathWaypoints.length > 0) {
-        this._pathWaypoints.shift(); // Skip to next waypoint on collision
+        this._pathWaypoints.shift();
       } else {
         this.moveTarget = null;
         this._pathWaypoints = null;
@@ -968,138 +556,64 @@
     },
 
     // ── Camera ──
-
     updateCamera: function(dt) {
       var av = Game.state.avatar;
       if (!av) return;
-
-      // Target in 2D (same as before)
-      var vw = this.canvas.clientWidth;
-      var vh = this.canvas.clientHeight;
-      var targetX = av.x - vw / 2;
-      var targetY = av.y - vh / 2;
-      targetX = Math.max(0, Math.min(WORLD_W - vw, targetX));
-      targetY = Math.max(0, Math.min(WORLD_H - vh, targetY));
-
-      this.camera.x += (targetX - this.camera.x) * 0.1;
-      this.camera.y += (targetY - this.camera.y) * 0.1;
-
-      // Position 3D camera looking at avatar from above+behind
-      var camHeight = 450;
-      var camDist = 350;
-      var lookX = av.x;
-      var lookZ = av.y;
-
-      this._camera3.position.x += (lookX - this._camera3.position.x) * 0.08;
-      this._camera3.position.z += (lookZ + camDist - this._camera3.position.z) * 0.08;
-      this._camera3.position.y += (camHeight - this._camera3.position.y) * 0.08;
-      this._camera3.lookAt(lookX, 0, lookZ);
+      var target = this._camera3.target;
+      this._camera3.target = new BABYLON.Vector3(
+        target.x + (av.x - target.x) * 0.08,
+        0,
+        target.z + (av.y - target.z) * 0.08
+      );
     },
 
     // ── Render ──
-
     render: function() {
-      if (!this._renderer) return;
-
-      this._time += 0.016; // ~60fps increment
-
+      if (!this._engine) return;
+      this._time += 0.016;
       var av = Game.state.avatar;
 
-      // Update avatar 3D position
-      if (av) {
-        this._avatarGroup.visible = true;
-        this._avatarGroup.position.x = av.x;
-        this._avatarGroup.position.z = av.y;
-
-        // Gentle bob
-        this._avatarBody.position.y = 12 + Math.sin(this._time * 3) * 1.5;
-        this._avatarHead.position.y = 28 + Math.sin(this._time * 3) * 1.5;
-
-        // Create/update name sprite
-        if (!this._avatarNameSprite && av.name) {
-          this._avatarNameSprite = makeTextSprite(av.name, { fontSize: 32, color: '#f7931a', bold: true });
-          this._avatarGroup.add(this._avatarNameSprite);
+      // Sync avatar
+      if (av && this._avatarRoot) {
+        this._avatarRoot.position.x = av.x;
+        this._avatarRoot.position.z = av.y;
+        this._avatarRoot.position.y = Math.sin(this._time * 3) * 1.5;
+        // Update name label
+        if (this._avatarLastName !== av.name) {
+          this._avatarLastName = av.name;
+          var ctx = this._avatarLabelTex.getContext();
+          ctx.clearRect(0, 0, 256, 64);
+          ctx.font = 'bold 32px sans-serif';
+          ctx.fillStyle = '#f7931a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(av.name, 128, 32);
+          this._avatarLabelTex.update();
         }
-        if (this._avatarNameSprite) {
-          this._avatarNameSprite.position.y = 40;
-        }
-      } else {
-        this._avatarGroup.visible = false;
       }
 
-      // Move target ring
-      if (this.moveTarget) {
-        this._moveTargetMesh.visible = true;
+      // Sync move target
+      if (this.moveTarget && this._moveTargetMesh) {
+        this._moveTargetMesh.setEnabled(true);
         this._moveTargetMesh.position.x = this.moveTarget.x;
         this._moveTargetMesh.position.z = this.moveTarget.y;
-        this._moveTargetMesh.rotation.z = this._time * 2;
-      } else {
-        this._moveTargetMesh.visible = false;
+        this._moveTargetMesh.position.y = 0.5;
+      } else if (this._moveTargetMesh) {
+        this._moveTargetMesh.setEnabled(false);
       }
 
-      // Interaction prompt
-      if (this.nearbyBuilding && !UI.panelOpen && av) {
-        this._promptSprite.visible = true;
-        this._promptSprite.position.set(av.x, 55, av.y);
-      } else {
-        this._promptSprite.visible = false;
+      // Sync prompt
+      if (this.nearbyBuilding && av && !UI.panelOpen && this._promptMesh) {
+        this._promptMesh.setEnabled(true);
+        this._promptMesh.position.x = av.x;
+        this._promptMesh.position.y = 40;
+        this._promptMesh.position.z = av.y;
+      } else if (this._promptMesh) {
+        this._promptMesh.setEnabled(false);
       }
 
-      // Update building edge highlights for nearby building
-      for (var bi = 0; bi < BUILDINGS.length; bi++) {
-        var isNearby = (this.nearbyBuilding === BUILDINGS[bi]);
-        var edgeMesh = this._buildingEdgeMeshes[bi];
-        if (edgeMesh) {
-          if (isNearby) {
-            edgeMesh.material.color.setHex(0xf7931a);
-            edgeMesh.material.opacity = 0.9;
-          } else {
-            var rgb = hexToRGB(BUILDINGS[bi].color);
-            edgeMesh.material.color.setRGB(rgb.r, rgb.g, rgb.b);
-            edgeMesh.material.opacity = 0.6;
-          }
-        }
-      }
-
-      // Floating texts - render as temporary sprites
-      this._updateFloatingTexts();
-
-      // Render
-      this._renderer.render(this._scene, this._camera3);
+      this._scene.render();
     },
-
-    _updateFloatingTexts: function() {
-      // Remove expired sprites
-      for (var i = this._floatingTextSprites.length - 1; i >= 0; i--) {
-        var entry = this._floatingTextSprites[i];
-        if (entry.age > 1) {
-          this._scene.remove(entry.sprite);
-          this._floatingTextSprites.splice(i, 1);
-        }
-      }
-
-      // Sync with Game.floatingTexts
-      var gTexts = Game.floatingTexts;
-      for (var fi = 0; fi < gTexts.length; fi++) {
-        var ft = gTexts[fi];
-        // Check if we already have a sprite for this floating text
-        if (!ft._spriteCreated) {
-          var sprite = makeTextSprite(ft.text, { fontSize: 42, color: ft.color, bold: true });
-          sprite.position.set(ft.x, 50, ft.y);
-          this._scene.add(sprite);
-          this._floatingTextSprites.push({ sprite: sprite, ref: ft, age: 0 });
-          ft._spriteCreated = true;
-        }
-      }
-
-      // Update positions and opacity
-      for (var si = 0; si < this._floatingTextSprites.length; si++) {
-        var s = this._floatingTextSprites[si];
-        s.age = s.ref.age;
-        s.sprite.position.y = 50 + s.age * 40;
-        s.sprite.material.opacity = 1 - s.age;
-      }
-    }
   };
 
   window.Town = Town;

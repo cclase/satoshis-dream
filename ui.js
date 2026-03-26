@@ -244,16 +244,16 @@
         '<div class="hud-right">' +
           '<div class="hud-item hud-price">BTC <span id="hudPrice">$65,000</span></div>' +
           '<div class="hud-item hud-rate"><span id="hudRate">0</span>/s</div>' +
-          '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
-          '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
-          '<div class="hud-item hud-reset" id="hudMenu">\u2630</div>' +
-          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:200;flex-direction:column;gap:4px;pointer-events:auto;">' +
-            '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
-            '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
-            '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
-            '<div class="hud-item hud-reset" id="hudRival">\u{1F9D4}</div>' +
-            '<div class="hud-item hud-reset" id="hudSkills">\u{1F3AF}</div>' +
-            '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
+          '<div class="hud-item hud-reset" id="hudReset" title="Prestige / Reset">\u{1F504}</div>' +
+          '<div class="hud-item hud-reset" id="hudSaveSlots" title="Save Slots">\u{1F4BE}</div>' +
+          '<div class="hud-item hud-reset" id="hudMenu" title="Menu">\u2630</div>' +
+          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.97);border:1px solid var(--border);border-radius:10px;padding:8px;z-index:200;flex-direction:column;gap:2px;pointer-events:auto;min-width:160px;">' +
+            '<div class="hud-menu-item" id="hudAchievements">\u{1F3C6} <span>Achievements</span></div>' +
+            '<div class="hud-menu-item" id="hudPrestigeShop">\u{1F6D2} <span>Prestige Shop</span></div>' +
+            '<div class="hud-menu-item" id="hudDailies">\u{1F4C5} <span>Daily Challenges</span></div>' +
+            '<div class="hud-menu-item" id="hudRival">\u{1F9D4} <span>Craig Rival</span></div>' +
+            '<div class="hud-menu-item" id="hudSkills">\u{1F3AF} <span>Skill Tree</span></div>' +
+            '<div class="hud-menu-item" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + ' <span>' + (Sound.isMuted() ? 'Sound Off' : 'Sound On') + '</span></div>' +
           '</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
@@ -277,10 +277,28 @@
       document.getElementById('hudSkills').addEventListener('click', function() { hideDD(); UI.showSkillPanel(); });
       document.getElementById('hudMute').addEventListener('click', function() {
         var m = Sound.toggleMute();
-        document.getElementById('hudMute').textContent = m ? '\u{1F507}' : '\u{1F50A}';
+        document.getElementById('hudMute').innerHTML = (m ? '\u{1F507}' : '\u{1F50A}') + ' <span>' + (m ? 'Sound Off' : 'Sound On') + '</span>';
       });
       document.getElementById('hudDailies').addEventListener('click', function() { UI.showDailiesPanel(); });
       document.getElementById('hudSaveSlots').addEventListener('click', function() { UI.showSaveSlotsModal(); });
+
+      // Close dropdown and nav menu when clicking outside
+      document.addEventListener('mousedown', function(e) {
+        var dd = document.getElementById('hudDropdown');
+        var menuBtn = document.getElementById('hudMenu');
+        var navMenu = document.getElementById('nav-menu');
+        var navBtn = document.getElementById('nav-menu-btn');
+        if (dd && dd.style.display !== 'none') {
+          if (!dd.contains(e.target) && e.target !== menuBtn) {
+            dd.style.display = 'none';
+          }
+        }
+        if (navMenu && navMenu.classList.contains('active')) {
+          if (!navMenu.contains(e.target) && e.target !== navBtn && !navBtn.contains(e.target)) {
+            UI.hideNavMenu();
+          }
+        }
+      });
     },
 
     updateHUD: function() {
@@ -351,29 +369,69 @@
       this._renderMinimap();
     },
 
-    _minimapCanvas: null,
+    _minimapCanvas: null, _minimapTooltip: null,
     _renderMinimap: function() {
+      var self = this;
       if (!this._minimapCanvas) {
         this._minimapCanvas = document.createElement('canvas');
         this._minimapCanvas.id = 'minimap';
         this._minimapCanvas.width = 180;
         this._minimapCanvas.height = 128;
         document.body.appendChild(this._minimapCanvas);
-        // Click on minimap to navigate
-        var self = this;
+
+        // Tooltip overlay
+        this._minimapTooltip = document.createElement('div');
+        this._minimapTooltip.id = 'minimap-tooltip';
+        this._minimapTooltip.style.cssText = 'position:fixed;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--text);pointer-events:none;display:none;z-index:201;white-space:nowrap;';
+        document.body.appendChild(this._minimapTooltip);
+
+        // Hover: show building name tooltip
+        this._minimapCanvas.addEventListener('mousemove', function(e) {
+          var rect = self._minimapCanvas.getBoundingClientRect();
+          var mx = (e.clientX - rect.left) / rect.width * 2400;
+          var my = (e.clientY - rect.top) / rect.height * 1700;
+          var hit = null;
+          for (var i = 0; i < Town.BUILDINGS.length; i++) {
+            var b = Town.BUILDINGS[i];
+            if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) { hit = b; break; }
+          }
+          if (hit) {
+            self._minimapTooltip.style.display = 'block';
+            self._minimapTooltip.textContent = hit.emoji + ' ' + hit.name;
+            self._minimapTooltip.style.left = (e.clientX + 10) + 'px';
+            self._minimapTooltip.style.top = (e.clientY - 24) + 'px';
+          } else {
+            self._minimapTooltip.style.display = 'none';
+          }
+        });
+        this._minimapCanvas.addEventListener('mouseleave', function() {
+          self._minimapTooltip.style.display = 'none';
+        });
+
+        // Click to navigate
         this._minimapCanvas.addEventListener('click', function(e) {
           var rect = self._minimapCanvas.getBoundingClientRect();
           var mx = (e.clientX - rect.left) / rect.width * 2400;
           var my = (e.clientY - rect.top) / rect.height * 1700;
+          // If clicking on a building, go to its entrance
+          var hit = null;
+          for (var i = 0; i < Town.BUILDINGS.length; i++) {
+            var b = Town.BUILDINGS[i];
+            if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) { hit = b; break; }
+          }
           Town._pathWaypoints = null;
-          Town.moveTarget = { x: mx, y: my };
-          Town.autoEnterBuilding = null;
+          if (hit) {
+            Town.moveTarget = { x: hit.x + hit.w / 2, y: hit.y + hit.h + 30 };
+            Town.autoEnterBuilding = hit;
+          } else {
+            Town.moveTarget = { x: mx, y: my };
+            Town.autoEnterBuilding = null;
+          }
         });
       }
       var c = this._minimapCanvas;
       var ctx = c.getContext('2d');
       var sx = c.width / 2400, sy = c.height / 1700;
-      // Background
       ctx.fillStyle = '#4a7a3a';
       ctx.fillRect(0, 0, c.width, c.height);
       // Roads
@@ -382,16 +440,18 @@
       var vr = [{ x: 448, w: 50 },{ x: 832, w: 50 },{ x: 1216, w: 50 }];
       for (var ri = 0; ri < hr.length; ri++) ctx.fillRect(0, hr[ri].y * sy, c.width, hr[ri].h * sy);
       for (var vi = 0; vi < vr.length; vi++) ctx.fillRect(vr[vi].x * sx, 0, vr[vi].w * sx, c.height);
-      // Buildings
+      // Buildings — colored rect + emoji icon
       var bldgs = Town.BUILDINGS;
+      ctx.textAlign = 'center';
       for (var bi = 0; bi < bldgs.length; bi++) {
         var b = bldgs[bi];
         ctx.fillStyle = b.color;
         ctx.fillRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy);
-        // Label abbreviation
-        ctx.fillStyle = '#fff'; ctx.font = '6px sans-serif'; ctx.textAlign = 'center';
-        var abbr = b.name.substring(0, 3);
-        ctx.fillText(abbr, (b.x + b.w/2) * sx, (b.y + b.h/2) * sy + 2);
+        // Emoji centered in building rect
+        var bw = b.w * sx, bh = b.h * sy;
+        var fontSize = Math.max(7, Math.min(bw, bh) * 0.7);
+        ctx.font = fontSize + 'px sans-serif';
+        ctx.fillText(b.emoji, (b.x + b.w / 2) * sx, (b.y + b.h / 2) * sy + fontSize * 0.35);
       }
       // Avatar
       var av = Game.state.avatar;
@@ -401,7 +461,7 @@
         ctx.arc(av.x * sx, av.y * sy, 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#f7931a';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
       }
       // Treasure map X

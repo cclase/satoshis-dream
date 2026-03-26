@@ -216,6 +216,32 @@
           eb.style.display = 'block';
         } else { eb.style.display = 'none'; }
       }
+      // Active delivery indicator
+      var deliveryBar = document.getElementById('deliveryBar');
+      if (!deliveryBar) {
+        deliveryBar = document.createElement('div');
+        deliveryBar.id = 'deliveryBar';
+        deliveryBar.style.cssText = 'position:fixed;top:62px;left:50%;transform:translateX(-50%);background:rgba(16,16,37,0.85);border:1px solid var(--gold);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--gold);z-index:11;display:none;';
+        document.body.appendChild(deliveryBar);
+      }
+      if (s.activeDelivery) {
+        deliveryBar.style.display = 'block';
+        deliveryBar.textContent = '\u{1F4E6} Deliver to: ' + s.activeDelivery.targetName;
+      } else { deliveryBar.style.display = 'none'; }
+      // Power cut warning
+      if (s.powerCut) {
+        var pcEl = document.getElementById('powerCutWarn');
+        if (!pcEl) {
+          pcEl = document.createElement('div');
+          pcEl.id = 'powerCutWarn';
+          pcEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,0,0,0.15);border:2px solid var(--red);border-radius:12px;padding:16px 24px;font-size:16px;font-weight:800;color:var(--red);z-index:25;text-align:center;';
+          pcEl.textContent = '\u26A1 POWER CUT \u26A1\nProduction halted!';
+          document.body.appendChild(pcEl);
+        }
+      } else {
+        var pcEl2 = document.getElementById('powerCutWarn');
+        if (pcEl2) pcEl2.remove();
+      }
       // Minimap
       this._renderMinimap();
     },
@@ -338,6 +364,10 @@
       this._hwDirty = true;
       // Tutorial: step 1 (go to mine) → step 2
       if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
+      // Auto-complete delivery quest
+      if (Game.state.activeDelivery && Game.state.activeDelivery.targetId === building.id) {
+        Game.completeDelivery();
+      }
 
       var header = '<div class="panel-header">' +
         '<div class="panel-title">' + building.emoji + ' ' + building.name + '</div>' +
@@ -741,6 +771,23 @@
             '<div class="hw-cost">Borrow</div></div>';
         });
       }
+      // Bribe option
+      if (s.policeRisk > 0 && s.policeRisk < 75) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+        html += '<button class="panel-btn btn-gold" id="bribeBtn"' + (s.usd < 500 ? ' disabled style="opacity:0.4"' : '') + '>\u{1F46E} Bribe Officer ($500, -10% risk)</button>';
+        html += '</div>';
+      }
+      // Pay tickets
+      if (s.tickets && s.tickets.length > 0) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">';
+        html += '<div style="font-weight:800;margin-bottom:6px;color:var(--red);">\u{1F4CB} Unpaid Tickets (' + s.tickets.length + ')</div>';
+        s.tickets.forEach(function(t, i) {
+          html += '<div class="hw-card" data-payticket="' + i + '"><div class="hw-icon">\u{1F4CB}</div>' +
+            '<div class="hw-info"><div class="hw-name">Traffic Ticket</div><div class="hw-sub">Fine: $' + Game.formatNumber(t.fine) + '</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Pay</div></div>';
+        });
+        html += '</div>';
+      }
       return html + '</div>';
     },
     wireBankPanel: function() {
@@ -749,6 +796,15 @@
       document.querySelectorAll('[data-loan]').forEach(function(el) {
         el.addEventListener('click', function() {
           if (Game.takeLoan(el.dataset.loan)) { UI.toast('Loan received!'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
+      var bribe = document.getElementById('bribeBtn');
+      if (bribe) bribe.addEventListener('click', function() {
+        if (Game.bribePolice()) { UI.toast('\u{1F46E} Officer bribed! -10% risk'); UI.showPanel(UI.currentBuilding); }
+      });
+      document.querySelectorAll('[data-payticket]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          if (Game.payTicket(parseInt(el.dataset.payticket))) { UI.toast('\u{1F4CB} Ticket paid!'); UI.showPanel(UI.currentBuilding); }
         });
       });
     },
@@ -790,6 +846,23 @@
     // ═══════════════════════════════════════
     buildPostOfficePanel: function() {
       var s = Game.state, html = '<div class="panel-body">';
+      // Delivery quests
+      Game.generateDeliveries();
+      if (s.activeDelivery) {
+        html += '<div class="hw-card" style="border-color:var(--gold);"><div class="hw-icon">\u{1F4E6}</div>' +
+          '<div class="hw-info"><div class="hw-name">Active: Deliver to ' + s.activeDelivery.targetName + '</div>' +
+          '<div class="hw-sub">Reward: ' + Game.formatNumber(s.activeDelivery.sats) + ' sats + $' + Game.formatNumber(s.activeDelivery.usd) + '</div></div></div>';
+      } else if (s.deliveries.length > 0) {
+        html += '<div style="font-weight:800;margin-bottom:8px;">\u{1F4E6} Delivery Jobs</div>';
+        s.deliveries.forEach(function(d, i) {
+          html += '<div class="hw-card" data-delivery="' + i + '">' +
+            '<div class="hw-icon">\u{1F4E6}</div>' +
+            '<div class="hw-info"><div class="hw-name">Deliver to ' + d.targetName + '</div>' +
+            '<div class="hw-sub">Reward: ' + Game.formatNumber(d.sats) + ' sats + $' + Game.formatNumber(d.usd) + '</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Accept</div></div>';
+        });
+      }
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
       html += '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Order hardware at 30% off! Delivery in 2 minutes.</p>';
       if (s.mailOrders.length > 0) {
         html += '<div style="margin-bottom:12px;">';
@@ -806,9 +879,15 @@
           '<div class="hw-info"><div class="hw-name">' + u.name + '</div><div class="hw-sub">30% off! 2 min delivery</div></div>' +
           '<div class="hw-cost">' + Game.formatNumber(cost) + ' sats</div></div>';
       });
-      return html + '</div>';
+      return html + '</div></div>';
     },
     wirePostOfficePanel: function() {
+      document.querySelectorAll('[data-delivery]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var idx = parseInt(el.dataset.delivery);
+          if (Game.acceptDelivery(idx)) UI.showPanel(UI.currentBuilding);
+        });
+      });
       document.querySelectorAll('[data-order]').forEach(function(el) {
         el.addEventListener('click', function() {
           var item = Game.HARDWARE.find(function(u){return u.id===el.dataset.order;});
@@ -1095,9 +1174,20 @@
         ownedFurn.forEach(function(f) { html += '<span style="font-size:20px;" title="' + f.name + ' - ' + f.desc + '">' + f.icon + '</span> '; });
         html += '</div>';
       }
+      // Sleep button
+      var canSleep = Date.now() - (s.lastSleepTime || 0) >= 180000;
+      html += '<button class="panel-btn btn-purple" id="sleepBtn"' + (canSleep ? '' : ' disabled style="opacity:0.4"') + '>\u{1F6CC} Sleep' + (canSleep ? '' : ' (cooldown)') + '</button>';
       return html + '</div>';
     },
-    wireApartmentPanel: function() {},
+    wireApartmentPanel: function() {
+      var el = document.getElementById('sleepBtn');
+      if (el) el.addEventListener('click', function() {
+        var result = Game.sleep();
+        if (result.error) { UI.toast(result.error); return; }
+        UI.toast('\u{1F6CC} Slept! +' + result.energy + ' energy, +' + Game.formatNumber(result.sats) + ' sats');
+        UI.showPanel(UI.currentBuilding);
+      });
+    },
 
     // ═══════════════════════════════════════
     // Random Name / Avatar Creation

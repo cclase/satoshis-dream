@@ -73,6 +73,9 @@
     { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
     { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+3 energy regen',bonus: 'eregen', val: 3 },
     { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
+    { id: 'fu_bed_good',name: 'Comfy Bed',       icon: '\u{1F6CF}\uFE0F', cost: 500,  cur: 'usd', desc: 'Sleep restores 75 energy', bonus: 'bed', val: 75 },
+    { id: 'fu_bed_luxury',name:'Luxury Bed',     icon: '\u{1F6CC}', cost: 5000, cur: 'usd', desc: 'Sleep restores 100 energy', bonus: 'bed', val: 100 },
+    { id: 'fu_kitchen', name: 'Kitchen',         icon: '\u{1F373}', cost: 1000, cur: 'usd', desc: '+25% energy from home food', bonus: 'kitchen', val: 0.25 },
   ];
 
   var NPC_EVENTS = [
@@ -133,8 +136,18 @@
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
-      tutorialStep: 0, // 0=not started, 1-6=active, 7=done
+      tutorialStep: 0,
       pendingNpcEvent: null, lastNpcTime: 0,
+      // Delivery quests
+      deliveries: [], activeDelivery: null,
+      // Police
+      tickets: [], policeChaseActive: false,
+      // Electricity
+      powerCut: false, powerCutUntil: 0,
+      // Sleep
+      lastSleepTime: 0,
+      // Garden
+      garden: [], gardenInventory: {},
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -432,6 +445,80 @@
       return 0.5 + (this.state.gymLevel * 0.2);
     },
 
+    // ── Delivery Quests ──
+    generateDeliveries: function() {
+      var s = this.state;
+      if (s.deliveries.length >= 3) return;
+      var allBuildings = (window.Town && window.Town.BUILDINGS) || [];
+      var targets = allBuildings.filter(function(b) { return b.panelType !== 'post_office' && b.panelType !== 'apartment'; });
+      while (s.deliveries.length < 3 && targets.length > 0) {
+        var idx = Math.floor(Math.random() * targets.length);
+        var t = targets.splice(idx, 1)[0];
+        var dist = Math.sqrt(Math.pow(t.x - 960, 2) + Math.pow(t.y - 768, 2));
+        var reward = Math.floor(50 + dist * 0.3 + Math.random() * 100);
+        var usdReward = Math.floor(reward * 0.01 + Math.random() * 5);
+        s.deliveries.push({ targetId: t.id, targetName: t.name, sats: reward, usd: usdReward });
+      }
+    },
+    acceptDelivery: function(index) {
+      var s = this.state;
+      if (s.activeDelivery || index >= s.deliveries.length) return false;
+      s.activeDelivery = s.deliveries.splice(index, 1)[0];
+      if (UI && UI.toast) UI.toast('\u{1F4E6} Delivering to ' + s.activeDelivery.targetName + '!');
+      return true;
+    },
+    completeDelivery: function() {
+      var s = this.state;
+      if (!s.activeDelivery) return false;
+      s.sats += s.activeDelivery.sats;
+      s.totalSats += s.activeDelivery.sats;
+      s.lifetimeSats += s.activeDelivery.sats;
+      s.usd += s.activeDelivery.usd;
+      if (UI && UI.toast) UI.toast('\u{1F4E6} Delivered! +' + Game.formatNumber(s.activeDelivery.sats) + ' sats, +$' + Game.formatNumber(s.activeDelivery.usd));
+      s.activeDelivery = null;
+      this.generateDeliveries();
+      return true;
+    },
+
+    // ── Sleep ──
+    sleep: function() {
+      var s = this.state;
+      var now = Date.now();
+      if (now - s.lastSleepTime < 180000) return { error: 'Too soon! Wait ' + Math.ceil((180000 - (now - s.lastSleepTime)) / 1000) + 's' };
+      s.lastSleepTime = now;
+      // Energy restore based on bed
+      var restore = 50;
+      if (s.furniture && s.furniture.fu_bed_luxury) restore = 100;
+      else if (s.furniture && s.furniture.fu_bed_good) restore = 75;
+      s.energy = Math.min(this.getEnergyMax(), s.energy + restore);
+      // Fast-forward 30s of production
+      var rate = this.getProductionRate() * this.getMultiplier();
+      var gain = Math.floor(rate * 30);
+      s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
+      s.heat = Math.max(0, s.heat - 10);
+      return { energy: restore, sats: gain };
+    },
+
+    // ── Police ──
+    bribePolice: function(amount) {
+      var s = this.state;
+      if (s.policeRisk <= 0 || s.policeRisk >= 75) return false;
+      var cost = 500;
+      if (s.usd < cost) return false;
+      s.usd -= cost;
+      s.policeRisk = Math.max(0, s.policeRisk - 10);
+      return true;
+    },
+    payTicket: function(index) {
+      var s = this.state;
+      if (index >= s.tickets.length) return false;
+      var ticket = s.tickets[index];
+      if (s.usd < ticket.fine) return false;
+      s.usd -= ticket.fine;
+      s.tickets.splice(index, 1);
+      return true;
+    },
+
     collectStreetItem: function() {
       var rate = Math.max(1, this.getProductionRate());
       var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
@@ -566,8 +653,8 @@
       var now = Date.now();
       s.lastTick = now; // Update every tick so offline calc is accurate
 
-      // Production
-      var rate = this.getProductionRate();
+      // Production (zero during power cut)
+      var rate = s.powerCut ? 0 : this.getProductionRate();
       var mul = this.getMultiplier();
       var gain = rate * mul * dt;
       s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
@@ -694,6 +781,48 @@
           s.pendingNpcEvent = { id: evt.id, name: evt.name, icon: evt.icon, desc: evt.desc, accept: evt.accept, decline: evt.decline };
           s.lastNpcTime = now;
         }
+      }
+
+      // Police consequences
+      if (s.policeRisk >= 100 && !s.policeChaseActive) {
+        s.policeChaseActive = true;
+        s.policeChaseEnd = now + 15000;
+        if (UI && UI.toast) UI.toast('\u{1F6A8} POLICE CHASE! Run home!');
+      }
+      if (s.policeChaseActive && now >= s.policeChaseEnd) {
+        // Caught!
+        s.policeChaseActive = false;
+        s.owned.d1 = 0; s.owned.d2 = 0; s.owned.d3 = 0;
+        s.sats = Math.floor(s.sats * 0.5);
+        s.usd = Math.max(0, s.usd * 0.5);
+        s.policeRisk = 0;
+        if (UI && UI.toast) UI.toast('\u{1F6A8} ARRESTED! Lost dark web items, 50% sats & USD!');
+      }
+      if (s.policeRisk >= 50 && !s._lastRaidTime) s._lastRaidTime = now;
+      if (s.policeRisk >= 50 && now - (s._lastRaidTime || 0) > 300000) {
+        s._lastRaidTime = now;
+        var confiscated = '';
+        if (s.owned.d1 > 0) { s.owned.d1--; confiscated = 'Botnet'; }
+        else if (s.owned.d3 > 0) { s.owned.d3--; confiscated = 'Relay'; }
+        if (confiscated) {
+          s.tickets.push({ fine: 100 + Math.floor(Math.random() * 400), issuedAt: now });
+          if (UI && UI.toast) UI.toast('\u{1F46E} Police raid! Confiscated ' + confiscated + ' + ticket issued!');
+        }
+      }
+      // Unpaid tickets → auto-arrest
+      if (s.tickets.length >= 3 && s.policeRisk >= 25) {
+        s.policeRisk = 100; // triggers chase next tick
+      }
+
+      // Electricity enforcement
+      if (s.powerCut) {
+        if (now >= s.powerCutUntil) s.powerCut = false;
+      }
+      if (!s.powerCut && s.electricityBill > 0 && s.usd < 0) {
+        s.powerCut = true;
+        s.powerCutUntil = now + 30000;
+        s.usd = 0;
+        if (UI && UI.toast) UI.toast('\u26A1 BLACKOUT! Power cut for 30s!');
       }
 
       // Check achievements

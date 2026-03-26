@@ -601,8 +601,8 @@
       var s = this.state;
       if (s.treasureMap) return;
       if (Math.random() < 0.01) { // 1% per tap (was 0.5%)
-        var tx = 100 + Math.random() * (WORLD_W - 200);
-        var ty = 100 + Math.random() * (WORLD_H - 200);
+        var tx = 100 + Math.random() * (this.WORLD_W - 200);
+        var ty = 100 + Math.random() * (this.WORLD_H - 200);
         var reward = 500 + Math.floor(Math.random() * 4500);
         s.treasureMap = { x: tx, y: ty, reward: reward, expiresAt: Date.now() + 600000 };
         if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Found a treasure map! Check your minimap!');
@@ -925,6 +925,7 @@
       this.state.lifetimeSats += gain;
       if (!this.state.stats) this.state.stats = {};
       this.state.stats.itemsCollected = (this.state.stats.itemsCollected || 0) + 1;
+      if (window.Sound) Sound.coinCollect();
       if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
       return gain;
     },
@@ -1197,6 +1198,7 @@
       if (s.policeRisk >= 100 && !s.policeChaseActive) {
         s.policeChaseActive = true;
         s.policeChaseEnd = now + 15000;
+        if (window.Sound) Sound.policeSiren();
         if (UI && UI.toast) UI.toast('\u{1F6A8} POLICE CHASE! Run home!');
       }
       if (s.policeChaseActive && now >= s.policeChaseEnd) {

@@ -244,7 +244,7 @@
         '<div class="hud-right">' +
           '<div class="hud-item hud-price">BTC <span id="hudPrice">$65,000</span></div>' +
           '<div class="hud-item hud-rate"><span id="hudRate">0</span>/s</div>' +
-          '<div class="hud-item hud-reset" id="hudReset" title="Prestige / Reset">\u{1F504}</div>' +
+          '<div class="hud-item hud-reset" id="hudReset" title="Prestige (reset for tokens)">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots" title="Save Slots">\u{1F4BE}</div>' +
           '<div class="hud-item hud-reset" id="hudMenu" title="Menu">\u2630</div>' +
           '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.97);border:1px solid var(--border);border-radius:10px;padding:8px;z-index:200;flex-direction:column;gap:2px;pointer-events:auto;min-width:160px;">' +

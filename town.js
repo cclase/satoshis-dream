@@ -708,9 +708,47 @@
     },
 
     // ── Render ──
+    _updateDayNight: function() {
+      var t = this._dayTime;
+      var s = this._scene;
+      // Interpolate sky color
+      var r, g, b;
+      if (t < 0.6) { // Day
+        r = 0.55; g = 0.75; b = 0.95;
+      } else if (t < 0.7) { // Sunset transition
+        var p = (t - 0.6) / 0.1;
+        r = 0.55 + p * 0.35; g = 0.75 - p * 0.45; b = 0.95 - p * 0.55;
+      } else if (t < 0.85) { // Night
+        r = 0.05; g = 0.08; b = 0.15;
+      } else { // Dawn transition
+        var p2 = (t - 0.85) / 0.15;
+        r = 0.05 + p2 * 0.5; g = 0.08 + p2 * 0.67; b = 0.15 + p2 * 0.8;
+      }
+      s.clearColor = new BABYLON.Color4(r, g, b, 1);
+      s.fogColor = new BABYLON.Color3(r, g, b);
+      // Adjust light intensity
+      var hemi = s.getLightByName('hemi');
+      var sun = s.getLightByName('sun');
+      if (hemi) hemi.intensity = t < 0.7 ? 0.7 : (t < 0.85 ? 0.2 : 0.2 + ((t - 0.85) / 0.15) * 0.5);
+      if (sun) sun.intensity = t < 0.7 ? 1.0 : (t < 0.85 ? 0.15 : 0.15 + ((t - 0.85) / 0.15) * 0.85);
+    },
+
+    // Day/night cycle
+    _dayTime: 0,
+    getDayPhase: function() {
+      var t = this._dayTime;
+      if (t < 0.2) return 'morning';
+      if (t < 0.6) return 'day';
+      if (t < 0.7) return 'evening';
+      return 'night';
+    },
+
     render: function() {
       if (!this._engine) return;
       this._time += 0.016;
+      // Day/night cycle: 300 seconds (5 minutes)
+      this._dayTime = (this._dayTime + 0.016 / 300) % 1.0;
+      this._updateDayNight();
       var av = Game.state.avatar;
 
       // Sync avatar

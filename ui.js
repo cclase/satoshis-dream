@@ -268,10 +268,11 @@
         var dd = document.getElementById('hudDropdown');
         dd.style.display = dd.style.display === 'none' ? 'flex' : 'none';
       });
-      document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
-      document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
-      document.getElementById('hudRival').addEventListener('click', function() { UI.showRivalPanel(); });
-      document.getElementById('hudSkills').addEventListener('click', function() { UI.showSkillPanel(); });
+      function hideDD() { document.getElementById('hudDropdown').style.display = 'none'; }
+      document.getElementById('hudAchievements').addEventListener('click', function() { hideDD(); UI.showAchievementsPanel(); });
+      document.getElementById('hudPrestigeShop').addEventListener('click', function() { hideDD(); UI.showPrestigeShopPanel(); });
+      document.getElementById('hudRival').addEventListener('click', function() { hideDD(); UI.showRivalPanel(); });
+      document.getElementById('hudSkills').addEventListener('click', function() { hideDD(); UI.showSkillPanel(); });
       document.getElementById('hudMute').addEventListener('click', function() {
         var m = Sound.toggleMute();
         document.getElementById('hudMute').textContent = m ? '\u{1F507}' : '\u{1F50A}';
@@ -521,6 +522,8 @@
       this.panelOpen = false;
       this.currentPanel = null;
       this.currentBuilding = null;
+      // Clear any auto-tap intervals
+      if (this._holdInterval) { clearInterval(this._holdInterval); this._holdInterval = null; }
     },
 
     updateOpenPanel: function() {
@@ -620,8 +623,8 @@
       btn.addEventListener('click', doTap);
       // Auto-tap on hold (5x/second)
       var holdInterval = null;
-      btn.addEventListener('mousedown', function() { holdInterval = setInterval(doTap, 200); });
-      btn.addEventListener('touchstart', function(e) { e.preventDefault(); doTap(); holdInterval = setInterval(doTap, 200); });
+      btn.addEventListener('mousedown', function() { holdInterval = setInterval(doTap, 200); UI._holdInterval = holdInterval; });
+      btn.addEventListener('touchstart', function(e) { e.preventDefault(); doTap(); holdInterval = setInterval(doTap, 200); UI._holdInterval = holdInterval; });
       var stopHold = function() { if (holdInterval) { clearInterval(holdInterval); holdInterval = null; } };
       btn.addEventListener('mouseup', stopHold);
       btn.addEventListener('mouseleave', stopHold);

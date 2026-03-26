@@ -1013,7 +1013,7 @@ body {
   position: fixed;
   top: 80px;
   right: 10px;
-  z-index: 12;
+  z-index: 9;
   border: 2px solid var(--border);
   border-radius: 8px;
   cursor: pointer;

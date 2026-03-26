@@ -811,12 +811,12 @@
       var s = this.state;
       if (!s.craig) return null;
       // 30-second duel: compare production rates
-      var playerRate = this.getProductionRate() * this.getMultiplier();
+      var playerRate = Math.max(1, this.getProductionRate() * this.getMultiplier());
       var craigRate = playerRate * this.getCraigPace();
-      var playerScore = playerRate * 30 * (0.8 + Math.random() * 0.4); // some randomness
+      var playerScore = playerRate * 30 * (0.8 + Math.random() * 0.4);
       var craigScore = craigRate * 30 * (0.8 + Math.random() * 0.4);
       var won = playerScore > craigScore;
-      var prize = Math.floor(Math.max(playerScore, craigScore) * 0.5);
+      var prize = Math.max(10, Math.floor(Math.max(playerScore, craigScore) * 0.5));
       if (won) { s.sats += prize; s.totalSats += prize; s.lifetimeSats += prize; }
       else { s.sats = Math.max(0, s.sats - Math.floor(prize * 0.3)); }
       return { won: won, prize: prize, playerScore: Math.floor(playerScore), craigScore: Math.floor(craigScore) };
@@ -1078,7 +1078,9 @@
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.3; // per second base
       if (this.getProductionRate() > 0) energyDrain = 0.6;
-      s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + (this.getEnergyRegen() * dt * 0.1)));
+      // Energy regen only when NOT producing (idle regen)
+      var energyRegen = this.getProductionRate() > 0 ? 0 : this.getEnergyRegen() * dt * 0.1;
+      s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + energyRegen));
 
       // Electricity bill
       var elecCost = this.getElectricityCost();

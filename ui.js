@@ -174,6 +174,8 @@
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
           '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
           '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
+          '<div class="hud-item hud-reset" id="hudRival">\u{1F9D4}</div>' +
+          '<div class="hud-item hud-reset" id="hudSkills">\u{1F3AF}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
@@ -188,6 +190,8 @@
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
+      document.getElementById('hudRival').addEventListener('click', function() { UI.showRivalPanel(); });
+      document.getElementById('hudSkills').addEventListener('click', function() { UI.showSkillPanel(); });
       document.getElementById('hudMute').addEventListener('click', function() {
         var m = Sound.toggleMute();
         document.getElementById('hudMute').textContent = m ? '\u{1F507}' : '\u{1F50A}';
@@ -1530,6 +1534,75 @@
     },
 
     // ═══════════════════════════════════════
+    // ═══════════════════════════════════════
+    // ═══════════════════════════════════════
+    // RIVAL PANEL
+    // ═══════════════════════════════════════
+    showRivalPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block'; this.panelOpen = true;
+      this.currentPanel = 'rival'; this.currentBuilding = null;
+      var s = Game.state, c = s.craig || { sats: 0, hardware: 0 };
+      var playerAhead = s.lifetimeSats > c.sats;
+      var html = '<div class="panel-header"><div class="panel-title">\u{1F9D4} Rival: Craig</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div><div class="panel-body">' +
+        '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Craig is also building a mining empire. Can you stay ahead?</p>' +
+        '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+          '<div style="flex:1;background:var(--bg);border:1px solid ' + (playerAhead ? 'var(--green)' : 'var(--border)') + ';border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:11px;color:var(--dim);">YOU</div>' +
+            '<div style="font-size:20px;font-weight:900;color:var(--gold);">' + Game.formatNumber(s.lifetimeSats) + '</div>' +
+            '<div style="font-size:10px;color:var(--dim);">lifetime sats</div></div>' +
+          '<div style="flex:1;background:var(--bg);border:1px solid ' + (!playerAhead ? 'var(--red)' : 'var(--border)') + ';border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:11px;color:var(--dim);">CRAIG</div>' +
+            '<div style="font-size:20px;font-weight:900;color:var(--red);">' + Game.formatNumber(c.sats) + '</div>' +
+            '<div style="font-size:10px;color:var(--dim);">lifetime sats</div></div>' +
+        '</div>' +
+        '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Craig\'s Hardware</span><span>' + c.hardware + ' units</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Difficulty</span><span>' + Math.round(Game.getCraigPace() * 100) + '% of your pace</span></div>' +
+        '<div class="ex-stat"><span class="ex-stat-label">Status</span><span style="color:' + (playerAhead ? 'var(--green)' : 'var(--red)') + ';">' + (playerAhead ? 'You\'re winning!' : 'Craig is ahead!') + '</span></div>' +
+        '</div>';
+      panel.innerHTML = html;
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+    },
+
+    // ═══════════════════════════════════════
+    // SKILL TREE PANEL
+    // ═══════════════════════════════════════
+    showSkillPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block'; this.panelOpen = true;
+      this.currentPanel = 'skills'; this.currentBuilding = null;
+      var s = Game.state;
+      var html = '<div class="panel-header"><div class="panel-title">\u{1F3AF} Skill Tree</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div><div class="panel-body">' +
+        '<div style="text-align:center;margin-bottom:12px;"><span style="color:var(--dim);font-size:12px;">SKILL POINTS</span><br>' +
+        '<span style="font-size:24px;font-weight:900;color:var(--gold);">' + (s.skillPoints || 0) + '</span>' +
+        '<span style="font-size:11px;color:var(--dim);"> (earn 1 per prestige)</span></div>';
+      var paths = { mining: '\u26CF\uFE0F Mining', trader: '\u{1F4C8} Trader', shadow: '\u{1F480} Shadow' };
+      for (var pathName in paths) {
+        html += '<div style="font-weight:800;margin:8px 0 4px;color:var(--gold);">' + paths[pathName] + '</div>';
+        Game.SKILL_TREE.filter(function(sk) { return sk.path === pathName; }).forEach(function(sk) {
+          var owned = Game.hasSkill(sk.id);
+          var canBuy = !owned && (s.skillPoints || 0) >= sk.cost && (!sk.requires || Game.hasSkill(sk.requires));
+          html += '<div class="hw-card' + (owned ? '' : (!canBuy ? ' locked' : '')) + '" data-skill="' + sk.id + '">' +
+            '<div class="hw-icon">' + (owned ? '\u2705' : '\u{1F3AF}') + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + sk.name + '</div><div class="hw-sub">' + sk.desc + '</div></div>' +
+            '<div class="hw-cost">' + (owned ? 'Learned' : sk.cost + ' pts') + '</div></div>';
+        });
+      }
+      panel.innerHTML = html + '</div>';
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+      document.querySelectorAll('[data-skill]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          if (Game.buySkill(el.dataset.skill)) {
+            if (window.Sound) Sound.levelUp();
+            UI.toast('\u{1F3AF} Skill learned!');
+            UI.showSkillPanel();
+          }
+        });
+      });
+    },
+
     // ═══════════════════════════════════════
     // DAILY CHALLENGES PANEL
     // ═══════════════════════════════════════

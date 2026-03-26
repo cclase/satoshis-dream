@@ -217,6 +217,7 @@
     _buildingMeshes: [], _time: 0,
     _lastAvatarX: 0, _lastAvatarY: 0, _stuckTimer: 0,
     _collectibles: [], // {mesh, x, z, active, respawnAt}
+    _ghostMeshes: [], _ghostIdx: 0, _craigMesh: null,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
@@ -254,7 +255,7 @@
       this._shadowGen.useBlurExponentialShadowMap = true;
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildCollectibles(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
+      this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
 
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
@@ -516,6 +517,58 @@
       }
     },
 
+    _buildGhosts: function() {
+      var s = this._scene;
+      var ghostMat = new BABYLON.StandardMaterial('ghostMat', s);
+      ghostMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.7);
+      ghostMat.alpha = 0.3;
+      // 2 ghost avatars following recorded paths
+      for (var gi = 0; gi < 2; gi++) {
+        var ghost = BABYLON.MeshBuilder.CreateCylinder('ghost' + gi, {diameterTop: 10, diameterBottom: 14, height: 20, tessellation: 6}, s);
+        ghost.material = ghostMat;
+        ghost.position.y = 10;
+        ghost.setEnabled(false);
+        this._ghostMeshes.push(ghost);
+      }
+      // Craig mesh (distinct color)
+      var craigMat = new BABYLON.StandardMaterial('craigMat', s);
+      craigMat.diffuseColor = new BABYLON.Color3(0.8, 0.3, 0.3);
+      craigMat.alpha = 0.5;
+      this._craigMesh = BABYLON.MeshBuilder.CreateCylinder('craig', {diameterTop: 12, diameterBottom: 16, height: 24, tessellation: 6}, s);
+      this._craigMesh.material = craigMat;
+      this._craigMesh.position.y = 12;
+      // Craig label
+      var cLabel = BABYLON.MeshBuilder.CreatePlane('craigLabel', {width: 30, height: 8}, s);
+      cLabel.position.y = 34; cLabel.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; cLabel.parent = this._craigMesh;
+      var cTex = new BABYLON.DynamicTexture('craigTex', {width: 256, height: 64}, s, false);
+      cTex.hasAlpha = true;
+      var cCtx = cTex.getContext(); cCtx.font = 'bold 28px sans-serif'; cCtx.fillStyle = '#ff4444'; cCtx.textAlign = 'center'; cCtx.fillText('Craig', 128, 40); cTex.update();
+      var cLMat = new BABYLON.StandardMaterial('craigLM', s); cLMat.diffuseTexture = cTex; cLMat.emissiveColor = new BABYLON.Color3(1,1,1); cLMat.backFaceCulling = false;
+      cLabel.material = cLMat;
+    },
+
+    _updateGhosts: function() {
+      var history = Game.state.movementHistory || [];
+      if (history.length < 10) return;
+      this._ghostIdx = (this._ghostIdx + 1) % 60; // Update every ~60 frames
+      if (this._ghostIdx !== 0) return;
+      for (var gi = 0; gi < this._ghostMeshes.length; gi++) {
+        var offset = Math.floor(history.length * (gi + 1) / 4);
+        if (offset < history.length) {
+          var pos = history[offset];
+          this._ghostMeshes[gi].setEnabled(true);
+          this._ghostMeshes[gi].position.x = pos.x;
+          this._ghostMeshes[gi].position.z = pos.y;
+        }
+      }
+      // Craig wanders semi-randomly near a building
+      if (this._craigMesh) {
+        var b = BUILDINGS[Math.floor(this._time * 0.1) % BUILDINGS.length];
+        this._craigMesh.position.x += (b.x + b.w/2 - this._craigMesh.position.x) * 0.02;
+        this._craigMesh.position.z += (b.y + b.h + 30 - this._craigMesh.position.z) * 0.02;
+      }
+    },
+
     _buildAvatar: function() {
       var s=this._scene;
       this._avatarRoot=new BABYLON.TransformNode('avRoot',s);
@@ -770,8 +823,9 @@
         }
       }
 
-      // Collectibles
+      // Collectibles + Ghosts
       if (av) this._checkCollectibles(av);
+      this._updateGhosts();
 
       // Sync move target
       if (this.moveTarget && this._moveTargetMesh) {

@@ -158,6 +158,15 @@
       dailyChallenges: [], dailyDate: '',
       buildingLevels: {}, buildingVisits: {},
       collection: {}, // rare drops
+      // Craig rival
+      craig: { sats: 0, hardware: 0, lastTaunt: 0 },
+      craigMilestones: {},
+      // Skill tree
+      skillPoints: 0, skills: {},
+      // Story
+      storyFound: {},
+      // Unlocked areas
+      unlockedAreas: ['north'],
       stats: { taps: 0, satsSold: 0, buildingsVisited: 0, itemsCollected: 0, deliveriesCompleted: 0 },
       priceEvent: null, nextEventAt: 0,
       // New systems
@@ -388,6 +397,8 @@
       mul *= (1 + this._getItemBonus('income'));
       mul *= (1 + this._getItemBonus('prod'));
       mul *= (1 + this.getCollectionBonus());
+      if (this.hasSkill('sk_hash1')) mul *= 1.1;
+      if (this.hasSkill('sk_trade1')) mul *= 1.0; // trade skill affects sell, not production
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
@@ -421,6 +432,7 @@
       if (this.state.research.algo_trade) mul *= 1.10;
       if (this.state.pet === 'parrot') mul *= 1.15;
       mul *= (1 + this._getItemBonus('sell'));
+      if (this.hasSkill('sk_trade1')) mul *= 1.1;
       return mul;
     },
 
@@ -748,6 +760,105 @@
       // +2% per individual item
       total += Object.keys(s.collection).length * 0.02;
       return total;
+    },
+
+    // ── Craig Rival ──
+    getSkillScore: function() {
+      var s = this.state;
+      return (s.tokens || 0) + Math.floor(Object.keys(s.buildingStars || {}).length) +
+        Math.floor(Object.keys(s.achievements || {}).length / 5) +
+        Math.floor((s.lifetimeSats || 0) / 100000);
+    },
+    getCraigPace: function() {
+      var score = this.getSkillScore();
+      if (score >= 25) return 0.95;
+      if (score >= 10) return 0.85;
+      return 0.70;
+    },
+    updateCraig: function(dt) {
+      var s = this.state;
+      if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
+      var pace = this.getCraigPace();
+      // Craig mirrors player production at pace%
+      var playerRate = this.getProductionRate() * this.getMultiplier();
+      s.craig.sats += playerRate * pace * dt;
+      s.craig.hardware = Math.floor(s.craig.sats / 5000);
+      // Craig taunts
+      var now = Date.now();
+      if (now - s.craig.lastTaunt > 120000) { // every 2 min
+        s.craig.lastTaunt = now;
+        if (s.craig.sats > s.lifetimeSats * 0.9) {
+          var taunts = ['Craig: "Catching up yet?"', 'Craig: "My rigs never sleep!"', 'Craig: "I\'m about to prestige..."'];
+          if (UI && UI.toast) UI.toast('\u{1F9D4} ' + taunts[Math.floor(Math.random() * taunts.length)]);
+        } else if (s.craig.sats < s.lifetimeSats * 0.5) {
+          var nice = ['Craig: "Nice moves..."', 'Craig: "How did you get so many sats?!"', 'Craig: "I\'ll catch up, just watch."'];
+          if (UI && UI.toast) UI.toast('\u{1F9D4} ' + nice[Math.floor(Math.random() * nice.length)]);
+        }
+      }
+    },
+
+    // ── Skill Tree ──
+    SKILL_TREE: [
+      { id: 'sk_hash1',  path: 'mining',  tier: 1, name: 'Hash Boost I',      desc: '+10% production', cost: 1 },
+      { id: 'sk_hash2',  path: 'mining',  tier: 2, name: 'Auto-Vent',         desc: 'Auto-vent at 80% heat', cost: 2, requires: 'sk_hash1' },
+      { id: 'sk_hash3',  path: 'mining',  tier: 3, name: 'Bulk Discount',     desc: 'Hardware -20%', cost: 3, requires: 'sk_hash2' },
+      { id: 'sk_trade1', path: 'trader',  tier: 1, name: 'Market Eye',        desc: '+10% sell price', cost: 1 },
+      { id: 'sk_trade2', path: 'trader',  tier: 2, name: 'Trend Spotter',     desc: 'See price trend', cost: 2, requires: 'sk_trade1' },
+      { id: 'sk_trade3', path: 'trader',  tier: 3, name: 'Auto-Sell Bull',    desc: 'Auto-sell in bull runs', cost: 3, requires: 'sk_trade2' },
+      { id: 'sk_shadow1',path: 'shadow',  tier: 1, name: 'Low Profile',       desc: 'Risk decays 2x faster', cost: 1 },
+      { id: 'sk_shadow2',path: 'shadow',  tier: 2, name: 'Discount Goods',    desc: 'Dark web -30% cost', cost: 2, requires: 'sk_shadow1' },
+      { id: 'sk_shadow3',path: 'shadow',  tier: 3, name: 'Untouchable',       desc: 'Immune 5min after buy', cost: 3, requires: 'sk_shadow2' },
+    ],
+    buySkill: function(id) {
+      var s = this.state;
+      var sk = this.SKILL_TREE.find(function(x) { return x.id === id; });
+      if (!sk || (s.skills && s.skills[id])) return false;
+      if (sk.requires && !(s.skills && s.skills[sk.requires])) return false;
+      if ((s.skillPoints || 0) < sk.cost) return false;
+      s.skillPoints -= sk.cost;
+      if (!s.skills) s.skills = {};
+      s.skills[id] = true;
+      return true;
+    },
+    hasSkill: function(id) { return !!(this.state.skills && this.state.skills[id]); },
+
+    // ── Story ──
+    STORY_FRAGMENTS: [
+      { id: 'ch1', name: 'Chapter 1: The Genesis Block', text: 'In 2009, a mysterious figure mined the first Bitcoin block, embedding a message about bank bailouts.', reward: 100 },
+      { id: 'ch2', name: 'Chapter 2: The Pizza', text: 'On May 22, 2010, someone paid 10,000 BTC for two pizzas. Worth hundreds of millions today.', reward: 200 },
+      { id: 'ch3', name: 'Chapter 3: The Silk Road', text: 'The dark web marketplace proved Bitcoin could be used for anonymous transactions.', reward: 300 },
+      { id: 'ch4', name: 'Chapter 4: Mt. Gox', text: 'The largest exchange collapsed in 2014, losing 850,000 BTC. Trust was shattered.', reward: 500 },
+      { id: 'ch5', name: 'Chapter 5: The Halving', text: 'Every 210,000 blocks, the mining reward halves. Scarcity drives value.', reward: 500 },
+      { id: 'ch6', name: 'Chapter 6: HODL', text: 'A typo in a forum post became a movement. "Hold On for Dear Life" became a philosophy.', reward: 300 },
+      { id: 'ch7', name: 'Chapter 7: The Bull Run', text: 'In 2017, Bitcoin reached $20,000 for the first time. The world took notice.', reward: 500 },
+      { id: 'ch8', name: 'Chapter 8: Lightning', text: 'The Lightning Network promised instant Bitcoin payments. Layer 2 was born.', reward: 400 },
+      { id: 'ch9', name: 'Chapter 9: DeFi Summer', text: 'In 2020, decentralized finance exploded. Smart contracts changed everything.', reward: 500 },
+      { id: 'ch10', name: 'Chapter 10: The Moon', text: 'They said Bitcoin would go to the moon. And maybe, just maybe, it will.', reward: 1000 },
+    ],
+    checkStoryDrop: function() {
+      var s = this.state;
+      if (!s.storyFound) s.storyFound = {};
+      if (Math.random() > 0.0003) return; // Very rare per tick
+      var unread = this.STORY_FRAGMENTS.filter(function(f) { return !s.storyFound[f.id]; });
+      if (unread.length === 0) return;
+      var frag = unread[Math.floor(Math.random() * unread.length)];
+      s.storyFound[frag.id] = true;
+      s.sats += frag.reward; s.totalSats += frag.reward; s.lifetimeSats += frag.reward;
+      if (UI && UI.toast) UI.toast('\u{1F4DC} ' + frag.name + ' (+' + frag.reward + ' sats)');
+    },
+
+    // ── Area Unlock ──
+    checkAreaUnlock: function() {
+      var s = this.state;
+      if (!s.unlockedAreas) s.unlockedAreas = ['north'];
+      if (s.unlockedAreas.indexOf('south') === -1 && s.lifetimeSats >= 50000) {
+        s.unlockedAreas.push('south');
+        if (UI && UI.toast) UI.toast('\u{1F510} Southside District unlocked!');
+      }
+      if (s.unlockedAreas.indexOf('waterfront') === -1 && s.lifetimeSats >= 500000) {
+        s.unlockedAreas.push('waterfront');
+        if (UI && UI.toast) UI.toast('\u{1F510} Waterfront area unlocked!');
+      }
     },
 
     SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
@@ -1078,6 +1189,19 @@
           }
         }
       }
+      // Craig rival
+      this.updateCraig(dt);
+      // Story fragments
+      this.checkStoryDrop();
+      // Area unlocks
+      this.checkAreaUnlock();
+      // Auto-vent skill
+      if (this.hasSkill('sk_hash2') && s.heat >= 80) { s.heat = Math.max(0, s.heat - 20); }
+      // Auto-sell in bull skill
+      if (this.hasSkill('sk_trade3') && s.priceEvent && s.priceEvent.type === 'bull' && s.sats > 1000) {
+        this.sellSats(0.5);
+      }
+
       // Daily challenges
       this.generateDailyChallenges();
       this.checkDailyChallenges();
@@ -1180,11 +1304,23 @@
       var upgrades = this.state.prestigeUpgrades || {};
       var achievements = this.state.achievements || {};
       var avatar = this.state.avatar; // Preserve avatar identity
+      var skills = this.state.skills || {};
+      var skillPoints = (this.state.skillPoints || 0) + 1; // +1 per prestige
+      var collection = this.state.collection || {};
+      var storyFound = this.state.storyFound || {};
+      var buildingStars = this.state.buildingStars || {};
+      var stats = this.state.stats || {};
       var def = defaultState();
       def.tokens = tokens;
       def.prestigeUpgrades = upgrades;
       def.achievements = achievements;
-      def.avatar = avatar; // Keep same character
+      def.skills = skills;
+      def.skillPoints = skillPoints;
+      def.collection = collection;
+      def.storyFound = storyFound;
+      def.buildingStars = buildingStars;
+      def.stats = stats;
+      def.avatar = avatar;
       def.lastTick = Date.now();
       this.state = def;
       this.floatingTexts = [];

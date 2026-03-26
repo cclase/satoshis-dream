@@ -75,6 +75,19 @@
     { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
   ];
 
+  var NPC_EVENTS = [
+    { id: 'npc_tips', name: 'Mining Tips', icon: '\u{1F4A1}', desc: 'A stranger offers mining tips for $10.', accept: 'Buy Tips', decline: 'No thanks', effect: function(s) { if (s.usd < 10) return 'Not enough USD!'; s.usd -= 10; s._tempBoost = (s._tempBoost||0) + 0.05; s._tempBoostEnd = Date.now() + 60000; return '+5% production for 60s!'; } },
+    { id: 'npc_usb', name: 'Found USB', icon: '\u{1F4BE}', desc: 'You found a USB drive on the ground!', accept: 'Pick up', decline: 'Leave it', effect: function(s) { var g = 50 + Math.floor(Math.random()*150); s.sats += g; s.totalSats += g; s.lifetimeSats += g; return '+' + g + ' sats!'; } },
+    { id: 'npc_drink', name: 'Energy Drink', icon: '\u{1F964}', desc: 'Street vendor selling energy drinks for $3.', accept: 'Buy ($3)', decline: 'Pass', effect: function(s) { if (s.usd < 3) return 'Not enough USD!'; s.usd -= 3; s.energy = Math.min(s.energy + 30, 100 + s.gymLevel * 20); return '+30 energy!'; } },
+    { id: 'npc_brief', name: 'Mysterious Briefcase', icon: '\u{1F4BC}', desc: 'A mysterious briefcase! Open it?', accept: 'Open', decline: 'Walk away', effect: function(s) { if (Math.random() > 0.5) { s.sats += 500; s.totalSats += 500; s.lifetimeSats += 500; return 'Jackpot! +500 sats!'; } else { var loss = Math.min(s.sats, 100); s.sats -= loss; return 'Empty! Lost ' + loss + ' sats...'; } } },
+    { id: 'npc_trade', name: 'Miner Trade', icon: '\u{1F91D}', desc: 'Local miner: "Trade 1000 sats for $20?"', accept: 'Trade', decline: 'Decline', effect: function(s) { if (s.sats < 1000) return 'Not enough sats!'; s.sats -= 1000; s.usd += 20; return 'Traded! +$20'; } },
+    { id: 'npc_meetup', name: 'BTC Meetup', icon: '\u{1F4E3}', desc: 'Bitcoin meetup nearby! Attend for a boost?', accept: 'Attend', decline: 'Too busy', effect: function(s) { s._tempBoost = (s._tempBoost||0) + 0.02; s._tempBoostEnd = Date.now() + 300000; return '+2% production for 5 min!'; } },
+    { id: 'npc_rig', name: 'Broken Rig', icon: '\u{1F527}', desc: 'Broken mining rig on the sidewalk. Fix it for $50?', accept: 'Fix ($50)', decline: 'Leave it', effect: function(s) { if (s.usd < 50) return 'Not enough USD!'; s.usd -= 50; s.owned.u1 = (s.owned.u1||0) + 1; return 'Fixed! +1 Laptop!'; } },
+    { id: 'npc_conf', name: 'Crypto Conference', icon: '\u{1F3AB}', desc: 'Conference ticket for $100. Instant knowledge!', accept: 'Buy ($100)', decline: 'Skip', effect: function(s) { if (s.usd < 100) return 'Not enough USD!'; s.usd -= 100; s.sats += 1000; s.totalSats += 1000; s.lifetimeSats += 1000; return '+1000 sats from networking!'; } },
+    { id: 'npc_penny', name: 'Lucky Penny', icon: '\u{1FA99}', desc: 'You spot a shiny penny on the ground!', accept: 'Pick up', decline: 'Ignore', effect: function(s) { s.sats += 1; s.totalSats += 1; s.lifetimeSats += 1; return '+1 sat. Every sat counts!'; } },
+    { id: 'npc_police', name: 'Police Patrol', icon: '\u{1F46E}', desc: 'Police are patrolling the area...', accept: 'Act normal', decline: 'Hide', effect: function(s) { if (s.policeRisk > 20) { var loss = Math.floor(s.sats * 0.05); s.sats -= loss; return 'They searched you! Lost ' + loss + ' sats.'; } return 'All clear. Nothing to worry about.'; } },
+  ];
+
   var SAVE_KEY = 'sd_town_v1';
   var OLD_SAVE_KEY = 'sd_v2_5';
   var COST_SCALE = 1.18;
@@ -121,6 +134,7 @@
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
       tutorialStep: 0, // 0=not started, 1-6=active, 7=done
+      pendingNpcEvent: null, lastNpcTime: 0,
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -151,7 +165,7 @@
     HARDWARE: HARDWARE, DARK_WEB: DARK_WEB, HOUSING: HOUSING,
     VEHICLES: VEHICLES, PETS: PETS, RESEARCH: RESEARCH, LOANS: LOANS,
     PRESTIGE_UPGRADES: PRESTIGE_UPGRADES, ACHIEVEMENTS: ACHIEVEMENTS,
-    COST_SCALE: COST_SCALE, CLOTHING: CLOTHING, FURNITURE: FURNITURE,
+    COST_SCALE: COST_SCALE, CLOTHING: CLOTHING, FURNITURE: FURNITURE, NPC_EVENTS: NPC_EVENTS,
     lastFrame: 0, running: false, floatingTexts: [],
     _offlineReport: null, // set after offline calc
 
@@ -418,6 +432,16 @@
       return 0.5 + (this.state.gymLevel * 0.2);
     },
 
+    collectStreetItem: function() {
+      var rate = Math.max(1, this.getProductionRate());
+      var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
+      this.state.sats += gain;
+      this.state.totalSats += gain;
+      this.state.lifetimeSats += gain;
+      if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
+      return gain;
+    },
+
     tapMine: function() {
       var gain = 1;
       if (this.state.avatar && this.state.avatar.bonus === 'quickhands') gain += 5;
@@ -658,6 +682,17 @@
         if (now - s._lastAutoSell > 30000) { // every 30s
           this.sellSats(0.5);
           s._lastAutoSell = now;
+        }
+      }
+
+      // NPC events (every 60-120s while tutorial done)
+      if (s.tutorialStep >= 7 && !s.pendingNpcEvent) {
+        if (!s.lastNpcTime) s.lastNpcTime = now;
+        var npcInterval = 60000 + Math.random() * 60000;
+        if (now - s.lastNpcTime > npcInterval) {
+          var evt = NPC_EVENTS[Math.floor(Math.random() * NPC_EVENTS.length)];
+          s.pendingNpcEvent = { id: evt.id, name: evt.name, icon: evt.icon, desc: evt.desc, accept: evt.accept, decline: evt.decline };
+          s.lastNpcTime = now;
         }
       }
 

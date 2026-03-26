@@ -601,8 +601,8 @@
       var s = this.state;
       if (s.treasureMap) return;
       if (Math.random() < 0.01) { // 1% per tap (was 0.5%)
-        var tx = 100 + Math.random() * (WORLD_W - 200);
-        var ty = 100 + Math.random() * (WORLD_H - 200);
+        var tx = 100 + Math.random() * (this.WORLD_W - 200);
+        var ty = 100 + Math.random() * (this.WORLD_H - 200);
         var reward = 500 + Math.floor(Math.random() * 4500);
         s.treasureMap = { x: tx, y: ty, reward: reward, expiresAt: Date.now() + 600000 };
         if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Found a treasure map! Check your minimap!');

@@ -172,6 +172,7 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
+          '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
@@ -186,6 +187,7 @@
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
+      document.getElementById('hudDailies').addEventListener('click', function() { UI.showDailiesPanel(); });
       document.getElementById('hudSaveSlots').addEventListener('click', function() { UI.showSaveSlotsModal(); });
     },
 
@@ -1473,6 +1475,43 @@
           }
         });
       });
+    },
+
+    // ═══════════════════════════════════════
+    // ═══════════════════════════════════════
+    // DAILY CHALLENGES PANEL
+    // ═══════════════════════════════════════
+    showDailiesPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block';
+      this.panelOpen = true;
+      this.currentPanel = 'dailies';
+      this.currentBuilding = null;
+      var s = Game.state;
+      Game.generateDailyChallenges();
+      var html = '<div class="panel-header"><div class="panel-title">\u{1F4C5} Daily Challenges</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div><div class="panel-body">';
+      if (s.dailyChallenges && s.dailyChallenges.length > 0) {
+        s.dailyChallenges.forEach(function(ch) {
+          html += '<div class="hw-card' + (ch.completed ? '' : '') + '">' +
+            '<div class="hw-icon">' + (ch.completed ? '\u2705' : '\u{1F3AF}') + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + ch.desc + '</div>' +
+            '<div class="hw-sub">Reward: ' + Game.formatNumber(ch.reward) + ' sats' + (ch.completed ? ' — DONE!' : '') + '</div></div></div>';
+        });
+      } else {
+        html += '<p style="color:var(--dim);">No challenges today.</p>';
+      }
+      // Stats section
+      var st = s.stats || {};
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">' +
+        '<div style="font-weight:800;margin-bottom:6px;">\u{1F4CA} Lifetime Stats</div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Total Taps</span><span>' + Game.formatNumber(st.taps||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Items Collected</span><span>' + (st.itemsCollected||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Buildings Visited</span><span>' + (st.buildingsVisited||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Deliveries</span><span>' + (st.deliveriesCompleted||0) + '</span></div>' +
+        '</div>';
+      panel.innerHTML = html + '</div>';
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
     },
 
     // ═══════════════════════════════════════

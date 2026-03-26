@@ -76,6 +76,7 @@
     { id: 'fu_bed_good',name: 'Comfy Bed',       icon: '\u{1F6CF}\uFE0F', cost: 500,  cur: 'usd', desc: 'Sleep restores 75 energy', bonus: 'bed', val: 75 },
     { id: 'fu_bed_luxury',name:'Luxury Bed',     icon: '\u{1F6CC}', cost: 5000, cur: 'usd', desc: 'Sleep restores 100 energy', bonus: 'bed', val: 100 },
     { id: 'fu_kitchen', name: 'Kitchen',         icon: '\u{1F373}', cost: 1000, cur: 'usd', desc: '+25% energy from home food', bonus: 'kitchen', val: 0.25 },
+    { id: 'fu_garage',  name: 'Garage',          icon: '\u{1F3CE}\uFE0F', cost: 2000, cur: 'usd', desc: 'Use vehicle anywhere', bonus: 'garage', val: 0 },
   ];
 
   var SEEDS = [
@@ -154,6 +155,8 @@
       lastSleepTime: 0,
       // Garden
       garden: [], gardenInventory: {},
+      dailyChallenges: [], dailyDate: '',
+      stats: { taps: 0, satsSold: 0, buildingsVisited: 0, itemsCollected: 0, deliveriesCompleted: 0 },
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -421,8 +424,20 @@
     getSpeedMultiplier: function() {
       var base = 1.0;
       if (this.state.vehicle) {
-        var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
-        if (v) base = v.speed;
+        // Vehicle speed only works with garage or when near home
+        var hasGarage = !!(this.state.furniture && this.state.furniture.fu_garage);
+        var nearHome = false;
+        if (!hasGarage && this.state.avatar) {
+          var hb = (window.Town && window.Town.BUILDINGS) ? window.Town.BUILDINGS.find(function(b){return b.id==='apartment';}) : null;
+          if (hb) {
+            var dx = this.state.avatar.x - (hb.x + hb.w/2), dy = this.state.avatar.y - (hb.y + hb.h/2);
+            nearHome = Math.sqrt(dx*dx+dy*dy) < 100;
+          }
+        }
+        if (hasGarage || nearHome) {
+          var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
+          if (v) base = v.speed;
+        }
       }
       if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
       base *= (1 + this._getItemBonus('speed'));
@@ -592,6 +607,8 @@
       var s = this.state;
       if (!s.buildingVisits) s.buildingVisits = {};
       s.buildingVisits[panelType] = (s.buildingVisits[panelType] || 0) + 1;
+      if (!s.stats) s.stats = {};
+      s.stats.buildingsVisited = (s.stats.buildingsVisited || 0) + 1;
     },
     getBuildingDiscount: function(panelType) {
       var visits = (this.state.buildingVisits || {})[panelType] || 0;
@@ -617,6 +634,46 @@
       return this.weather === 'rain' ? 0.85 : this.weather === 'storm' ? 0.7 : 1.0;
     },
 
+    // ── Daily Challenges ──
+    generateDailyChallenges: function() {
+      var s = this.state;
+      var today = new Date().toDateString();
+      if (s.dailyDate === today) return;
+      s.dailyDate = today;
+      // Seed from date
+      var seed = 0; for (var ci = 0; ci < today.length; ci++) seed += today.charCodeAt(ci);
+      function dr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+      var types = [
+        { desc: 'Mine {n} sats', key: 'sats', target: function() { return Math.floor(500 + dr() * 5000); }, check: function(s,t) { return s.lifetimeSats >= t._start + t.target; } },
+        { desc: 'Visit {n} buildings', key: 'visits', target: function() { return Math.floor(3 + dr() * 5); }, check: function(s,t) { return (s.stats.buildingsVisited||0) >= t._startVisits + t.target; } },
+        { desc: 'Collect {n} street items', key: 'collect', target: function() { return Math.floor(3 + dr() * 5); }, check: function(s,t) { return (s.stats.itemsCollected||0) >= t._startItems + t.target; } },
+      ];
+      s.dailyChallenges = [];
+      for (var di = 0; di < 3; di++) {
+        var type = types[di % types.length];
+        var target = type.target();
+        s.dailyChallenges.push({ desc: type.desc.replace('{n}', target), key: type.key, target: target, completed: false, reward: Math.floor(100 + dr() * 500),
+          _start: s.lifetimeSats, _startVisits: s.stats.buildingsVisited||0, _startItems: s.stats.itemsCollected||0 });
+      }
+    },
+    checkDailyChallenges: function() {
+      var s = this.state;
+      if (!s.dailyChallenges) return;
+      for (var ci = 0; ci < s.dailyChallenges.length; ci++) {
+        var ch = s.dailyChallenges[ci];
+        if (ch.completed) continue;
+        var done = false;
+        if (ch.key === 'sats') done = s.lifetimeSats >= ch._start + ch.target;
+        else if (ch.key === 'visits') done = (s.stats.buildingsVisited||0) >= ch._startVisits + ch.target;
+        else if (ch.key === 'collect') done = (s.stats.itemsCollected||0) >= ch._startItems + ch.target;
+        if (done) {
+          ch.completed = true;
+          s.sats += ch.reward; s.totalSats += ch.reward; s.lifetimeSats += ch.reward;
+          if (UI && UI.toast) UI.toast('\u{1F3C6} Challenge done! +' + Game.formatNumber(ch.reward) + ' sats');
+        }
+      }
+    },
+
     SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
 
     collectStreetItem: function() {
@@ -625,6 +682,8 @@
       this.state.sats += gain;
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.itemsCollected = (this.state.stats.itemsCollected || 0) + 1;
       if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
       return gain;
     },
@@ -642,6 +701,8 @@
       // Tutorial: step 2 (tap mine) → step 3
       if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
       this.checkTreasureDrop();
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.taps = (this.state.stats.taps || 0) + 1;
       return gain;
     },
 
@@ -940,6 +1001,10 @@
           }
         }
       }
+      // Daily challenges
+      this.generateDailyChallenges();
+      this.checkDailyChallenges();
+
       // Treasure map expiry
       if (s.treasureMap && Date.now() > s.treasureMap.expiresAt) {
         s.treasureMap = null;

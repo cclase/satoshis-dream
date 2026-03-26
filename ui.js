@@ -172,6 +172,7 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
+          '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
           '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
         '</div>' +
@@ -187,6 +188,10 @@
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
+      document.getElementById('hudMute').addEventListener('click', function() {
+        var m = Sound.toggleMute();
+        document.getElementById('hudMute').textContent = m ? '\u{1F507}' : '\u{1F50A}';
+      });
       document.getElementById('hudDailies').addEventListener('click', function() { UI.showDailiesPanel(); });
       document.getElementById('hudSaveSlots').addEventListener('click', function() { UI.showSaveSlotsModal(); });
     },
@@ -494,6 +499,7 @@
       var doTap = function(e) {
         if (e) e.preventDefault();
         var gain = Game.tapMine();
+        if (window.Sound) Sound.tapMine();
         var av = Game.state.avatar;
         if (av) Game.addFloatingText('+' + Game.formatNumber(gain), av.x, av.y - 20, '#f7931a');
         btn.classList.add('tapped');
@@ -1645,6 +1651,7 @@
       el.classList.add('show');
       if (this.toastTimer) clearTimeout(this.toastTimer);
       this.toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+      if (window.Sound) Sound.toast();
     },
   };
 

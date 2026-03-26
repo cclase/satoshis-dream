@@ -869,10 +869,9 @@ body {
   color: var(--dim);
 }
 
-@media (pointer: fine) {
-  #dpad, #dpad-action { display: none; }
-  #nav-menu-btn { bottom: 20px; right: 20px; }
-}
+/* D-pad hidden — drag-to-move replaces it */
+#dpad, #dpad-action { display: none; }
+#nav-menu-btn { bottom: 20px; right: 20px; }
 
 /* Mobile responsive */
 @media (max-width: 600px) {

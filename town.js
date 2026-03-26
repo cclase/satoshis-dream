@@ -229,14 +229,15 @@
       this._scene.fogDensity = 0.0001;
       this._scene.fogColor = new BABYLON.Color3(0.6, 0.78, 0.95);
 
-      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
+      // Camera: steeper angle to see over buildings
+      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, 0.65, 700,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
       // Only enable scroll wheel zoom — NO pointer drag (conflicts with touch-to-move)
       this._camera3.inputs.addMouseWheel();
       this._camera3.lowerRadiusLimit = 250;
       this._camera3.upperRadiusLimit = 1200;
-      this._camera3.lowerBetaLimit = 0.3;
-      this._camera3.upperBetaLimit = 1.3;
+      this._camera3.lowerBetaLimit = 0.5;  // ~29° from vertical (steepest)
+      this._camera3.upperBetaLimit = 0.8;  // ~46° from vertical (lowest)
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);

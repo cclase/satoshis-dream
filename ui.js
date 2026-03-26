@@ -190,6 +190,7 @@
     },
 
     updateHUD: function() {
+      this._renderGuide();
       var s = Game.state;
       var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats);
       el = document.getElementById('hudUsd'); if (el) el.textContent = Game.formatNumber(s.usd);
@@ -213,6 +214,67 @@
           eb.textContent = (s.priceEvent.type === 'bull' ? '\u{1F4C8} BULL +' : '\u{1F4C9} CRASH -') + s.priceEvent.magnitude + '% (' + tl + 's)';
           eb.style.display = 'block';
         } else { eb.style.display = 'none'; }
+      }
+      // Minimap
+      this._renderMinimap();
+    },
+
+    _minimapCanvas: null,
+    _renderMinimap: function() {
+      if (!this._minimapCanvas) {
+        this._minimapCanvas = document.createElement('canvas');
+        this._minimapCanvas.id = 'minimap';
+        this._minimapCanvas.width = 180;
+        this._minimapCanvas.height = 128;
+        document.body.appendChild(this._minimapCanvas);
+        // Click on minimap to navigate
+        var self = this;
+        this._minimapCanvas.addEventListener('click', function(e) {
+          var rect = self._minimapCanvas.getBoundingClientRect();
+          var mx = (e.clientX - rect.left) / rect.width * 2400;
+          var my = (e.clientY - rect.top) / rect.height * 1700;
+          Town._pathWaypoints = null;
+          Town.moveTarget = { x: mx, y: my };
+          Town.autoEnterBuilding = null;
+        });
+      }
+      var c = this._minimapCanvas;
+      var ctx = c.getContext('2d');
+      var sx = c.width / 2400, sy = c.height / 1700;
+      // Background
+      ctx.fillStyle = '#4a7a3a';
+      ctx.fillRect(0, 0, c.width, c.height);
+      // Roads
+      ctx.fillStyle = '#555';
+      var hr = [{ y: 330, h: 50 },{ y: 650, h: 50 },{ y: 970, h: 50 },{ y: 1290, h: 50 }];
+      var vr = [{ x: 448, w: 50 },{ x: 832, w: 50 },{ x: 1216, w: 50 }];
+      for (var ri = 0; ri < hr.length; ri++) ctx.fillRect(0, hr[ri].y * sy, c.width, hr[ri].h * sy);
+      for (var vi = 0; vi < vr.length; vi++) ctx.fillRect(vr[vi].x * sx, 0, vr[vi].w * sx, c.height);
+      // Buildings
+      var bldgs = Town.BUILDINGS;
+      for (var bi = 0; bi < bldgs.length; bi++) {
+        var b = bldgs[bi];
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy);
+      }
+      // Avatar
+      var av = Game.state.avatar;
+      if (av) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(av.x * sx, av.y * sy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#f7931a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // Move target
+      if (Town.moveTarget) {
+        ctx.strokeStyle = '#ff0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(Town.moveTarget.x * sx, Town.moveTarget.y * sy, 3, 0, Math.PI * 2);
+        ctx.stroke();
       }
     },
 
@@ -273,6 +335,8 @@
       this.currentPanel = building.panelType;
       this.currentBuilding = building;
       this._hwDirty = true;
+      // Tutorial: step 1 (go to mine) → step 2
+      if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
 
       var header = '<div class="panel-header">' +
         '<div class="panel-title">' + building.emoji + ' ' + building.name + '</div>' +
@@ -1085,6 +1149,8 @@
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();
         document.getElementById('town').focus();
+        // Start tutorial for new characters
+        if (Game.state.tutorialStep === 0) Game.state.tutorialStep = 1;
         Game.save();
         self.startGame();
       });
@@ -1092,6 +1158,44 @@
     },
 
     startGame: function() { Game.start(); },
+
+    // ═══════════════════════════════════════
+    // NPC TUTORIAL GUIDE
+    // ═══════════════════════════════════════
+    _guideMessages: [
+      '', // step 0: not started
+      '\u{1F9D9} Welcome! Head to Mining HQ \u26CF\uFE0F to earn your first Bitcoin! Use the map button or walk there.',
+      '\u{1F9D9} Tap the \u20BF button to mine sats! Try it!',
+      '\u{1F9D9} Nice! You earned your first sat! Keep tapping to earn more.',
+      '\u{1F9D9} You can afford a Laptop now! Visit the Hardware Shop \u{1F527} to buy one.',
+      '\u{1F9D9} You\'re mining automatically! Visit the Exchange \u{1F4C8} to sell sats for USD.',
+      '\u{1F9D9} You\'re a real miner now! Explore the town \u2014 there\'s lots to discover. Good luck! \u{1F680}',
+    ],
+    _lastGuideStep: -1,
+
+    _renderGuide: function() {
+      var step = Game.state.tutorialStep;
+      if (!step || step <= 0 || step >= 7) {
+        var existing = document.getElementById('guide-bubble');
+        if (existing) existing.remove();
+        return;
+      }
+      var bubble = document.getElementById('guide-bubble');
+      if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.id = 'guide-bubble';
+        document.body.appendChild(bubble);
+      }
+      if (this._lastGuideStep !== step) {
+        this._lastGuideStep = step;
+        bubble.innerHTML = '<div class="guide-text">' + (this._guideMessages[step] || '') + '</div>' +
+          '<button class="guide-dismiss" id="guideDismiss">Skip tutorial</button>';
+        document.getElementById('guideDismiss').addEventListener('click', function() {
+          Game.state.tutorialStep = 7;
+          bubble.remove();
+        });
+      }
+    },
 
     // ═══════════════════════════════════════
     // ACHIEVEMENTS PANEL (HUD button)

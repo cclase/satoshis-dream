@@ -120,6 +120,7 @@
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
+      tutorialStep: 0, // 0=not started, 1-6=active, 7=done
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -315,6 +316,8 @@
       }
       if (item.cur === 'sats') this.state.sats -= cost; else this.state.usd -= cost;
       this.state.owned[item.id] = (this.state.owned[item.id] || 0) + count;
+      // Tutorial: step 4 (buy hardware) → step 5
+      if (this.state.tutorialStep === 4 && item.slots) this.state.tutorialStep = 5;
       return true;
     },
 
@@ -425,6 +428,8 @@
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
       this.state.heat = Math.min(100, this.state.heat + 0.05);
+      // Tutorial: step 2 (tap mine) → step 3
+      if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
       return gain;
     },
 
@@ -441,6 +446,12 @@
       var usdGain = btcAmount * this.getEffectivePrice() * this.getSellMultiplier();
       this.state.sats -= satsToSell;
       this.state.usd += usdGain;
+      // Tutorial: step 5 (sell sats) → step 6, then auto-complete to 7
+      if (this.state.tutorialStep === 5) {
+        this.state.tutorialStep = 6;
+        var self = this;
+        setTimeout(function() { if (self.state.tutorialStep === 6) self.state.tutorialStep = 7; }, 5000);
+      }
       return usdGain;
     },
 
@@ -536,6 +547,9 @@
       var mul = this.getMultiplier();
       var gain = rate * mul * dt;
       s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
+
+      // Tutorial: step 3 → 4 when player has enough for a laptop
+      if (s.tutorialStep === 3 && s.sats >= 15) s.tutorialStep = 4;
 
       // Heat
       var hGen = 0;

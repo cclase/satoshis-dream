@@ -4,7 +4,7 @@
   var WORLD_W = 2400;
   var WORLD_H = 1700;
   var AVATAR_SIZE = 24;
-  var AVATAR_SPEED = 200;
+  var AVATAR_SPEED = 280;
   var INTERACT_DIST = 52;
 
   var BUILDINGS = [
@@ -215,6 +215,7 @@
     _avatarLabelTex: null, _avatarLastName: null,
     _moveTargetMesh: null, _promptMesh: null,
     _buildingMeshes: [], _time: 0,
+    _lastAvatarX: 0, _lastAvatarY: 0, _stuckTimer: 0,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
@@ -228,9 +229,18 @@
 
       this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
+      // Enable zoom (scroll/pinch) and rotate (right-drag/two-finger)
       this._camera3.inputs.clear();
-      this._camera3.lowerRadiusLimit = 300;
-      this._camera3.upperRadiusLimit = 1500;
+      this._camera3.inputs.addMouseWheel();
+      this._camera3.inputs.addPointers();
+      this._camera3.lowerRadiusLimit = 250;
+      this._camera3.upperRadiusLimit = 1200;
+      this._camera3.lowerBetaLimit = 0.3;
+      this._camera3.upperBetaLimit = 1.3;
+      // Prevent left-click drag from rotating (reserve for click-to-move)
+      this._camera3.angularSensibilityX = 3000;
+      this._camera3.angularSensibilityY = 3000;
+      this._camera3.panningSensibility = 0; // Disable panning
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);
@@ -248,21 +258,47 @@
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
 
-      canvasEl.addEventListener('pointerup', function() {
+      canvasEl.addEventListener('pointerup', function(evt) {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
-        var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY, function(m) { return m === self._groundMesh; });
+        // Try picking ground first, then any mesh
+        var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY);
         if (!pick.hit) return;
-        var worldX = pick.pickedPoint.x, worldY = pick.pickedPoint.z;
-        var tappedBuilding = null;
-        for (var i = 0; i < BUILDINGS.length; i++) {
-          var b = BUILDINGS[i];
-          if (worldX >= b.x && worldX <= b.x+b.w && worldY >= b.y && worldY <= b.y+b.h) { tappedBuilding = b; break; }
+        var hitMesh = pick.pickedMesh;
+        var worldX, worldY;
+
+        // Check if we hit a building mesh
+        var clickedBuilding = null;
+        if (hitMesh && hitMesh !== self._groundMesh) {
+          // Find which building this mesh belongs to by checking position
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            var px = pick.pickedPoint.x, pz = pick.pickedPoint.z;
+            if (px >= bb.x - 10 && px <= bb.x + bb.w + 10 && pz >= bb.y - 10 && pz <= bb.y + bb.h + 10) {
+              clickedBuilding = bb; break;
+            }
+          }
         }
-        self._pathWaypoints = null;
-        if (tappedBuilding) {
-          self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
-          self.autoEnterBuilding = tappedBuilding;
-        } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
+
+        if (clickedBuilding) {
+          worldX = clickedBuilding.x + clickedBuilding.w / 2;
+          worldY = clickedBuilding.y + clickedBuilding.h + 30;
+          self._pathWaypoints = null;
+          self.moveTarget = { x: worldX, y: worldY };
+          self.autoEnterBuilding = clickedBuilding;
+        } else if (hitMesh === self._groundMesh) {
+          worldX = pick.pickedPoint.x; worldY = pick.pickedPoint.z;
+          // Also check if ground click is inside a building footprint
+          var tappedBuilding = null;
+          for (var i = 0; i < BUILDINGS.length; i++) {
+            var b = BUILDINGS[i];
+            if (worldX >= b.x && worldX <= b.x+b.w && worldY >= b.y && worldY <= b.y+b.h) { tappedBuilding = b; break; }
+          }
+          self._pathWaypoints = null;
+          if (tappedBuilding) {
+            self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
+            self.autoEnterBuilding = tappedBuilding;
+          } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
+        }
       });
     },
 
@@ -543,6 +579,27 @@
 
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));
       av.y = Math.max(AVATAR_SIZE, Math.min(WORLD_H - AVATAR_SIZE, av.y));
+
+      // Stuck detection: if position hasn't changed much in 1.5 seconds, skip waypoint
+      if (this.moveTarget) {
+        var movedDist = Math.abs(av.x - this._lastAvatarX) + Math.abs(av.y - this._lastAvatarY);
+        if (movedDist < 2) {
+          this._stuckTimer += dt;
+          if (this._stuckTimer > 1.5) {
+            this._stuckTimer = 0;
+            if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+              this._pathWaypoints.shift();
+            } else {
+              this.moveTarget = null;
+              this._pathWaypoints = null;
+            }
+          }
+        } else {
+          this._stuckTimer = 0;
+        }
+      }
+      this._lastAvatarX = av.x;
+      this._lastAvatarY = av.y;
 
       this.nearbyBuilding = this.getNearbyBuilding();
     },

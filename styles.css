@@ -973,18 +973,18 @@ body {
 /* Guide Bubble */
 #guide-bubble {
   position: fixed;
-  bottom: 200px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(16,16,37,0.92);
   border: 2px solid var(--gold);
   padding: 14px 20px;
   border-radius: 16px;
-  z-index: 30;
-  max-width: 400px;
-  width: 90%;
+  z-index: 18;
+  max-width: 360px;
+  width: 85%;
   text-align: center;
-  backdrop-filter: blur(8px);
+  pointer-events: auto;
   animation: guideIn 0.4s ease;
 }
 .guide-text {

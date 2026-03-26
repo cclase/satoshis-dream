@@ -1391,6 +1391,9 @@
         bubble.id = 'guide-bubble';
         document.body.appendChild(bubble);
       }
+      // Hide guide when panel is open to prevent blocking clicks
+      if (this.panelOpen) { bubble.style.display = 'none'; return; }
+      else { bubble.style.display = ''; }
       if (this._lastGuideStep !== step) {
         this._lastGuideStep = step;
         bubble.innerHTML = '<div class="guide-text">' + (this._guideMessages[step] || '') + '</div>' +

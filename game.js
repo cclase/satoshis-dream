@@ -781,12 +781,14 @@
     updateCraig: function(dt) {
       var s = this.state;
       if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
+      // Craig gets a head start: starts at 30% of player's lifetime sats
+      if (s.craig.sats === 0 && s.lifetimeSats > 100) s.craig.sats = s.lifetimeSats * 0.3;
       var pace = this.getCraigPace();
-      // Sabotage slows Craig 50%
       if (s.craig._sabotageUntil && Date.now() < s.craig._sabotageUntil) pace *= 0.5;
-      // Craig mirrors player production at pace%
-      var playerRate = this.getProductionRate() * this.getMultiplier();
+      var playerRate = Math.max(1, this.getProductionRate() * this.getMultiplier());
       s.craig.sats += playerRate * pace * dt;
+      // Craig also earns a base amount even when player has no production
+      s.craig.sats += 0.5 * dt;
       // Craig steals from you if he's ahead
       if (s.craig.sats > s.lifetimeSats * 1.1) {
         var steal = playerRate * 0.01 * dt; // 1% production per second
@@ -928,7 +930,11 @@
     },
 
     tapMine: function() {
-      var gain = 3; // base 3 sats per tap (was 1)
+      var gain = 5; // base 5 sats per tap
+      // Scale with owned hardware count
+      var hwCount = 0;
+      for (var i = 0; i < HARDWARE.length; i++) hwCount += (this.state.owned[HARDWARE[i].id] || 0);
+      gain += hwCount * 2; // +2 per owned hardware
       if (this.state.avatar && this.state.avatar.bonus === 'quickhands') gain += 5;
       if (this.state.pet === 'hamster') gain += 10;
       if (this.hasPrestigeUpgrade('pu_double_tap')) gain *= 2;
@@ -1076,8 +1082,8 @@
       s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() * dt) - (0.3 * dt)));
 
       // Energy - drains slowly, regens slowly
-      var energyDrain = 0.3; // per second base
-      if (this.getProductionRate() > 0) energyDrain = 0.6;
+      var energyDrain = 0.4; // per second base
+      if (this.getProductionRate() > 0) energyDrain = 1.0; // drains in ~100s when producing
       // Energy regen only when NOT producing (idle regen)
       var energyRegen = this.getProductionRate() > 0 ? 0 : this.getEnergyRegen() * dt * 0.1;
       s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + energyRegen));

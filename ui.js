@@ -135,20 +135,11 @@
         var dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < DEAD_ZONE) return;
         moved = true;
-        // Normalize and rotate by camera angle (~45 degrees)
-        var ndx = dx / dist, ndy = dy / dist;
-        // Camera is at -PI/4 alpha, so rotate drag direction to match world
-        var camAngle = Math.PI / 4; // 45 degrees
-        var cos = Math.cos(camAngle), sin = Math.sin(camAngle);
-        var worldDx = ndx * cos - ndy * sin;
-        var worldDy = ndx * sin + ndy * cos;
-        self.dragDir.x = worldDx;
-        self.dragDir.y = worldDy;
-        // Also set keys for compatibility
-        self.keys.left = worldDx < -0.3;
-        self.keys.right = worldDx > 0.3;
-        self.keys.up = worldDy < -0.3;
-        self.keys.down = worldDy > 0.3;
+        // Set raw screen direction — camera rotation applied in town.js updateAvatar
+        self.keys.left = dx < -DEAD_ZONE;
+        self.keys.right = dx > DEAD_ZONE;
+        self.keys.up = dy < -DEAD_ZONE;
+        self.keys.down = dy > DEAD_ZONE;
       }, { passive: false });
 
       var stopTouch = function() {
@@ -173,17 +164,10 @@
         var dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < DEAD_ZONE) return;
         moved = true;
-        var ndx = dx / dist, ndy = dy / dist;
-        var camAngle = Math.PI / 4;
-        var cos = Math.cos(camAngle), sin = Math.sin(camAngle);
-        var worldDx = ndx * cos - ndy * sin;
-        var worldDy = ndx * sin + ndy * cos;
-        self.dragDir.x = worldDx;
-        self.dragDir.y = worldDy;
-        self.keys.left = worldDx < -0.3;
-        self.keys.right = worldDx > 0.3;
-        self.keys.up = worldDy < -0.3;
-        self.keys.down = worldDy > 0.3;
+        self.keys.left = dx < -DEAD_ZONE;
+        self.keys.right = dx > DEAD_ZONE;
+        self.keys.up = dy < -DEAD_ZONE;
+        self.keys.down = dy > DEAD_ZONE;
       });
       document.addEventListener('pointerup', function(e) {
         if (touching && e.pointerType !== 'touch') stopTouch();

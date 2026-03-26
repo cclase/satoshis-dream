@@ -1072,8 +1072,8 @@
       for (var j = 0; j < DARK_WEB.length; j++) {
         if (DARK_WEB[j].id !== 'd2') hGen += (s.owned[DARK_WEB[j].id] || 0) * DARK_WEB[j].heat;
       }
-      // Heat gen scaled by /3, passive cooling at 0.5/s
-      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 3 * dt) - (0.5 * dt)));
+      // Heat: direct hGen with 0.3/s passive cooling — heat matters from early game
+      s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() * dt) - (0.3 * dt)));
 
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.3; // per second base
@@ -1281,9 +1281,11 @@
       // Check achievements
       this.checkAchievements();
 
-      // BTC price random walk
-      s.price *= (1 + (Math.random() - 0.499) * 0.0005);
-      s.price = Math.max(1000, s.price);
+      // BTC price random walk with mean reversion toward 65K
+      var priceDrift = (Math.random() - 0.5) * 0.0005;
+      var meanRevert = (65000 - s.price) * 0.00001; // Pull toward 65K
+      s.price *= (1 + priceDrift + meanRevert);
+      s.price = Math.max(50000, Math.min(150000, s.price)); // Floor 50K, cap 150K
 
       // Price events
       if (s.priceEvent && now >= s.priceEvent.endsAt) { s.priceEvent = null; this.scheduleNextEvent(); }

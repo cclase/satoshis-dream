@@ -78,6 +78,12 @@
     { id: 'fu_kitchen', name: 'Kitchen',         icon: '\u{1F373}', cost: 1000, cur: 'usd', desc: '+25% energy from home food', bonus: 'kitchen', val: 0.25 },
   ];
 
+  var SEEDS = [
+    { id: 'seed_herb',  name: 'Herb Seeds',    icon: '\u{1F33F}', cost: 20,   growTime: 120000, reward: 25,  energy: 15, desc: '2min grow, +25 sats or +15 energy' },
+    { id: 'seed_flower',name: 'Flower Seeds',  icon: '\u{1F33B}', cost: 100,  growTime: 300000, reward: 150, energy: 10, desc: '5min grow, +150 sats or +10 energy' },
+    { id: 'seed_money', name: 'Money Tree',    icon: '\u{1F4B0}', cost: 1000, growTime: 900000, reward: 2000,energy: 50, desc: '15min grow, +2000 sats or +50 energy' },
+  ];
+
   var NPC_EVENTS = [
     { id: 'npc_tips', name: 'Mining Tips', icon: '\u{1F4A1}', desc: 'A stranger offers mining tips for $10.', accept: 'Buy Tips', decline: 'No thanks', effect: function(s) { if (s.usd < 10) return 'Not enough USD!'; s.usd -= 10; s._tempBoost = (s._tempBoost||0) + 0.05; s._tempBoostEnd = Date.now() + 60000; return '+5% production for 60s!'; } },
     { id: 'npc_usb', name: 'Found USB', icon: '\u{1F4BE}', desc: 'You found a USB drive on the ground!', accept: 'Pick up', decline: 'Leave it', effect: function(s) { var g = 50 + Math.floor(Math.random()*150); s.sats += g; s.totalSats += g; s.lifetimeSats += g; return '+' + g + ' sats!'; } },
@@ -420,6 +426,7 @@
       }
       if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
       base *= (1 + this._getItemBonus('speed'));
+      base *= this.getWeatherSpeedMod();
       return base;
     },
 
@@ -519,6 +526,99 @@
       return true;
     },
 
+    // ── Garden ──
+    getMaxPlots: function() {
+      var h = { studio: 0, apartment: 1, house: 2, warehouse: 3, solar: 3 };
+      return h[this.state.housing] || 0;
+    },
+    plantSeed: function(seedId) {
+      var s = this.state;
+      var seed = SEEDS.find(function(se) { return se.id === seedId; });
+      if (!seed || s.garden.length >= this.getMaxPlots()) return false;
+      if (s.usd < seed.cost) return false;
+      s.usd -= seed.cost;
+      s.garden.push({ seedId: seedId, plantedAt: Date.now() });
+      return true;
+    },
+    harvestPlant: function(index) {
+      var s = this.state;
+      if (index >= s.garden.length) return false;
+      var plant = s.garden[index];
+      var seed = SEEDS.find(function(se) { return se.id === plant.seedId; });
+      if (!seed || Date.now() - plant.plantedAt < seed.growTime) return false;
+      s.garden.splice(index, 1);
+      if (!s.gardenInventory) s.gardenInventory = {};
+      s.gardenInventory[seed.id] = (s.gardenInventory[seed.id] || 0) + 1;
+      return seed;
+    },
+    eatGardenItem: function(seedId) {
+      var s = this.state;
+      if (!s.gardenInventory || !s.gardenInventory[seedId]) return false;
+      var seed = SEEDS.find(function(se) { return se.id === seedId; });
+      if (!seed) return false;
+      s.gardenInventory[seedId]--;
+      if (s.gardenInventory[seedId] <= 0) delete s.gardenInventory[seedId];
+      var bonus = s.furniture && s.furniture.fu_kitchen ? 1.25 : 1;
+      s.energy = Math.min(this.getEnergyMax(), s.energy + Math.floor(seed.energy * bonus));
+      return seed;
+    },
+
+    // ── Treasure Maps ──
+    checkTreasureDrop: function() {
+      var s = this.state;
+      if (s.treasureMap) return;
+      if (Math.random() < 0.005) { // 0.5% per tap
+        var tx = 100 + Math.random() * (WORLD_W - 200);
+        var ty = 100 + Math.random() * (WORLD_H - 200);
+        var reward = 500 + Math.floor(Math.random() * 4500);
+        s.treasureMap = { x: tx, y: ty, reward: reward, expiresAt: Date.now() + 600000 };
+        if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Found a treasure map! Check your minimap!');
+      }
+    },
+    digTreasure: function() {
+      var s = this.state;
+      if (!s.treasureMap || !s.avatar) return false;
+      var dx = s.avatar.x - s.treasureMap.x, dy = s.avatar.y - s.treasureMap.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 30) return false;
+      var reward = s.treasureMap.reward;
+      s.sats += reward; s.totalSats += reward; s.lifetimeSats += reward;
+      s.treasureMap = null;
+      if (UI && UI.toast) UI.toast('\u{1F4B0} Treasure! +' + Game.formatNumber(reward) + ' sats!');
+      return true;
+    },
+
+    // ── Building Reputation ──
+    visitBuilding: function(panelType) {
+      var s = this.state;
+      if (!s.buildingVisits) s.buildingVisits = {};
+      s.buildingVisits[panelType] = (s.buildingVisits[panelType] || 0) + 1;
+    },
+    getBuildingDiscount: function(panelType) {
+      var visits = (this.state.buildingVisits || {})[panelType] || 0;
+      if (visits >= 30) return 0.15; // VIP
+      if (visits >= 15) return 0.10;
+      if (visits >= 5) return 0.05;
+      return 0;
+    },
+
+    // ── Weather ──
+    weather: 'clear',
+    _weatherTimer: 0,
+    updateWeather: function(dt) {
+      this._weatherTimer += dt;
+      if (this._weatherTimer > 180 + Math.random() * 300) { // 3-8 min
+        this._weatherTimer = 0;
+        var weathers = ['clear', 'clear', 'cloudy', 'rain'];
+        if (this.weather === 'rain' && Math.random() < 0.1) weathers.push('storm');
+        this.weather = weathers[Math.floor(Math.random() * weathers.length)];
+      }
+    },
+    getWeatherSpeedMod: function() {
+      return this.weather === 'rain' ? 0.85 : this.weather === 'storm' ? 0.7 : 1.0;
+    },
+
+    SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
+
     collectStreetItem: function() {
       var rate = Math.max(1, this.getProductionRate());
       var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
@@ -541,6 +641,7 @@
       this.state.heat = Math.min(100, this.state.heat + 0.05);
       // Tutorial: step 2 (tap mine) → step 3
       if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
+      this.checkTreasureDrop();
       return gain;
     },
 
@@ -823,6 +924,26 @@
         s.powerCutUntil = now + 30000;
         s.usd = 0;
         if (UI && UI.toast) UI.toast('\u26A1 BLACKOUT! Power cut for 30s!');
+      }
+
+      // Weather
+      this.updateWeather(dt);
+      // Storm hardware damage
+      if (this.weather === 'storm') {
+        if (!s._stormDmgCheck) s._stormDmgCheck = now;
+        if (now - s._stormDmgCheck > 60000) {
+          s._stormDmgCheck = now;
+          if (Math.random() < 0.02) {
+            for (var hi = HARDWARE.length - 1; hi >= 0; hi--) {
+              if ((s.owned[HARDWARE[hi].id] || 0) > 0) { s.owned[HARDWARE[hi].id]--; if (UI && UI.toast) UI.toast('\u26A1 Lightning fried a ' + HARDWARE[hi].name + '!'); break; }
+            }
+          }
+        }
+      }
+      // Treasure map expiry
+      if (s.treasureMap && Date.now() > s.treasureMap.expiresAt) {
+        s.treasureMap = null;
+        if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Treasure map expired!');
       }
 
       // Check achievements

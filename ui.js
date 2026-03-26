@@ -216,6 +216,16 @@
           eb.style.display = 'block';
         } else { eb.style.display = 'none'; }
       }
+      // Weather icon
+      var weatherEl = document.getElementById('weatherIcon');
+      if (!weatherEl) {
+        weatherEl = document.createElement('div');
+        weatherEl.id = 'weatherIcon';
+        weatherEl.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);font-size:18px;z-index:11;';
+        document.body.appendChild(weatherEl);
+      }
+      var wi = {clear:'\u2600\uFE0F',cloudy:'\u26C5',rain:'\u{1F327}\uFE0F',storm:'\u26C8\uFE0F'};
+      weatherEl.textContent = wi[Game.weather] || '\u2600\uFE0F';
       // Active delivery indicator
       var deliveryBar = document.getElementById('deliveryBar');
       if (!deliveryBar) {
@@ -295,6 +305,12 @@
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+      // Treasure map X
+      if (Game.state.treasureMap) {
+        var tm = Game.state.treasureMap;
+        ctx.fillStyle = '#ff0000'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('X', tm.x * sx, tm.y * sy + 3);
+      }
       // Move target
       if (Town.moveTarget) {
         ctx.strokeStyle = '#ff0';
@@ -364,6 +380,8 @@
       this._hwDirty = true;
       // Tutorial: step 1 (go to mine) → step 2
       if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
+      // Track building visits
+      Game.visitBuilding(building.panelType);
       // Auto-complete delivery quest
       if (Game.state.activeDelivery && Game.state.activeDelivery.targetId === building.id) {
         Game.completeDelivery();
@@ -1132,9 +1150,27 @@
           '<div class="hw-info"><div class="hw-name">' + f.name + '</div><div class="hw-sub">' + f.desc + '</div></div>' +
           '<div class="hw-cost">' + (owned ? '\u2705 Placed' : '$' + Game.formatNumber(f.cost)) + '</div></div>';
       });
+      // Seeds section
+      if (Game.getMaxPlots() > 0) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+        html += '<div style="font-weight:800;margin-bottom:6px;">\u{1F331} Garden Seeds</div>';
+        Game.SEEDS.forEach(function(se) {
+          html += '<div class="hw-card' + (s.usd < se.cost ? ' locked' : '') + '" data-seed="' + se.id + '">' +
+            '<div class="hw-icon">' + se.icon + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + se.name + '</div><div class="hw-sub">' + se.desc + '</div></div>' +
+            '<div class="hw-cost">$' + Game.formatNumber(se.cost) + '</div></div>';
+        });
+        html += '</div>';
+      }
       return html + '</div>';
     },
     wireHomegoodsPanel: function() {
+      document.querySelectorAll('[data-seed]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          if (Game.plantSeed(el.dataset.seed)) { UI.toast('\u{1F331} Planted!'); UI.showPanel(UI.currentBuilding); }
+          else UI.toast('No garden plots available or not enough USD');
+        });
+      });
       document.querySelectorAll('[data-furn]').forEach(function(el) {
         el.addEventListener('click', function() {
           var f = Game.FURNITURE.find(function(x) { return x.id === el.dataset.furn; });
@@ -1174,12 +1210,54 @@
         ownedFurn.forEach(function(f) { html += '<span style="font-size:20px;" title="' + f.name + ' - ' + f.desc + '">' + f.icon + '</span> '; });
         html += '</div>';
       }
+      // Garden
+      if (Game.getMaxPlots() > 0) {
+        html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">GARDEN (' + s.garden.length + '/' + Game.getMaxPlots() + ' plots)</div>';
+        s.garden.forEach(function(p, i) {
+          var seed = Game.SEEDS.find(function(se) { return se.id === p.seedId; });
+          var elapsed = Date.now() - p.plantedAt;
+          var ready = seed && elapsed >= seed.growTime;
+          var timeLeft = seed ? Math.max(0, Math.ceil((seed.growTime - elapsed) / 1000)) : 0;
+          html += '<div class="hw-card' + (ready ? '' : ' locked') + '" data-harvest="' + i + '">' +
+            '<div class="hw-icon">' + (seed ? seed.icon : '\u{1F331}') + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + (seed ? seed.name : 'Plant') + '</div>' +
+            '<div class="hw-sub">' + (ready ? 'Ready to harvest!' : timeLeft + 's remaining') + '</div></div>' +
+            '<div class="hw-cost" style="color:' + (ready ? 'var(--green)' : 'var(--dim)') + ';">' + (ready ? 'Harvest' : '\u231B') + '</div></div>';
+        });
+        html += '</div>';
+      }
+      // Garden inventory (eat at home)
+      var inv = s.gardenInventory || {};
+      var hasFood = Object.keys(inv).length > 0;
+      if (hasFood) {
+        html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">PANTRY</div>';
+        Game.SEEDS.forEach(function(se) {
+          if (!inv[se.id]) return;
+          html += '<div class="hw-card" data-eat="' + se.id + '"><div class="hw-icon">' + se.icon + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + se.name + ' x' + inv[se.id] + '</div>' +
+            '<div class="hw-sub">Eat for +' + se.energy + ' energy</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Eat</div></div>';
+        });
+        html += '</div>';
+      }
       // Sleep button
       var canSleep = Date.now() - (s.lastSleepTime || 0) >= 180000;
       html += '<button class="panel-btn btn-purple" id="sleepBtn"' + (canSleep ? '' : ' disabled style="opacity:0.4"') + '>\u{1F6CC} Sleep' + (canSleep ? '' : ' (cooldown)') + '</button>';
       return html + '</div>';
     },
     wireApartmentPanel: function() {
+      document.querySelectorAll('[data-harvest]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var seed = Game.harvestPlant(parseInt(el.dataset.harvest));
+          if (seed) { UI.toast(seed.icon + ' Harvested ' + seed.name + '!'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
+      document.querySelectorAll('[data-eat]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var seed = Game.eatGardenItem(el.dataset.eat);
+          if (seed) { UI.toast(seed.icon + ' Ate ' + seed.name + '! +' + seed.energy + ' energy'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
       var el = document.getElementById('sleepBtn');
       if (el) el.addEventListener('click', function() {
         var result = Game.sleep();

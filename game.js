@@ -12,9 +12,9 @@
   ];
 
   var DARK_WEB = [
-    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 500,    rate: 50,    heat: 2,    cur: 'usd', desc: '+50/s, +heat, +risk' },
+    { id: 'd1', name: 'Botnet',  icon: '\u{1F480}', base: 500,    rate: 200,   heat: 2,    cur: 'usd', desc: '+200/s, +heat, +risk' },
     { id: 'd2', name: 'Coolant', icon: '\u2744\uFE0F', base: 1000,  rate: 0,     heat: -0.05, cur: 'usd', desc: '-Heat gen' },
-    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 25000, rate: 500,   heat: 8,    cur: 'usd', desc: '+500/s, high heat+risk' },
+    { id: 'd3', name: 'Relay',   icon: '\u{1F6F0}\uFE0F', base: 25000, rate: 2000,  heat: 8,    cur: 'usd', desc: '+2K/s, high heat+risk' },
   ];
 
   var HOUSING = [
@@ -57,22 +57,22 @@
   ];
 
   var CLOTHING = [
-    { id: 'cl_hat',     name: 'Bitcoin Cap',     icon: '\u{1F9E2}', cost: 50,    cur: 'usd', desc: '+2% income',     bonus: 'income', val: 0.02 },
-    { id: 'cl_jacket',  name: 'Hoodie',          icon: '\u{1F9E5}', cost: 200,   cur: 'usd', desc: '-3% heat',       bonus: 'heat',   val: 0.03 },
-    { id: 'cl_shoes',   name: 'Running Shoes',   icon: '\u{1F45F}', cost: 500,   cur: 'usd', desc: '+10% speed',     bonus: 'speed',  val: 0.1 },
-    { id: 'cl_suit',    name: 'Business Suit',   icon: '\u{1F454}', cost: 2000,  cur: 'usd', desc: '+5% sell price', bonus: 'sell',   val: 0.05 },
-    { id: 'cl_watch',   name: 'Gold Watch',      icon: '\u231A',    cost: 10000, cur: 'usd', desc: '+8% income',     bonus: 'income', val: 0.08 },
+    { id: 'cl_hat',     name: 'Bitcoin Cap',     icon: '\u{1F9E2}', cost: 50,    cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
+    { id: 'cl_jacket',  name: 'Hoodie',          icon: '\u{1F9E5}', cost: 200,   cur: 'usd', desc: '-6% heat',       bonus: 'heat',   val: 0.06 },
+    { id: 'cl_shoes',   name: 'Running Shoes',   icon: '\u{1F45F}', cost: 500,   cur: 'usd', desc: '+20% speed',     bonus: 'speed',  val: 0.2 },
+    { id: 'cl_suit',    name: 'Business Suit',   icon: '\u{1F454}', cost: 2000,  cur: 'usd', desc: '+10% sell price',bonus: 'sell',   val: 0.10 },
+    { id: 'cl_watch',   name: 'Gold Watch',      icon: '\u231A',    cost: 10000, cur: 'usd', desc: '+15% income',    bonus: 'income', val: 0.15 },
   ];
 
   var FURNITURE = [
-    { id: 'fu_desk',    name: 'Mining Desk',     icon: '\u{1F5A5}\uFE0F', cost: 100,   cur: 'usd', desc: '+3% production', bonus: 'prod', val: 0.03 },
-    { id: 'fu_chair',   name: 'Gaming Chair',    icon: '\u{1FA91}', cost: 300,   cur: 'usd', desc: '+5 max energy',  bonus: 'energy', val: 5 },
-    { id: 'fu_plant',   name: 'House Plant',     icon: '\u{1FAB4}', cost: 150,   cur: 'usd', desc: '-2% heat',       bonus: 'heat',   val: 0.02 },
-    { id: 'fu_poster',  name: 'BTC Poster',      icon: '\u{1F5BC}\uFE0F', cost: 75,    cur: 'usd', desc: '+1% income',     bonus: 'income', val: 0.01 },
-    { id: 'fu_lamp',    name: 'Neon Lamp',       icon: '\u{1F4A1}', cost: 200,   cur: 'usd', desc: '+2% production', bonus: 'prod',   val: 0.02 },
-    { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
-    { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+3 energy regen',bonus: 'eregen', val: 3 },
-    { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
+    { id: 'fu_desk',    name: 'Mining Desk',     icon: '\u{1F5A5}\uFE0F', cost: 100,   cur: 'usd', desc: '+6% production', bonus: 'prod', val: 0.06 },
+    { id: 'fu_chair',   name: 'Gaming Chair',    icon: '\u{1FA91}', cost: 300,   cur: 'usd', desc: '+10 max energy', bonus: 'energy', val: 10 },
+    { id: 'fu_plant',   name: 'House Plant',     icon: '\u{1FAB4}', cost: 150,   cur: 'usd', desc: '-4% heat',       bonus: 'heat',   val: 0.04 },
+    { id: 'fu_poster',  name: 'BTC Poster',      icon: '\u{1F5BC}\uFE0F', cost: 75,    cur: 'usd', desc: '+3% income',     bonus: 'income', val: 0.03 },
+    { id: 'fu_lamp',    name: 'Neon Lamp',       icon: '\u{1F4A1}', cost: 200,   cur: 'usd', desc: '+4% production', bonus: 'prod',   val: 0.04 },
+    { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+8% income',     bonus: 'income', val: 0.08 },
+    { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+5 energy regen',bonus: 'eregen', val: 5 },
+    { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 15% sats on default', bonus: 'protect', val: 0.15 },
     { id: 'fu_bed_good',name: 'Comfy Bed',       icon: '\u{1F6CF}\uFE0F', cost: 500,  cur: 'usd', desc: 'Sleep restores 75 energy', bonus: 'bed', val: 75 },
     { id: 'fu_bed_luxury',name:'Luxury Bed',     icon: '\u{1F6CC}', cost: 5000, cur: 'usd', desc: 'Sleep restores 100 energy', bonus: 'bed', val: 100 },
     { id: 'fu_kitchen', name: 'Kitchen',         icon: '\u{1F373}', cost: 1000, cur: 'usd', desc: '+25% energy from home food', bonus: 'kitchen', val: 0.25 },
@@ -80,9 +80,9 @@
   ];
 
   var SEEDS = [
-    { id: 'seed_herb',  name: 'Herb Seeds',    icon: '\u{1F33F}', cost: 20,   growTime: 120000, reward: 25,  energy: 15, desc: '2min grow, +25 sats or +15 energy' },
-    { id: 'seed_flower',name: 'Flower Seeds',  icon: '\u{1F33B}', cost: 100,  growTime: 300000, reward: 150, energy: 10, desc: '5min grow, +150 sats or +10 energy' },
-    { id: 'seed_money', name: 'Money Tree',    icon: '\u{1F4B0}', cost: 1000, growTime: 900000, reward: 2000,energy: 50, desc: '15min grow, +2000 sats or +50 energy' },
+    { id: 'seed_herb',  name: 'Herb Seeds',    icon: '\u{1F33F}', cost: 20,   growTime: 120000, reward: 125,  energy: 25, desc: '2min grow, +125 sats or +25 energy' },
+    { id: 'seed_flower',name: 'Flower Seeds',  icon: '\u{1F33B}', cost: 100,  growTime: 300000, reward: 750,  energy: 30, desc: '5min grow, +750 sats or +30 energy' },
+    { id: 'seed_money', name: 'Money Tree',    icon: '\u{1F4B0}', cost: 1000, growTime: 900000, reward: 10000,energy: 80, desc: '15min grow, +10K sats or +80 energy' },
   ];
 
   var NPC_EVENTS = [
@@ -401,7 +401,8 @@
       mul *= (1 + this.getCollectionBonus());
       if (this.hasSkill('sk_hash1')) mul *= 1.1;
       if (this.hasSkill('sk_trade1')) mul *= 1.0; // trade skill affects sell, not production
-      if (s.heat > 90) mul *= 0.1;
+      // Gradual heat penalty: starts at 50%, scales to 0.1x at 100%
+      if (s.heat > 50) mul *= Math.max(0.1, 1 - (s.heat - 50) / 55.5);
       if (s.energy <= 0) mul *= 0.05;
       else if (s.energy < 25) mul *= 0.5; // 50% production when low energy
       return mul;
@@ -789,9 +790,9 @@
       s.craig.sats += playerRate * pace * dt;
       // Craig also earns a base amount even when player has no production
       s.craig.sats += 0.5 * dt;
-      // Craig steals from you if he's ahead
+      // Craig steals from you if he's ahead (reduced from 1% to 0.2%)
       if (s.craig.sats > s.lifetimeSats * 1.1) {
-        var steal = playerRate * 0.01 * dt; // 1% production per second
+        var steal = playerRate * 0.002 * dt; // 0.2% production per second
         s.sats = Math.max(0, s.sats - steal);
       }
       s.craig.hardware = Math.floor(s.craig.sats / 5000);
@@ -828,7 +829,7 @@
       if (s.sats < 1000) return false;
       s.sats -= 1000;
       if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
-      s.craig._sabotageUntil = Date.now() + 300000; // 5 min
+      s.craig._sabotageUntil = Date.now() + 600000; // 10 min
       return true;
     },
 
@@ -1046,10 +1047,10 @@
       var r = Math.random();
       var bonus = this.hasPrestigeUpgrade('pu_lucky') ? 0.05 : 0;
       var mult = 0;
-      if (r < 0.01 + bonus) mult = 10;
-      else if (r < 0.05 + bonus) mult = 5;
-      else if (r < 0.15 + bonus) mult = 3;
-      else if (r < 0.40 + bonus) mult = 1.5;
+      if (r < 0.01) mult = 10;       // 1% jackpot (unchanged)
+      else if (r < 0.05) mult = 5;   // 4% big win (unchanged)
+      else if (r < 0.15) mult = 3;   // 10% medium (unchanged)
+      else if (r < 0.40 + bonus) mult = 1.5; // 25-30% small win (lucky expands this)
       // 60% lose
       var win = Math.floor(bet * mult);
       this.state.sats += win;
@@ -1084,9 +1085,9 @@
 
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.4; // per second base
-      if (this.getProductionRate() > 0) energyDrain = 1.0; // drains in ~100s when producing
-      // Energy regen only when NOT producing (idle regen)
-      var energyRegen = this.getProductionRate() > 0 ? 0 : this.getEnergyRegen() * dt * 0.1;
+      if (this.getProductionRate() > 0) energyDrain = 0.6; // drains in ~170s when producing
+      // Reduced regen while producing (25% of normal), full regen when idle
+      var energyRegen = this.getEnergyRegen() * dt * (this.getProductionRate() > 0 ? 0.25 : 1.0);
       s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + energyRegen));
 
       // Electricity bill
@@ -1128,12 +1129,18 @@
             s.loans = [];
             if (UI && UI.toast) UI.toast('\u2705 Loan fully paid off!');
           }
-          // Default: if owed > 3x original (was 5x, now stricter)
-          if (loan.owed > loan.amount * 3) {
+          // Warn at 2x original
+          if (loan.owed > loan.amount * 2 && !loan._warned) {
+            loan._warned = true;
+            if (UI && UI.toast) UI.toast('\u26A0\uFE0F Loan at 2x! Repay soon or default at 5x!');
+          }
+          // Default: if owed > 5x original
+          if (loan.owed > loan.amount * 5) {
             s.loans = [];
-            s.sats = Math.floor(s.sats * 0.5);
-            s.usd = Math.max(0, s.usd - loan.amount * 0.5); // Also lose USD
-            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost 50% sats and $' + Game.formatNumber(loan.amount * 0.5) + '!');
+            var safeProtect = this._getItemBonus('protect'); // Safe furniture
+            s.sats = Math.floor(s.sats * (0.5 + safeProtect)); // Safe protects some sats
+            s.usd = Math.max(0, s.usd - loan.amount * 0.5);
+            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost ' + Math.round((0.5 - safeProtect) * 100) + '% sats and $' + Game.formatNumber(loan.amount * 0.5) + '!');
           }
         }
       }
@@ -1202,13 +1209,31 @@
         if (UI && UI.toast) UI.toast('\u{1F6A8} POLICE CHASE! Run home!');
       }
       if (s.policeChaseActive && now >= s.policeChaseEnd) {
-        // Caught!
         s.policeChaseActive = false;
-        s.owned.d1 = 0; s.owned.d2 = 0; s.owned.d3 = 0;
-        s.sats = Math.floor(s.sats * 0.5);
-        s.usd = Math.max(0, s.usd * 0.5);
-        s.policeRisk = 0;
-        if (UI && UI.toast) UI.toast('\u{1F6A8} ARRESTED! Lost dark web items, 50% sats & USD!');
+        // Check if player escaped home (near apartment building)
+        var escaped = false;
+        if (s.avatar && window.Town && window.Town.BUILDINGS) {
+          var home = window.Town.BUILDINGS.find(function(b) { return b.id === 'apartment'; });
+          if (home) {
+            var hdx = s.avatar.x - (home.x + home.w / 2);
+            var hdy = s.avatar.y - (home.y + home.h / 2);
+            escaped = Math.sqrt(hdx * hdx + hdy * hdy) < 100;
+          }
+        }
+        if (escaped) {
+          // Escaped! Just a fine
+          var fine = 200 + Math.floor(Math.random() * 300);
+          s.usd = Math.max(0, s.usd - fine);
+          s.policeRisk = Math.max(0, s.policeRisk - 50);
+          if (UI && UI.toast) UI.toast('\u{1F3E0} Escaped! Paid $' + fine + ' fine.');
+        } else {
+          // Caught! Full penalty
+          s.owned.d1 = 0; s.owned.d2 = 0; s.owned.d3 = 0;
+          s.sats = Math.floor(s.sats * 0.5);
+          s.usd = Math.max(0, s.usd * 0.5);
+          s.policeRisk = 0;
+          if (UI && UI.toast) UI.toast('\u{1F6A8} ARRESTED! Lost dark web items, 50% sats & USD!');
+        }
       }
       if (s.policeRisk >= 50 && !s._lastRaidTime) s._lastRaidTime = now;
       if (s.policeRisk >= 50 && now - (s._lastRaidTime || 0) > 300000) {
@@ -1271,9 +1296,13 @@
       this.checkAreaUnlock();
       // Auto-vent skill
       if (this.hasSkill('sk_hash2') && s.heat >= 80) { s.heat = Math.max(0, s.heat - 20); }
-      // Auto-sell in bull skill
+      // Auto-sell in bull skill (every 30s, not every frame)
       if (this.hasSkill('sk_trade3') && s.priceEvent && s.priceEvent.type === 'bull' && s.sats > 1000) {
-        this.sellSats(0.5);
+        if (!s._lastTradeSkillSell) s._lastTradeSkillSell = now;
+        if (now - s._lastTradeSkillSell > 30000) {
+          this.sellSats(0.5);
+          s._lastTradeSkillSell = now;
+        }
       }
 
       // Daily challenges

@@ -418,6 +418,16 @@
       return 0.5 + (this.state.gymLevel * 0.2);
     },
 
+    collectStreetItem: function() {
+      var rate = Math.max(1, this.getProductionRate());
+      var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
+      this.state.sats += gain;
+      this.state.totalSats += gain;
+      this.state.lifetimeSats += gain;
+      if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
+      return gain;
+    },
+
     tapMine: function() {
       var gain = 1;
       if (this.state.avatar && this.state.avatar.bonus === 'quickhands') gain += 5;

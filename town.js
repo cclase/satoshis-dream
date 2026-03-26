@@ -216,6 +216,7 @@
     _moveTargetMesh: null, _promptMesh: null,
     _buildingMeshes: [], _time: 0,
     _lastAvatarX: 0, _lastAvatarY: 0, _stuckTimer: 0,
+    _collectibles: [], // {mesh, x, z, active, respawnAt}
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
@@ -253,7 +254,7 @@
       this._shadowGen.useBlurExponentialShadowMap = true;
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
+      this._buildTrees(); this._buildCollectibles(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
 
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
@@ -452,6 +453,66 @@
             root.rotation.y = sr() * Math.PI * 2;
           });
         })(tx, tz, ti);
+      }
+    },
+
+    _buildCollectibles: function() {
+      var s = this._scene;
+      var goldMat = new BABYLON.StandardMaterial('goldMat', s);
+      goldMat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+      goldMat.emissiveColor = new BABYLON.Color3(0.5, 0.4, 0.1);
+      var seed = 99999;
+      function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+      for (var ci = 0; ci < 8; ci++) {
+        var cx, cz, valid;
+        var attempts = 0;
+        do {
+          cx = sr() * WORLD_W; cz = sr() * WORLD_H; valid = true; attempts++;
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            if (cx > bb.x - 20 && cx < bb.x + bb.w + 20 && cz > bb.y - 20 && cz < bb.y + bb.h + 20) { valid = false; break; }
+          }
+          if (valid) for (var ri = 0; ri < H_ROADS.length; ri++) { if (cz > H_ROADS[ri].y - 5 && cz < H_ROADS[ri].y + H_ROADS[ri].h + 5) { valid = false; break; } }
+          if (valid) for (var vi = 0; vi < V_ROADS.length; vi++) { if (cx > V_ROADS[vi].x - 5 && cx < V_ROADS[vi].x + V_ROADS[vi].w + 5) { valid = false; break; } }
+        } while (!valid && attempts < 30);
+        if (!valid) continue;
+
+        var orb = BABYLON.MeshBuilder.CreateSphere('orb' + ci, { diameter: 10, segments: 8 }, s);
+        orb.material = goldMat;
+        orb.position.set(cx, 8, cz);
+        this._collectibles.push({ mesh: orb, x: cx, z: cz, active: true, respawnAt: 0 });
+      }
+    },
+
+    _checkCollectibles: function(av) {
+      var now = Date.now();
+      for (var ci = 0; ci < this._collectibles.length; ci++) {
+        var c = this._collectibles[ci];
+        if (!c.active) {
+          // Check respawn
+          if (now >= c.respawnAt) {
+            c.active = true;
+            c.mesh.setEnabled(true);
+            // New random position
+            var seed = now + ci * 777;
+            c.x = 50 + (((seed * 16807) % 2147483647) / 2147483646) * (WORLD_W - 100);
+            c.z = 50 + ((((seed + 12345) * 16807) % 2147483647) / 2147483646) * (WORLD_H - 100);
+            c.mesh.position.x = c.x;
+            c.mesh.position.z = c.z;
+          }
+          continue;
+        }
+        // Bob animation
+        c.mesh.position.y = 8 + Math.sin(this._time * 3 + ci) * 3;
+        // Check collection distance
+        var dx = av.x - c.x, dz = av.y - c.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 25) {
+          c.active = false;
+          c.mesh.setEnabled(false);
+          c.respawnAt = now + 90000; // 90 seconds
+          Game.collectStreetItem();
+        }
       }
     },
 
@@ -670,6 +731,9 @@
           this._avatarLabelTex.update();
         }
       }
+
+      // Collectibles
+      if (av) this._checkCollectibles(av);
 
       // Sync move target
       if (this.moveTarget && this._moveTargetMesh) {

@@ -28,6 +28,10 @@ body {
   width: 100vw;
   height: 100vh;
   outline: none;
+  touch-action: none; /* Prevent browser gestures — we handle touch ourselves */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ═══════════════════════════════════════ */
@@ -779,13 +783,13 @@ body {
   bottom: 20px;
   right: 20px;
   z-index: 15;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: rgba(16,16,37,0.85);
-  border: 2px solid rgba(247,147,26,0.4);
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(16,16,37,0.9);
+  border: 2px solid rgba(247,147,26,0.6);
   color: var(--gold);
-  font-size: 20px;
+  font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -865,9 +869,83 @@ body {
   color: var(--dim);
 }
 
-@media (pointer: fine) {
-  #dpad, #dpad-action { display: none; }
-  #nav-menu-btn { bottom: 20px; right: 20px; }
+/* D-pad hidden — drag-to-move replaces it */
+#dpad, #dpad-action { display: none; }
+#nav-menu-btn { bottom: 20px; right: 20px; }
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  #hud {
+    padding: 4px 6px;
+    gap: 2px;
+  }
+  .hud-item {
+    padding: 2px 6px;
+    font-size: 9px;
+    border-radius: 6px;
+  }
+  .hud-left, .hud-right {
+    gap: 3px;
+  }
+  .hud-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .heat-bar-wrap, .energy-bar-wrap {
+    gap: 4px;
+  }
+  .heat-label, .energy-label {
+    font-size: 8px;
+    min-width: 24px;
+  }
+  #panel {
+    max-height: 60vh;
+    padding: 12px;
+  }
+  #panel .panel-title {
+    font-size: 15px;
+  }
+  .hw-card {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .hw-icon { font-size: 20px; }
+  .hw-name { font-size: 12px; }
+  .hw-sub { font-size: 9px; }
+  .hw-cost { font-size: 11px; }
+  .modal-card {
+    padding: 16px;
+    max-height: 85vh;
+  }
+  .modal-title { font-size: 18px; }
+  .modal-btn { padding: 12px; font-size: 14px; }
+  .sprite-row { gap: 8px; }
+  .sprite-option { width: 56px; height: 56px; }
+  .sprite-emoji { font-size: 24px; }
+  .bonus-grid { gap: 6px; }
+  .bonus-card { padding: 8px; }
+  .bonus-name { font-size: 11px; }
+  .bonus-desc { font-size: 9px; }
+  .mine-btn { width: 80px; height: 80px; font-size: 36px; }
+  .exchange-btns { grid-template-columns: 1fr 1fr; }
+  .exchange-stats { flex-direction: column; }
+  #nav-menu-btn {
+    width: 40px; height: 40px;
+    font-size: 16px; border-radius: 10px;
+  }
+  #dpad {
+    grid-template-columns: 44px 44px 44px;
+    grid-template-rows: 44px 44px 44px;
+    gap: 2px;
+    bottom: 12px; left: 10px;
+  }
+  .dpad-btn { width: 44px; height: 44px; font-size: 18px; }
+  #dpad-action {
+    width: 52px; height: 52px;
+    bottom: 56px; right: 14px;
+    font-size: 11px;
+  }
+  #toast { font-size: 11px; padding: 8px 14px; bottom: 20px; }
 }
 
 /* ═══════════════════════════════════════ */
@@ -893,4 +971,60 @@ body {
 
 #toast.show {
   opacity: 1;
+}
+
+/* Guide Bubble */
+#guide-bubble {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16,16,37,0.92);
+  border: 2px solid var(--gold);
+  padding: 14px 20px;
+  border-radius: 16px;
+  z-index: 18;
+  max-width: 360px;
+  width: 85%;
+  text-align: center;
+  pointer-events: auto;
+  animation: guideIn 0.4s ease;
+}
+.guide-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.guide-dismiss {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.guide-dismiss:hover { color: var(--text); border-color: var(--text); }
+/* Minimap */
+#minimap {
+  position: fixed;
+  top: 80px;
+  right: 10px;
+  z-index: 9;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+#minimap:hover { opacity: 1; border-color: var(--gold); }
+@media (max-width: 600px) {
+  #minimap { width: 100px; height: 70px; bottom: 80px; top: auto; left: 6px; right: auto; opacity: 0.7; }
+}
+
+@keyframes guideIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@media (max-width: 600px) {
+  #guide-bubble { bottom: 180px; padding: 10px 14px; }
+  .guide-text { font-size: 12px; }
 }

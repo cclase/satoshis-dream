@@ -4,7 +4,7 @@
   var WORLD_W = 2400;
   var WORLD_H = 1700;
   var AVATAR_SIZE = 24;
-  var AVATAR_SPEED = 200;
+  var AVATAR_SPEED = 280;
   var INTERACT_DIST = 52;
 
   var BUILDINGS = [
@@ -25,7 +25,9 @@
     { id: 'pet_shop',     name: 'Pet Shop',        emoji: '\u{1F43E}',    x: 960,  y: 1088, w: 128, h: 128, color: '#ffaacc', panelType: 'pet_shop' },
     { id: 'pawn_shop',    name: 'Pawn Shop',       emoji: '\u{1F48D}',    x: 1344, y: 1088, w: 128, h: 128, color: '#aa8833', panelType: 'pawn_shop' },
     { id: 'utility',      name: 'Utility Co.',     emoji: '\u26A1',       x: 128,  y: 1408, w: 192, h: 128, color: '#66aaff', panelType: 'utility' },
-    { id: 'apartment',    name: 'Studio Apt.',     emoji: '\u{1F6CF}\uFE0F', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
+    { id: 'clothing',     name: 'Clothing Store',  emoji: '\u{1F455}',    x: 576,  y: 1408, w: 192, h: 128, color: '#dd88aa', panelType: 'clothing' },
+    { id: 'apartment',    name: 'Your Home',       emoji: '\u{1F3E0}', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
+    { id: 'homegoods',    name: 'Home Goods',      emoji: '\u{1F6CB}\uFE0F', x: 1344, y: 1408, w: 192, h: 128, color: '#88aa66', panelType: 'homegoods' },
   ];
 
   // Road definitions
@@ -41,63 +43,577 @@
     { x: 1216, w: 50 },
   ];
 
+  // ── Road Pathfinding ──
+  // Build waypoint graph from road intersections + building entrances
+  var ROAD_CENTERS_H = H_ROADS.map(function(r) { return r.y + r.h / 2; });
+  var ROAD_CENTERS_V = V_ROADS.map(function(r) { return r.x + r.w / 2; });
+
+  // Waypoints: all road intersections + road endpoints
+  var WAYPOINTS = [];
+  // Road intersections
+  for (var hi = 0; hi < ROAD_CENTERS_H.length; hi++) {
+    // Add endpoints on horizontal roads
+    WAYPOINTS.push({ x: 20, y: ROAD_CENTERS_H[hi] });
+    WAYPOINTS.push({ x: WORLD_W - 20, y: ROAD_CENTERS_H[hi] });
+    for (var vi = 0; vi < ROAD_CENTERS_V.length; vi++) {
+      WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: ROAD_CENTERS_H[hi] });
+      if (hi === 0) {
+        WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: 20 });
+        WAYPOINTS.push({ x: ROAD_CENTERS_V[vi], y: WORLD_H - 20 });
+      }
+    }
+  }
+
+  function findNearestRoadPoint(px, py) {
+    // Find nearest point on road grid
+    var bestDist = Infinity, bestX = px, bestY = py;
+    // Check horizontal roads
+    for (var i = 0; i < ROAD_CENTERS_H.length; i++) {
+      var d = Math.abs(py - ROAD_CENTERS_H[i]);
+      if (d < bestDist) { bestDist = d; bestX = px; bestY = ROAD_CENTERS_H[i]; }
+    }
+    // Check vertical roads
+    for (var j = 0; j < ROAD_CENTERS_V.length; j++) {
+      var d2 = Math.abs(px - ROAD_CENTERS_V[j]);
+      if (d2 < bestDist) { bestDist = d2; bestX = ROAD_CENTERS_V[j]; bestY = py; }
+    }
+    return { x: bestX, y: bestY };
+  }
+
+  function findPath(sx, sy, ex, ey) {
+    // Route through nearest road intersections to avoid buildings
+    // Find nearest intersection to start and end
+    var startInt = nearestIntersection(sx, sy);
+    var endInt = nearestIntersection(ex, ey);
+    var path = [];
+
+    // Step 1: walk to nearest intersection
+    path.push(startInt);
+
+    // Step 2: travel along road grid via intersections
+    // If start and end are on same H road or same V road, go direct
+    if (startInt.x === endInt.x || startInt.y === endInt.y) {
+      // Same axis, go direct
+      if (startInt.x !== endInt.x || startInt.y !== endInt.y) path.push(endInt);
+    } else {
+      // Need an L-shaped turn through a shared intersection
+      // Option A: go horizontal on startInt.y, turn at endInt.x
+      var cornerA = { x: endInt.x, y: startInt.y };
+      // Option B: go vertical on startInt.x, turn at endInt.y
+      var cornerB = { x: startInt.x, y: endInt.y };
+      // Pick the corner that's an actual intersection (both coords on roads)
+      var aValid = isIntersection(cornerA.x, cornerA.y);
+      var bValid = isIntersection(cornerB.x, cornerB.y);
+      if (aValid) { path.push(cornerA); }
+      else if (bValid) { path.push(cornerB); }
+      else {
+        // Neither is a clean intersection — route through closest real intersection
+        var best = null, bestD = Infinity;
+        for (var w = 0; w < WAYPOINTS.length; w++) {
+          var wp = WAYPOINTS[w];
+          var d = Math.abs(wp.x - startInt.x) + Math.abs(wp.y - startInt.y) +
+                  Math.abs(wp.x - endInt.x) + Math.abs(wp.y - endInt.y);
+          if (d < bestD) { bestD = d; best = wp; }
+        }
+        if (best) path.push(best);
+      }
+      path.push(endInt);
+    }
+
+    // Step 3: walk from last intersection to destination
+    path.push({ x: ex, y: ey });
+    return path;
+  }
+
+  function nearestIntersection(px, py) {
+    var best = WAYPOINTS[0], bestD = Infinity;
+    for (var i = 0; i < WAYPOINTS.length; i++) {
+      var d = Math.abs(WAYPOINTS[i].x - px) + Math.abs(WAYPOINTS[i].y - py);
+      if (d < bestD) { bestD = d; best = WAYPOINTS[i]; }
+    }
+    return { x: best.x, y: best.y };
+  }
+
+  function isIntersection(px, py) {
+    var onH = false, onV = false;
+    for (var i = 0; i < ROAD_CENTERS_H.length; i++) { if (Math.abs(py - ROAD_CENTERS_H[i]) < 5) { onH = true; break; } }
+    for (var j = 0; j < ROAD_CENTERS_V.length; j++) { if (Math.abs(px - ROAD_CENTERS_V[j]) < 5) { onV = true; break; } }
+    return onH && onV;
+  }
+
+  function isOnRoad(px, py) {
+    for (var i = 0; i < H_ROADS.length; i++) {
+      if (py >= H_ROADS[i].y && py <= H_ROADS[i].y + H_ROADS[i].h) return true;
+    }
+    for (var j = 0; j < V_ROADS.length; j++) {
+      if (px >= V_ROADS[j].x && px <= V_ROADS[j].x + V_ROADS[j].w) return true;
+    }
+    return false;
+  }
+
+
+  // ── Babylon.js Helpers ──
+  function hexToColor3(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    return new BABYLON.Color3(parseInt(hex.substring(0,2),16)/255, parseInt(hex.substring(2,4),16)/255, parseInt(hex.substring(4,6),16)/255);
+  }
+  function makeBrickCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d');
+    var r=parseInt(baseHex.substr(1,2),16), g=parseInt(baseHex.substr(3,2),16), bl=parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle='#a09080'; ctx.fillRect(0,0,128,128);
+    for(var row=0;row*15<128;row++){var off=(row%2)*14;
+      for(var col=-1;col*31<140;col++){var v=(Math.random()-0.5)*25;
+        ctx.fillStyle='rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(off+col*31, row*15, 28, 12);}}
+    return c;
+  }
+  function makeStuccoCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d'); ctx.fillStyle=baseHex; ctx.fillRect(0,0,128,128);
+    var id=ctx.getImageData(0,0,128,128);
+    for(var i=0;i<id.data.length;i+=4){var n=(Math.random()-0.5)*18;
+      id.data[i]=Math.max(0,Math.min(255,id.data[i]+n));id.data[i+1]=Math.max(0,Math.min(255,id.data[i+1]+n));id.data[i+2]=Math.max(0,Math.min(255,id.data[i+2]+n));}
+    ctx.putImageData(id,0,0); return c;
+  }
+  function makeStoneCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d');
+    var r=parseInt(baseHex.substr(1,2),16), g=parseInt(baseHex.substr(3,2),16), bl=parseInt(baseHex.substr(5,2),16);
+    ctx.fillStyle='#888880'; ctx.fillRect(0,0,128,128);
+    for(var row=0;row*25<140;row++){var off=(row%2)*20; var x=-off;
+      while(x<128){var sw=28+Math.floor(Math.random()*20); var v=(Math.random()-0.5)*20;
+        ctx.fillStyle='rgb('+Math.max(0,Math.min(255,r+v))+','+Math.max(0,Math.min(255,g+v))+','+Math.max(0,Math.min(255,bl+v))+')';
+        ctx.fillRect(x+3,row*25+3,sw-3,22); x+=sw;}}
+    return c;
+  }
+  function makeRoofCanvas(baseHex) {
+    var c = document.createElement('canvas'); c.width=128; c.height=128;
+    var ctx = c.getContext('2d'); ctx.fillStyle=baseHex; ctx.fillRect(0,0,128,128);
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1;
+    for(var row=0;row<13;row++){var y=row*10;
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(128,y);ctx.stroke();
+      var off=(row%2)*14;for(var x=off;x<128;x+=28){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+10);ctx.stroke();}}
+    return c;
+  }
+
+  // ── Building Style Data ──
+  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',clothing:'#d8a8b8',apartment:'#c0b0a0',homegoods:'#a8b890'};
+  var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,clothing:35,apartment:40,homegoods:38};
+  var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
+  var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
+  var STONE_TYPES = ['bank','university','post_office','hospital'];
+
+  // ── Town Object ──
   var Town = {
-    canvas: null,
-    ctx: null,
-    camera: { x: 0, y: 0 },
-    nearbyBuilding: null,
-    moveTarget: null,  // { x, y } click-to-move destination
-    autoEnterBuilding: null, // building to auto-enter on arrival
-    BUILDINGS: BUILDINGS,
+    canvas: null, camera: { x: 0, y: 0 },
+    nearbyBuilding: null, moveTarget: null, _pathWaypoints: null,
+    autoEnterBuilding: null, BUILDINGS: BUILDINGS,
+    _engine: null, _scene: null, _camera3: null, _groundMesh: null,
+    _avatarRoot: null, _avatarBody: null, _avatarHead: null,
+    _avatarLabelTex: null, _avatarLastName: null,
+    _moveTargetMesh: null, _promptMesh: null,
+    _buildingMeshes: [], _time: 0,
+    _lastAvatarX: 0, _lastAvatarY: 0, _stuckTimer: 0,
+    _collectibles: [], // {mesh, x, z, active, respawnAt}
+    _ghostMeshes: [], _ghostIdx: 0, _craigMesh: null,
 
     init: function(canvasEl) {
       this.canvas = canvasEl;
-      this.ctx = canvasEl.getContext('2d');
-      this.resize();
+      this._engine = new BABYLON.Engine(canvasEl, true);
+      this._scene = new BABYLON.Scene(this._engine);
+      this._scene.clearColor = new BABYLON.Color4(0.55, 0.75, 0.95, 1);
+      this._scene.ambientColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+      this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+      this._scene.fogDensity = 0.0001;
+      this._scene.fogColor = new BABYLON.Color3(0.6, 0.78, 0.95);
+
+      // Camera: steeper angle, distance adapts to screen width
+      var camRadius = canvasEl.clientWidth < 600 ? 1000 : 700; // farther on mobile
+      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, 0.65, camRadius,
+        new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
+      // Only enable scroll wheel zoom — NO pointer drag (conflicts with touch-to-move)
+      this._camera3.inputs.addMouseWheel();
+      this._camera3.lowerRadiusLimit = 400;
+      this._camera3.upperRadiusLimit = 1200;
+      this._camera3.lowerBetaLimit = 0.5;  // ~29° from vertical (steepest)
+      this._camera3.upperBetaLimit = 0.8;  // ~46° from vertical (lowest)
+
+      var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
+      hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);
+      hemi.groundColor = new BABYLON.Color3(0.4,0.45,0.5);
+
+      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.5,-3,-1), this._scene);
+      sun.intensity = 1.0; sun.diffuse = new BABYLON.Color3(1,0.95,0.85);
+      sun.position = new BABYLON.Vector3(2000,800,-200);
+      this._shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+      this._shadowGen.useBlurExponentialShadowMap = true;
+
+      this._buildGround(); this._buildRoads(); this._buildBuildings();
+      this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
+
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
 
-      // Click/tap-to-move with building detection
-      function handleMapTap(clientX, clientY) {
+      canvasEl.addEventListener('pointerup', function(evt) {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
-        var rect = canvasEl.getBoundingClientRect();
-        var worldX = clientX - rect.left + self.camera.x;
-        var worldY = clientY - rect.top + self.camera.y;
+        // Skip click-to-move if this was a drag gesture
+        if (UI._touchMoved && UI._touchMoved()) return;
+        // Try picking ground first, then any mesh
+        var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY);
+        if (!pick.hit) return;
+        var hitMesh = pick.pickedMesh;
+        var worldX, worldY;
 
-        // Check if tapped on a building
-        var tappedBuilding = null;
-        for (var i = 0; i < BUILDINGS.length; i++) {
-          var b = BUILDINGS[i];
-          if (worldX >= b.x && worldX <= b.x + b.w && worldY >= b.y && worldY <= b.y + b.h) {
-            tappedBuilding = b;
-            break;
+        // Check if we hit a building mesh
+        var clickedBuilding = null;
+        if (hitMesh && hitMesh !== self._groundMesh) {
+          // Find which building this mesh belongs to by checking position
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            var px = pick.pickedPoint.x, pz = pick.pickedPoint.z;
+            if (px >= bb.x - 10 && px <= bb.x + bb.w + 10 && pz >= bb.y - 10 && pz <= bb.y + bb.h + 10) {
+              clickedBuilding = bb; break;
+            }
           }
         }
 
-        if (tappedBuilding) {
-          // Walk to building entrance and auto-enter
-          self.moveTarget = { x: tappedBuilding.x + tappedBuilding.w / 2, y: tappedBuilding.y + tappedBuilding.h + 30 };
-          self.autoEnterBuilding = tappedBuilding;
-        } else {
+        if (clickedBuilding) {
+          worldX = clickedBuilding.x + clickedBuilding.w / 2;
+          worldY = clickedBuilding.y + clickedBuilding.h + 30;
+          self._pathWaypoints = null;
           self.moveTarget = { x: worldX, y: worldY };
-          self.autoEnterBuilding = null;
+          self.autoEnterBuilding = clickedBuilding;
+        } else if (hitMesh === self._groundMesh) {
+          worldX = pick.pickedPoint.x; worldY = pick.pickedPoint.z;
+          // Also check if ground click is inside a building footprint
+          var tappedBuilding = null;
+          for (var i = 0; i < BUILDINGS.length; i++) {
+            var b = BUILDINGS[i];
+            if (worldX >= b.x && worldX <= b.x+b.w && worldY >= b.y && worldY <= b.y+b.h) { tappedBuilding = b; break; }
+          }
+          self._pathWaypoints = null;
+          if (tappedBuilding) {
+            self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
+            self.autoEnterBuilding = tappedBuilding;
+          } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
         }
-      }
-
-      canvasEl.addEventListener('click', function(e) { handleMapTap(e.clientX, e.clientY); });
-      canvasEl.addEventListener('touchend', function(e) {
-        if (e.changedTouches.length !== 1) return;
-        var t = e.changedTouches[0];
-        handleMapTap(t.clientX, t.clientY);
       });
     },
 
-    resize: function() {
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      this.canvas.width = this.canvas.clientWidth * dpr;
-      this.canvas.height = this.canvas.clientHeight * dpr;
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    _buildGround: function() {
+      var s = this._scene;
+      var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
+      ground.position.x=WORLD_W/2; ground.position.z=WORLD_H/2; ground.receiveShadows=true;
+      var gc=document.createElement('canvas'); gc.width=256; gc.height=256;
+      var gctx=gc.getContext('2d'); gctx.fillStyle='#5a8a4a'; gctx.fillRect(0,0,256,256);
+      var gid=gctx.getImageData(0,0,256,256);
+      for(var i=0;i<gid.data.length;i+=4){var n=(Math.random()-0.5)*15;gid.data[i]=Math.min(255,Math.max(0,gid.data[i]+n));gid.data[i+1]=Math.min(255,Math.max(0,gid.data[i+1]+n));gid.data[i+2]=Math.min(255,Math.max(0,gid.data[i+2]+n));}
+      gctx.putImageData(gid,0,0);
+      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=40; gtex.vScale=40;
+      var gmat=new BABYLON.StandardMaterial('gmat',s); gmat.diffuseTexture=gtex;
+      ground.material=gmat; this._groundMesh=ground;
     },
+
+    _buildRoads: function() {
+      var s=this._scene;
+      var rmat=new BABYLON.StandardMaterial('rmat',s); rmat.diffuseColor=new BABYLON.Color3(0.42,0.42,0.4);
+      var swmat=new BABYLON.StandardMaterial('swmat',s); swmat.diffuseColor=new BABYLON.Color3(0.78,0.75,0.7);
+      var lmat=new BABYLON.StandardMaterial('lmat',s); lmat.diffuseColor=new BABYLON.Color3(0.8,0.8,0.4); lmat.emissiveColor=new BABYLON.Color3(0.2,0.2,0.1);
+      for(var ri=0;ri<H_ROADS.length;ri++){
+        var hr=H_ROADS[ri]; var cz=hr.y+hr.h/2;
+        var rd=BABYLON.MeshBuilder.CreateGround('hr'+ri,{width:2400,height:hr.h},s);
+        rd.position.x=1200;rd.position.y=0.15;rd.position.z=cz;rd.material=rmat;rd.receiveShadows=true;
+        var sw1=BABYLON.MeshBuilder.CreateGround('hsw1'+ri,{width:2400,height:12},s);
+        sw1.position.set(1200,0.3,hr.y-6);sw1.material=swmat;sw1.receiveShadows=true;
+        var sw2=BABYLON.MeshBuilder.CreateGround('hsw2'+ri,{width:2400,height:12},s);
+        sw2.position.set(1200,0.3,hr.y+hr.h+6);sw2.material=swmat;sw2.receiveShadows=true;
+        for(var d=0;d<30;d++){var dx=d*80+20;if(dx>2400)break;
+          var dash=BABYLON.MeshBuilder.CreateGround('hd'+ri+'_'+d,{width:40,height:3},s);
+          dash.position.set(dx,0.2,cz);dash.material=lmat;}
+      }
+      for(var vi=0;vi<V_ROADS.length;vi++){
+        var vr=V_ROADS[vi]; var cx=vr.x+vr.w/2;
+        var vrd=BABYLON.MeshBuilder.CreateGround('vr'+vi,{width:vr.w,height:1700},s);
+        vrd.position.x=cx;vrd.position.y=0.15;vrd.position.z=850;vrd.material=rmat;vrd.receiveShadows=true;
+        var vsw1=BABYLON.MeshBuilder.CreateGround('vsw1'+vi,{width:12,height:1700},s);
+        vsw1.position.set(vr.x-6,0.3,850);vsw1.material=swmat;vsw1.receiveShadows=true;
+        var vsw2=BABYLON.MeshBuilder.CreateGround('vsw2'+vi,{width:12,height:1700},s);
+        vsw2.position.set(vr.x+vr.w+6,0.3,850);vsw2.material=swmat;vsw2.receiveShadows=true;
+        for(var vd=0;vd<22;vd++){var dz=vd*80+20;if(dz>1700)break;
+          var vdash=BABYLON.MeshBuilder.CreateGround('vd'+vi+'_'+vd,{width:3,height:40},s);
+          vdash.position.set(cx,0.2,dz);vdash.material=lmat;}
+      }
+    },
+
+    _buildBuildings: function() {
+      var s = this._scene;
+      this._buildingMeshes = [];
+      // Map each building to a Kenney model (cycle through 5 models)
+      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      var self = this;
+
+      for (var i = 0; i < BUILDINGS.length; i++) {
+        (function(idx) {
+          var b = BUILDINGS[idx];
+          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
+
+          // Load glb model
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+            if (!meshes.length) return;
+            var root = meshes[0];
+            // Get bounding info to scale properly
+            var bounds = root.getHierarchyBoundingVectors(true);
+            var modelW = bounds.max.x - bounds.min.x;
+            var modelH = bounds.max.y - bounds.min.y;
+            var modelD = bounds.max.z - bounds.min.z;
+            if (modelW < 0.01) modelW = 1;
+            if (modelH < 0.01) modelH = 1;
+            if (modelD < 0.01) modelD = 1;
+
+            // Scale model (1x1 unit) to fit building footprint (128-256 units)
+            var scaleX = b.w;
+            var scaleZ = b.h;
+            var scaleY = Math.min(b.w, b.h) * 0.8;
+            root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
+
+            // Position at building location
+            root.position.x = b.x + b.w / 2;
+            root.position.z = b.y + b.h / 2;
+            root.position.y = 0;
+
+            // Enable shadows on all child meshes
+            for (var mi = 0; mi < meshes.length; mi++) {
+              meshes[mi].receiveShadows = true;
+              if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
+            }
+            self._buildingMeshes.push(root);
+          });
+
+          // Floating label (always visible, doesn't need model to load)
+          var bh = BLDG_HEIGHTS[b.panelType] || 40;
+          var ltex = new BABYLON.DynamicTexture('lt' + b.id, {width: 512, height: 128}, s, false);
+          var lctx = ltex.getContext();
+          // Dark background for readability
+          lctx.fillStyle = 'rgba(0,0,0,0.5)';
+          lctx.beginPath(); lctx.roundRect(40, 20, 432, 80, 12); lctx.fill();
+          lctx.font = 'bold 48px sans-serif'; lctx.fillStyle = '#ffffff';
+          lctx.textAlign = 'center'; lctx.fillText(b.name, 256, 72);
+          ltex.update(); ltex.hasAlpha = true;
+          var lmat = new BABYLON.StandardMaterial('lm' + b.id, s);
+          lmat.diffuseTexture = ltex; lmat.emissiveColor = new BABYLON.Color3(1, 1, 1); lmat.backFaceCulling = false;
+          var lp = BABYLON.MeshBuilder.CreatePlane('lp' + b.id, {width: 80, height: 20}, s);
+          lp.position.set(b.x + b.w / 2, bh * 1.3 + 18, b.y + b.h / 2);
+          lp.material = lmat; lp.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+          // Emoji above label
+          var etex = new BABYLON.DynamicTexture('et' + b.id, {width: 128, height: 128}, s, false);
+          var ectx = etex.getContext(); ectx.font = '88px sans-serif'; ectx.textAlign = 'center';
+          ectx.textBaseline = 'middle'; ectx.fillText(b.emoji || '', 64, 64);
+          etex.update(); etex.hasAlpha = true;
+          var emat = new BABYLON.StandardMaterial('em' + b.id, s);
+          emat.diffuseTexture = etex; emat.emissiveColor = new BABYLON.Color3(1, 1, 1); emat.backFaceCulling = false;
+          var ep = BABYLON.MeshBuilder.CreatePlane('ep' + b.id, {width: 28, height: 28}, s);
+          ep.position.set(b.x + b.w / 2, bh * 1.3 + 38, b.y + b.h / 2);
+          ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+        })(i);
+      }
+    },
+
+    _buildTrees: function() {
+      var s = this._scene;
+      var TREE_MODELS = ['grass-trees.glb', 'grass-trees-tall.glb'];
+      var seed = 12345;
+      function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+      for (var ti = 0; ti < 25; ti++) {
+        var tx, tz, valid;
+        var attempts = 0;
+        do {
+          tx = sr() * WORLD_W; tz = sr() * WORLD_H; valid = true; attempts++;
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            if (tx > bb.x - 30 && tx < bb.x + bb.w + 30 && tz > bb.y - 30 && tz < bb.y + bb.h + 30) { valid = false; break; }
+          }
+          if (valid) for (var ri = 0; ri < H_ROADS.length; ri++) { if (tz > H_ROADS[ri].y - 10 && tz < H_ROADS[ri].y + H_ROADS[ri].h + 10) { valid = false; break; } }
+          if (valid) for (var vi = 0; vi < V_ROADS.length; vi++) { if (tx > V_ROADS[vi].x - 10 && tx < V_ROADS[vi].x + V_ROADS[vi].w + 10) { valid = false; break; } }
+        } while (!valid && attempts < 20);
+        if (!valid) continue;
+
+        (function(x, z, idx) {
+          var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+            if (!meshes.length) return;
+            var root = meshes[0];
+            var sc = 30 + sr() * 20;
+            root.scaling = new BABYLON.Vector3(sc, sc, sc);
+            root.position.set(x, 0, z);
+            root.rotation.y = sr() * Math.PI * 2;
+          });
+        })(tx, tz, ti);
+      }
+    },
+
+    _buildCollectibles: function() {
+      var s = this._scene;
+      var goldMat = new BABYLON.StandardMaterial('goldMat', s);
+      goldMat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+      goldMat.emissiveColor = new BABYLON.Color3(0.5, 0.4, 0.1);
+      var seed = 99999;
+      function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+      for (var ci = 0; ci < 8; ci++) {
+        var cx, cz, valid;
+        var attempts = 0;
+        do {
+          cx = sr() * WORLD_W; cz = sr() * WORLD_H; valid = true; attempts++;
+          for (var bi = 0; bi < BUILDINGS.length; bi++) {
+            var bb = BUILDINGS[bi];
+            if (cx > bb.x - 20 && cx < bb.x + bb.w + 20 && cz > bb.y - 20 && cz < bb.y + bb.h + 20) { valid = false; break; }
+          }
+          if (valid) for (var ri = 0; ri < H_ROADS.length; ri++) { if (cz > H_ROADS[ri].y - 5 && cz < H_ROADS[ri].y + H_ROADS[ri].h + 5) { valid = false; break; } }
+          if (valid) for (var vi = 0; vi < V_ROADS.length; vi++) { if (cx > V_ROADS[vi].x - 5 && cx < V_ROADS[vi].x + V_ROADS[vi].w + 5) { valid = false; break; } }
+        } while (!valid && attempts < 30);
+        if (!valid) continue;
+
+        var orb = BABYLON.MeshBuilder.CreateSphere('orb' + ci, { diameter: 10, segments: 8 }, s);
+        orb.material = goldMat;
+        orb.position.set(cx, 8, cz);
+        this._collectibles.push({ mesh: orb, x: cx, z: cz, active: true, respawnAt: 0 });
+      }
+    },
+
+    _checkCollectibles: function(av) {
+      var now = Date.now();
+      for (var ci = 0; ci < this._collectibles.length; ci++) {
+        var c = this._collectibles[ci];
+        if (!c.active) {
+          // Check respawn
+          if (now >= c.respawnAt) {
+            c.active = true;
+            c.mesh.setEnabled(true);
+            // New random position
+            var seed = now + ci * 777;
+            c.x = 50 + (((seed * 16807) % 2147483647) / 2147483646) * (WORLD_W - 100);
+            c.z = 50 + ((((seed + 12345) * 16807) % 2147483647) / 2147483646) * (WORLD_H - 100);
+            c.mesh.position.x = c.x;
+            c.mesh.position.z = c.z;
+          }
+          continue;
+        }
+        // Bob animation
+        c.mesh.position.y = 8 + Math.sin(this._time * 3 + ci) * 3;
+        // Check collection distance
+        var dx = av.x - c.x, dz = av.y - c.z;
+        if (Math.sqrt(dx * dx + dz * dz) < 25) {
+          c.active = false;
+          c.mesh.setEnabled(false);
+          c.respawnAt = now + 90000; // 90 seconds
+          Game.collectStreetItem();
+        }
+      }
+    },
+
+    _buildGhosts: function() {
+      var s = this._scene;
+      var ghostMat = new BABYLON.StandardMaterial('ghostMat', s);
+      ghostMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.7);
+      ghostMat.alpha = 0.3;
+      // 2 ghost avatars following recorded paths
+      for (var gi = 0; gi < 2; gi++) {
+        var ghost = BABYLON.MeshBuilder.CreateCylinder('ghost' + gi, {diameterTop: 10, diameterBottom: 14, height: 20, tessellation: 6}, s);
+        ghost.material = ghostMat;
+        ghost.position.y = 10;
+        ghost.setEnabled(false);
+        this._ghostMeshes.push(ghost);
+      }
+      // Craig mesh (distinct color)
+      var craigMat = new BABYLON.StandardMaterial('craigMat', s);
+      craigMat.diffuseColor = new BABYLON.Color3(0.8, 0.3, 0.3);
+      craigMat.alpha = 0.5;
+      this._craigMesh = BABYLON.MeshBuilder.CreateCylinder('craig', {diameterTop: 12, diameterBottom: 16, height: 24, tessellation: 6}, s);
+      this._craigMesh.material = craigMat;
+      this._craigMesh.position.y = 12;
+      // Craig label
+      var cLabel = BABYLON.MeshBuilder.CreatePlane('craigLabel', {width: 30, height: 8}, s);
+      cLabel.position.y = 34; cLabel.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; cLabel.parent = this._craigMesh;
+      var cTex = new BABYLON.DynamicTexture('craigTex', {width: 256, height: 64}, s, false);
+      cTex.hasAlpha = true;
+      var cCtx = cTex.getContext(); cCtx.font = 'bold 28px sans-serif'; cCtx.fillStyle = '#ff4444'; cCtx.textAlign = 'center'; cCtx.fillText('Craig', 128, 40); cTex.update();
+      var cLMat = new BABYLON.StandardMaterial('craigLM', s); cLMat.diffuseTexture = cTex; cLMat.emissiveColor = new BABYLON.Color3(1,1,1); cLMat.backFaceCulling = false;
+      cLabel.material = cLMat;
+    },
+
+    _updateGhosts: function() {
+      var history = Game.state.movementHistory || [];
+      if (history.length < 10) return;
+      this._ghostIdx = (this._ghostIdx + 1) % 60; // Update every ~60 frames
+      if (this._ghostIdx !== 0) return;
+      for (var gi = 0; gi < this._ghostMeshes.length; gi++) {
+        var offset = Math.floor(history.length * (gi + 1) / 4);
+        if (offset < history.length) {
+          var pos = history[offset];
+          this._ghostMeshes[gi].setEnabled(true);
+          this._ghostMeshes[gi].position.x = pos.x;
+          this._ghostMeshes[gi].position.z = pos.y;
+        }
+      }
+      // Craig wanders semi-randomly near a building
+      if (this._craigMesh) {
+        var b = BUILDINGS[Math.floor(this._time * 0.1) % BUILDINGS.length];
+        this._craigMesh.position.x += (b.x + b.w/2 - this._craigMesh.position.x) * 0.02;
+        this._craigMesh.position.z += (b.y + b.h + 30 - this._craigMesh.position.z) * 0.02;
+      }
+    },
+
+    _buildAvatar: function() {
+      var s=this._scene;
+      this._avatarRoot=new BABYLON.TransformNode('avRoot',s);
+      this._avatarBody=BABYLON.MeshBuilder.CreateCylinder('avBody',{diameterTop:14,diameterBottom:18,height:26,tessellation:8},s);
+      var bmat=new BABYLON.StandardMaterial('avBM',s); bmat.diffuseColor=new BABYLON.Color3(0.97,0.58,0.1);
+      this._avatarBody.material=bmat; this._avatarBody.position.y=13; this._avatarBody.parent=this._avatarRoot;
+      this._avatarHead=BABYLON.MeshBuilder.CreateSphere('avHead',{diameter:16,segments:8},s);
+      var hmat=new BABYLON.StandardMaterial('avHM',s); hmat.diffuseColor=new BABYLON.Color3(0.95,0.82,0.68);
+      this._avatarHead.material=hmat; this._avatarHead.position.y=32; this._avatarHead.parent=this._avatarRoot;
+      var shadow=BABYLON.MeshBuilder.CreateDisc('avSh',{radius:10,tessellation:16},s);
+      var smat=new BABYLON.StandardMaterial('avSM',s); smat.diffuseColor=new BABYLON.Color3(0,0,0); smat.alpha=0.3;
+      shadow.material=smat; shadow.rotation.x=Math.PI/2; shadow.position.y=0.2; shadow.parent=this._avatarRoot;
+      // Label
+      var lp=BABYLON.MeshBuilder.CreatePlane('avLabel',{width:50,height:12},s);
+      lp.position.y=44; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL; lp.parent=this._avatarRoot;
+      this._avatarLabelTex=new BABYLON.DynamicTexture('avLT',{width:256,height:64},s,false);
+      this._avatarLabelTex.hasAlpha=true;
+      var almat=new BABYLON.StandardMaterial('avLM',s);
+      almat.diffuseTexture=this._avatarLabelTex; almat.emissiveTexture=this._avatarLabelTex;
+      almat.opacityTexture=this._avatarLabelTex; almat.backFaceCulling=false;
+      lp.material=almat;
+    },
+
+    _buildMoveTarget: function() {
+      this._moveTargetMesh=BABYLON.MeshBuilder.CreateTorus('mt',{diameter:16,thickness:2,tessellation:16},this._scene);
+      var mmat=new BABYLON.StandardMaterial('mtM',this._scene); mmat.diffuseColor=new BABYLON.Color3(1,0.6,0); mmat.alpha=0.5;
+      this._moveTargetMesh.material=mmat; this._moveTargetMesh.rotation.x=Math.PI/2; this._moveTargetMesh.setEnabled(false);
+    },
+
+    _buildPrompt: function() {
+      var s=this._scene;
+      this._promptMesh=BABYLON.MeshBuilder.CreatePlane('prompt',{width:80,height:20},s);
+      var ptex=new BABYLON.DynamicTexture('ptex',{width:512,height:128},s,false);
+      ptex.hasAlpha=true; ptex.drawText('Press Enter',null,96,'bold 64px sans-serif','white','transparent',true,true);
+      var pmat=new BABYLON.StandardMaterial('pmat',s);
+      pmat.diffuseTexture=ptex; pmat.emissiveTexture=ptex; pmat.opacityTexture=ptex; pmat.backFaceCulling=false;
+      this._promptMesh.material=pmat; this._promptMesh.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+      this._promptMesh.setEnabled(false);
+    },
+
+    // ── Resize ──
+
+    resize: function() {
+      if (this._engine) this._engine.resize();
+    },
+
+    // ── Update Avatar (same logic, x/y mapped to x/z) ──
 
     updateAvatar: function(dt, keys) {
       var av = Game.state.avatar;
@@ -105,31 +621,49 @@
 
       var dx = 0, dy = 0;
 
-      // Keyboard input
       if (keys.left)  dx -= 1;
       if (keys.right) dx += 1;
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
-      // Cancel click-to-move if keyboard is used
-      if (dx !== 0 || dy !== 0) {
-        this.moveTarget = null;
+      // Rotate input direction by camera angle so movement matches screen direction
+      // Screen right (dx=+1) should map to camera's right vector on XZ plane
+      // Screen down (dy=+1) should map to camera's forward vector (toward camera)
+      if ((dx !== 0 || dy !== 0) && this._camera3) {
+        var a = this._camera3.alpha;
+        // Camera right vector on XZ: (cos(a), -sin(a)) mapped to (worldX, worldY)
+        // Camera forward (into screen) on XZ: (sin(a), cos(a))
+        var rightX = Math.cos(a), rightY = -Math.sin(a);
+        var fwdX = Math.sin(a), fwdY = Math.cos(a);
+        var rdx = dx * rightX + dy * fwdX;
+        var rdy = dx * rightY + dy * fwdY;
+        dx = rdx; dy = rdy;
       }
 
-      // Click-to-move
+      if (dx !== 0 || dy !== 0) {
+        this.moveTarget = null;
+        this._pathWaypoints = null;
+      }
+
       if (this.moveTarget && dx === 0 && dy === 0) {
-        var tdx = this.moveTarget.x - av.x;
-        var tdy = this.moveTarget.y - av.y;
+        if (!this._pathWaypoints) {
+          this._pathWaypoints = findPath(av.x, av.y, this.moveTarget.x, this.moveTarget.y);
+        }
+        var currentWP = this._pathWaypoints.length > 0 ? this._pathWaypoints[0] : this.moveTarget;
+        var tdx = currentWP.x - av.x;
+        var tdy = currentWP.y - av.y;
         var dist = Math.sqrt(tdx * tdx + tdy * tdy);
         if (dist < 12) {
-          this.moveTarget = null;
-          // Auto-enter building if we walked to one
-          if (this.autoEnterBuilding && !UI.panelOpen) {
-            var ab = this.autoEnterBuilding;
-            this.autoEnterBuilding = null;
-            // Check if we're actually nearby
-            if (this.getNearbyBuilding() === ab) {
-              setTimeout(function() { UI.showPanel(ab); }, 100);
+          if (this._pathWaypoints.length > 0) this._pathWaypoints.shift();
+          if (this._pathWaypoints.length === 0) {
+            this.moveTarget = null;
+            this._pathWaypoints = null;
+            if (this.autoEnterBuilding && !UI.panelOpen) {
+              var ab = this.autoEnterBuilding;
+              this.autoEnterBuilding = null;
+              if (this.getNearbyBuilding() === ab) {
+                setTimeout(function() { UI.showPanel(ab); }, 100);
+              }
             }
           }
         } else {
@@ -138,7 +672,6 @@
         }
       }
 
-      // Normalize diagonal for keyboard
       if (this.moveTarget === null && dx !== 0 && dy !== 0) {
         dx *= 0.707;
         dy *= 0.707;
@@ -150,26 +683,50 @@
       }
 
       var speed = AVATAR_SPEED * Game.getSpeedMultiplier();
-      var newX = av.x + dx * speed * dt;
-      var newY = av.y + dy * speed * dt;
+      var moveX = dx * speed * dt;
+      var moveY = dy * speed * dt;
 
-      // Axis-separated collision (sliding)
-      if (!this.collidesBuilding(newX, av.y)) {
-        av.x = newX;
-      } else {
-        this.moveTarget = null; // Stop click-to-move on collision
+      // Try full step, then half, then quarter (prevents overshooting buildings)
+      var movedX = false, movedY = false;
+      for (var step = 1; step >= 0.25; step *= 0.5) {
+        if (!movedX && !this.collidesBuilding(av.x + moveX * step, av.y)) {
+          av.x += moveX * step; movedX = true;
+        }
+        if (!movedY && !this.collidesBuilding(av.x, av.y + moveY * step)) {
+          av.y += moveY * step; movedY = true;
+        }
+        if (movedX && movedY) break;
       }
-      if (!this.collidesBuilding(av.x, newY)) {
-        av.y = newY;
-      } else {
-        this.moveTarget = null;
+      if (!movedX || !movedY) {
+        if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+          this._pathWaypoints.shift();
+        }
       }
 
-      // Clamp to world
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));
       av.y = Math.max(AVATAR_SIZE, Math.min(WORLD_H - AVATAR_SIZE, av.y));
 
-      // Check nearby building
+      // Stuck detection: if position hasn't changed much in 1.5 seconds, skip waypoint
+      if (this.moveTarget) {
+        var movedDist = Math.abs(av.x - this._lastAvatarX) + Math.abs(av.y - this._lastAvatarY);
+        if (movedDist < 2) {
+          this._stuckTimer += dt;
+          if (this._stuckTimer > 1.5) {
+            this._stuckTimer = 0;
+            if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+              this._pathWaypoints.shift();
+            } else {
+              this.moveTarget = null;
+              this._pathWaypoints = null;
+            }
+          }
+        } else {
+          this._stuckTimer = 0;
+        }
+      }
+      this._lastAvatarX = av.x;
+      this._lastAvatarY = av.y;
+
       this.nearbyBuilding = this.getNearbyBuilding();
     },
 
@@ -193,7 +750,6 @@
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         var b = BUILDINGS[i];
-        // Distance from avatar center to building edge
         var cx = Math.max(b.x, Math.min(av.x, b.x + b.w));
         var cy = Math.max(b.y, Math.min(av.y, b.y + b.h));
         var dist = Math.sqrt((av.x - cx) * (av.x - cx) + (av.y - cy) * (av.y - cy));
@@ -204,217 +760,106 @@
       return null;
     },
 
+    // ── Camera ──
     updateCamera: function(dt) {
       var av = Game.state.avatar;
       if (!av) return;
+      var target = this._camera3.target;
+      this._camera3.target = new BABYLON.Vector3(
+        target.x + (av.x - target.x) * 0.08,
+        0,
+        target.z + (av.y - target.z) * 0.08
+      );
+    },
 
-      var vw = this.canvas.clientWidth;
-      var vh = this.canvas.clientHeight;
-      var targetX = av.x - vw / 2;
-      var targetY = av.y - vh / 2;
+    // ── Render ──
+    _updateDayNight: function() {
+      var t = this._dayTime;
+      var s = this._scene;
+      // Interpolate sky color
+      var r, g, b;
+      if (t < 0.6) { // Day
+        r = 0.55; g = 0.75; b = 0.95;
+      } else if (t < 0.7) { // Sunset transition
+        var p = (t - 0.6) / 0.1;
+        r = 0.55 + p * 0.35; g = 0.75 - p * 0.45; b = 0.95 - p * 0.55;
+      } else if (t < 0.85) { // Night
+        r = 0.05; g = 0.08; b = 0.15;
+      } else { // Dawn transition
+        var p2 = (t - 0.85) / 0.15;
+        r = 0.05 + p2 * 0.5; g = 0.08 + p2 * 0.67; b = 0.15 + p2 * 0.8;
+      }
+      s.clearColor = new BABYLON.Color4(r, g, b, 1);
+      s.fogColor = new BABYLON.Color3(r, g, b);
+      // Adjust light intensity
+      var hemi = s.getLightByName('hemi');
+      var sun = s.getLightByName('sun');
+      if (hemi) hemi.intensity = t < 0.7 ? 0.7 : (t < 0.85 ? 0.2 : 0.2 + ((t - 0.85) / 0.15) * 0.5);
+      if (sun) sun.intensity = t < 0.7 ? 1.0 : (t < 0.85 ? 0.15 : 0.15 + ((t - 0.85) / 0.15) * 0.85);
+    },
 
-      // Clamp target
-      targetX = Math.max(0, Math.min(WORLD_W - vw, targetX));
-      targetY = Math.max(0, Math.min(WORLD_H - vh, targetY));
-
-      // Smooth lerp
-      this.camera.x += (targetX - this.camera.x) * 0.1;
-      this.camera.y += (targetY - this.camera.y) * 0.1;
+    // Day/night cycle
+    _dayTime: 0,
+    getDayPhase: function() {
+      var t = this._dayTime;
+      if (t < 0.2) return 'morning';
+      if (t < 0.6) return 'day';
+      if (t < 0.7) return 'evening';
+      return 'night';
     },
 
     render: function() {
-      var ctx = this.ctx;
-      var vw = this.canvas.clientWidth;
-      var vh = this.canvas.clientHeight;
-
-      // Clear
-      ctx.fillStyle = '#0a0a18';
-      ctx.fillRect(0, 0, vw, vh);
-
-      ctx.save();
-      ctx.translate(-this.camera.x, -this.camera.y);
-
-      // Draw ground pattern (subtle grid)
-      ctx.strokeStyle = '#0f0f22';
-      ctx.lineWidth = 1;
-      for (var gx = 0; gx < WORLD_W; gx += 64) {
-        ctx.beginPath();
-        ctx.moveTo(gx, 0);
-        ctx.lineTo(gx, WORLD_H);
-        ctx.stroke();
-      }
-      for (var gy = 0; gy < WORLD_H; gy += 64) {
-        ctx.beginPath();
-        ctx.moveTo(0, gy);
-        ctx.lineTo(WORLD_W, gy);
-        ctx.stroke();
-      }
-
-      // Draw roads
-      ctx.fillStyle = '#0d0d20';
-      for (var ri = 0; ri < H_ROADS.length; ri++) {
-        var hr = H_ROADS[ri];
-        ctx.fillRect(0, hr.y, WORLD_W, hr.h);
-        // Road markings
-        ctx.strokeStyle = '#1a1a30';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([20, 15]);
-        ctx.beginPath();
-        ctx.moveTo(0, hr.y + hr.h / 2);
-        ctx.lineTo(WORLD_W, hr.y + hr.h / 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-      for (var vi = 0; vi < V_ROADS.length; vi++) {
-        var vr = V_ROADS[vi];
-        ctx.fillRect(vr.x, 0, vr.w, WORLD_H);
-        ctx.strokeStyle = '#1a1a30';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([20, 15]);
-        ctx.beginPath();
-        ctx.moveTo(vr.x + vr.w / 2, 0);
-        ctx.lineTo(vr.x + vr.w / 2, WORLD_H);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      // Draw buildings
-      for (var bi = 0; bi < BUILDINGS.length; bi++) {
-        this.drawBuilding(BUILDINGS[bi]);
-      }
-
-      // Draw avatar
-      this.drawAvatar();
-
-      // Draw click-to-move target
-      if (this.moveTarget) {
-        ctx.strokeStyle = 'rgba(247,147,26,0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.moveTarget.x, this.moveTarget.y, 8, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Draw interaction prompt
-      if (this.nearbyBuilding && !UI.panelOpen) {
-        this.drawPrompt(this.nearbyBuilding);
-      }
-
-      // Draw floating texts
-      for (var fi = 0; fi < Game.floatingTexts.length; fi++) {
-        var ft = Game.floatingTexts[fi];
-        var alpha = 1 - ft.age;
-        ctx.globalAlpha = alpha;
-        ctx.font = 'bold 14px -apple-system, system-ui, sans-serif';
-        ctx.fillStyle = ft.color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(ft.text, ft.x, ft.y);
-      }
-      ctx.globalAlpha = 1;
-
-      ctx.restore();
-    },
-
-    drawBuilding: function(b) {
-      var ctx = this.ctx;
-      var isNearby = (this.nearbyBuilding === b);
-      var r = 8;
-
-      // Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      this.roundRect(ctx, b.x + 4, b.y + 4, b.w, b.h, r);
-      ctx.fill();
-
-      // Building body
-      ctx.fillStyle = b.color + '22';
-      this.roundRect(ctx, b.x, b.y, b.w, b.h, r);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = isNearby ? '#f7931a' : (b.color + '88');
-      ctx.lineWidth = isNearby ? 3 : 2;
-      this.roundRect(ctx, b.x, b.y, b.w, b.h, r);
-      ctx.stroke();
-
-      // Roof accent line
-      ctx.fillStyle = b.color + '44';
-      ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, 6);
-
-      // Emoji
-      ctx.font = '32px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(b.emoji, b.x + b.w / 2, b.y + b.h / 2 - 10);
-
-      // Label
-      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#e8e8f0';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(b.name, b.x + b.w / 2, b.y + b.h / 2 + 14);
-    },
-
-    drawAvatar: function() {
+      if (!this._engine) return;
+      this._time += 0.016;
+      // Day/night cycle: 300 seconds (5 minutes)
+      this._dayTime = (this._dayTime + 0.016 / 300) % 1.0;
+      this._updateDayNight();
       var av = Game.state.avatar;
-      if (!av) return;
-      var ctx = this.ctx;
 
-      // Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath();
-      ctx.ellipse(av.x, av.y + 14, 10, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // Sync avatar
+      if (av && this._avatarRoot) {
+        this._avatarRoot.position.x = av.x;
+        this._avatarRoot.position.z = av.y;
+        this._avatarRoot.position.y = Math.sin(this._time * 3) * 1.5;
+        // Update name label
+        if (this._avatarLastName !== av.name) {
+          this._avatarLastName = av.name;
+          var ctx = this._avatarLabelTex.getContext();
+          ctx.clearRect(0, 0, 256, 64);
+          ctx.font = 'bold 32px sans-serif';
+          ctx.fillStyle = '#f7931a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(av.name, 128, 32);
+          this._avatarLabelTex.update();
+        }
+      }
 
-      // Sprite emoji
-      ctx.font = '26px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(av.sprite, av.x, av.y);
+      // Collectibles + Ghosts
+      if (av) this._checkCollectibles(av);
+      this._updateGhosts();
 
-      // Name tag
-      ctx.font = 'bold 9px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#f7931a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(av.name, av.x, av.y + 16);
-    },
+      // Sync move target
+      if (this.moveTarget && this._moveTargetMesh) {
+        this._moveTargetMesh.setEnabled(true);
+        this._moveTargetMesh.position.x = this.moveTarget.x;
+        this._moveTargetMesh.position.z = this.moveTarget.y;
+        this._moveTargetMesh.position.y = 0.5;
+      } else if (this._moveTargetMesh) {
+        this._moveTargetMesh.setEnabled(false);
+      }
 
-    drawPrompt: function(b) {
-      var av = Game.state.avatar;
-      var ctx = this.ctx;
-      var text = 'Press Enter';
-      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
-      var tw = ctx.measureText(text).width;
+      // Sync prompt
+      if (this.nearbyBuilding && av && !UI.panelOpen && this._promptMesh) {
+        this._promptMesh.setEnabled(true);
+        this._promptMesh.position.x = av.x;
+        this._promptMesh.position.y = 40;
+        this._promptMesh.position.z = av.y;
+      } else if (this._promptMesh) {
+        this._promptMesh.setEnabled(false);
+      }
 
-      // Background pill
-      ctx.fillStyle = 'rgba(16,16,37,0.85)';
-      this.roundRect(ctx, av.x - tw / 2 - 10, av.y - 36, tw + 20, 22, 11);
-      ctx.fill();
-
-      ctx.strokeStyle = '#f7931a';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, av.x - tw / 2 - 10, av.y - 36, tw + 20, 22, 11);
-      ctx.stroke();
-
-      ctx.fillStyle = '#f7931a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, av.x, av.y - 25);
-    },
-
-    roundRect: function(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
+      this._scene.render();
     },
   };
 

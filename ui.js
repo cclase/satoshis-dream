@@ -3,6 +3,7 @@
 
   var UI = {
     keys: { up: false, down: false, left: false, right: false },
+    dragDir: { x: 0, y: 0 }, // continuous drag direction vector
     panelOpen: false,
     currentPanel: null,
     currentBuilding: null,
@@ -127,23 +128,33 @@
 
       canvas.addEventListener('touchmove', function(e) {
         if (!touching || self.panelOpen || e.touches.length !== 1) return;
-        e.preventDefault(); // Prevent scrolling
+        e.preventDefault();
         var t = e.touches[0];
         var dx = t.clientX - touchStartX;
         var dy = t.clientY - touchStartY;
         var dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < DEAD_ZONE) return;
         moved = true;
-        // Set movement direction based on drag
-        self.keys.left = dx < -DEAD_ZONE;
-        self.keys.right = dx > DEAD_ZONE;
-        self.keys.up = dy < -DEAD_ZONE;
-        self.keys.down = dy > DEAD_ZONE;
+        // Normalize and rotate by camera angle (~45 degrees)
+        var ndx = dx / dist, ndy = dy / dist;
+        // Camera is at -PI/4 alpha, so rotate drag direction to match world
+        var camAngle = Math.PI / 4; // 45 degrees
+        var cos = Math.cos(camAngle), sin = Math.sin(camAngle);
+        var worldDx = ndx * cos - ndy * sin;
+        var worldDy = ndx * sin + ndy * cos;
+        self.dragDir.x = worldDx;
+        self.dragDir.y = worldDy;
+        // Also set keys for compatibility
+        self.keys.left = worldDx < -0.3;
+        self.keys.right = worldDx > 0.3;
+        self.keys.up = worldDy < -0.3;
+        self.keys.down = worldDy > 0.3;
       }, { passive: false });
 
       var stopTouch = function() {
         touching = false;
         self.keys.up = self.keys.down = self.keys.left = self.keys.right = false;
+        self.dragDir.x = 0; self.dragDir.y = 0;
       };
       canvas.addEventListener('touchend', stopTouch);
       canvas.addEventListener('touchcancel', stopTouch);
@@ -162,10 +173,17 @@
         var dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < DEAD_ZONE) return;
         moved = true;
-        self.keys.left = dx < -DEAD_ZONE;
-        self.keys.right = dx > DEAD_ZONE;
-        self.keys.up = dy < -DEAD_ZONE;
-        self.keys.down = dy > DEAD_ZONE;
+        var ndx = dx / dist, ndy = dy / dist;
+        var camAngle = Math.PI / 4;
+        var cos = Math.cos(camAngle), sin = Math.sin(camAngle);
+        var worldDx = ndx * cos - ndy * sin;
+        var worldDy = ndx * sin + ndy * cos;
+        self.dragDir.x = worldDx;
+        self.dragDir.y = worldDy;
+        self.keys.left = worldDx < -0.3;
+        self.keys.right = worldDx > 0.3;
+        self.keys.up = worldDy < -0.3;
+        self.keys.down = worldDy > 0.3;
       });
       document.addEventListener('pointerup', function(e) {
         if (touching && e.pointerType !== 'touch') stopTouch();

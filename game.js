@@ -167,6 +167,8 @@
       storyFound: {},
       // Unlocked areas
       unlockedAreas: ['north'],
+      // Movement history for ghosts
+      movementHistory: [],
       stats: { taps: 0, satsSold: 0, buildingsVisited: 0, itemsCollected: 0, deliveriesCompleted: 0 },
       priceEvent: null, nextEventAt: 0,
       // New systems
@@ -861,6 +863,25 @@
       }
     },
 
+    // ── Seasonal Events ──
+    activeEvent: null,
+    checkSeasonalEvents: function() {
+      if (this.activeEvent) return;
+      var d = new Date();
+      var m = d.getMonth(), day = d.getDate();
+      // Christmas (Dec 20-31)
+      if (m === 11 && day >= 20) { this.activeEvent = { name: 'Crypto Christmas', icon: '\u{1F384}', bonus: 'collect5x', desc: 'Collectibles worth 5x!' }; }
+      // Halloween (Oct 25-31)
+      else if (m === 9 && day >= 25) { this.activeEvent = { name: 'Spooky Mining', icon: '\u{1F383}', bonus: 'darkweb50', desc: 'Dark web -50% cost!' }; }
+      // April Fools (Apr 1)
+      else if (m === 3 && day === 1) { this.activeEvent = { name: "Satoshi's Birthday", icon: '\u{1F382}', bonus: 'double', desc: 'Double production!' }; }
+    },
+    getSeasonalMultiplier: function() {
+      if (!this.activeEvent) return 1;
+      if (this.activeEvent.bonus === 'double') return 2;
+      return 1;
+    },
+
     SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
 
     collectStreetItem: function() {
@@ -1189,6 +1210,18 @@
           }
         }
       }
+      // Record movement for ghosts (every 2 seconds)
+      if (s.avatar) {
+        if (!s._lastRecordTime) s._lastRecordTime = now;
+        if (now - s._lastRecordTime > 2000) {
+          s._lastRecordTime = now;
+          if (!s.movementHistory) s.movementHistory = [];
+          s.movementHistory.push({ x: s.avatar.x, y: s.avatar.y });
+          if (s.movementHistory.length > 150) s.movementHistory.shift();
+        }
+      }
+      // Seasonal events
+      this.checkSeasonalEvents();
       // Craig rival
       this.updateCraig(dt);
       // Story fragments

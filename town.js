@@ -625,6 +625,20 @@
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
+      // Rotate input direction by camera angle so movement matches screen direction
+      // Screen right (dx=+1) should map to camera's right vector on XZ plane
+      // Screen down (dy=+1) should map to camera's forward vector (toward camera)
+      if ((dx !== 0 || dy !== 0) && this._camera3) {
+        var a = this._camera3.alpha;
+        // Camera right vector on XZ: (cos(a), -sin(a)) mapped to (worldX, worldY)
+        // Camera forward (into screen) on XZ: (sin(a), cos(a))
+        var rightX = Math.cos(a), rightY = -Math.sin(a);
+        var fwdX = Math.sin(a), fwdY = Math.cos(a);
+        var rdx = dx * rightX + dy * fwdX;
+        var rdy = dx * rightY + dy * fwdY;
+        dx = rdx; dy = rdy;
+      }
+
       if (dx !== 0 || dy !== 0) {
         this.moveTarget = null;
         this._pathWaypoints = null;

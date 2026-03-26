@@ -28,6 +28,10 @@ body {
   width: 100vw;
   height: 100vh;
   outline: none;
+  touch-action: none; /* Prevent browser gestures — we handle touch ourselves */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ═══════════════════════════════════════ */

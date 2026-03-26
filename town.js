@@ -231,18 +231,12 @@
 
       this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
-      // Enable zoom (scroll/pinch) and rotate (right-drag/two-finger)
-      this._camera3.inputs.clear();
+      // Only enable scroll wheel zoom — NO pointer drag (conflicts with touch-to-move)
       this._camera3.inputs.addMouseWheel();
-      this._camera3.inputs.addPointers();
       this._camera3.lowerRadiusLimit = 250;
       this._camera3.upperRadiusLimit = 1200;
       this._camera3.lowerBetaLimit = 0.3;
       this._camera3.upperBetaLimit = 1.3;
-      // Prevent left-click drag from rotating (reserve for click-to-move)
-      this._camera3.angularSensibilityX = 3000;
-      this._camera3.angularSensibilityY = 3000;
-      this._camera3.panningSensibility = 0; // Disable panning
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);
@@ -673,24 +667,24 @@
       }
 
       var speed = AVATAR_SPEED * Game.getSpeedMultiplier();
-      var newX = av.x + dx * speed * dt;
-      var newY = av.y + dy * speed * dt;
+      var moveX = dx * speed * dt;
+      var moveY = dy * speed * dt;
 
-      if (!this.collidesBuilding(newX, av.y)) {
-        av.x = newX;
-      } else if (this._pathWaypoints && this._pathWaypoints.length > 0) {
-        this._pathWaypoints.shift();
-      } else {
-        this.moveTarget = null;
-        this._pathWaypoints = null;
+      // Try full step, then half, then quarter (prevents overshooting buildings)
+      var movedX = false, movedY = false;
+      for (var step = 1; step >= 0.25; step *= 0.5) {
+        if (!movedX && !this.collidesBuilding(av.x + moveX * step, av.y)) {
+          av.x += moveX * step; movedX = true;
+        }
+        if (!movedY && !this.collidesBuilding(av.x, av.y + moveY * step)) {
+          av.y += moveY * step; movedY = true;
+        }
+        if (movedX && movedY) break;
       }
-      if (!this.collidesBuilding(av.x, newY)) {
-        av.y = newY;
-      } else if (this._pathWaypoints && this._pathWaypoints.length > 0) {
-        this._pathWaypoints.shift();
-      } else {
-        this.moveTarget = null;
-        this._pathWaypoints = null;
+      if (!movedX || !movedY) {
+        if (this._pathWaypoints && this._pathWaypoints.length > 0) {
+          this._pathWaypoints.shift();
+        }
       }
 
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));

@@ -114,36 +114,62 @@
       var self = this;
       var canvas = document.getElementById('town');
       var touchStartX = 0, touchStartY = 0, touching = false, moved = false;
-      var DEAD_ZONE = 15;
+      var DEAD_ZONE = 20;
 
-      canvas.addEventListener('pointerdown', function(e) {
+      // Use touch events directly for reliable mobile support
+      canvas.addEventListener('touchstart', function(e) {
         if (self.panelOpen || self.modalActive()) return;
-        touchStartX = e.clientX; touchStartY = e.clientY;
+        if (e.touches.length !== 1) return; // Only single finger
+        var t = e.touches[0];
+        touchStartX = t.clientX; touchStartY = t.clientY;
         touching = true; moved = false;
-      });
+      }, { passive: true });
 
-      canvas.addEventListener('pointermove', function(e) {
-        if (!touching || self.panelOpen) return;
-        var dx = e.clientX - touchStartX;
-        var dy = e.clientY - touchStartY;
+      canvas.addEventListener('touchmove', function(e) {
+        if (!touching || self.panelOpen || e.touches.length !== 1) return;
+        e.preventDefault(); // Prevent scrolling
+        var t = e.touches[0];
+        var dx = t.clientX - touchStartX;
+        var dy = t.clientY - touchStartY;
         var dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < DEAD_ZONE) return;
         moved = true;
-        // Convert screen drag to world movement direction
-        // Screen right = world right, screen up = world "up" (negative z)
+        // Set movement direction based on drag
         self.keys.left = dx < -DEAD_ZONE;
         self.keys.right = dx > DEAD_ZONE;
         self.keys.up = dy < -DEAD_ZONE;
         self.keys.down = dy > DEAD_ZONE;
-      });
+      }, { passive: false });
 
       var stopTouch = function() {
         touching = false;
         self.keys.up = self.keys.down = self.keys.left = self.keys.right = false;
       };
-      canvas.addEventListener('pointerup', stopTouch);
-      canvas.addEventListener('pointercancel', stopTouch);
-      canvas.addEventListener('pointerleave', stopTouch);
+      canvas.addEventListener('touchend', stopTouch);
+      canvas.addEventListener('touchcancel', stopTouch);
+
+      // Also handle pointer drag for desktop (Babylon consumes mousedown on canvas)
+      document.addEventListener('pointerdown', function(e) {
+        if (e.target !== canvas || self.panelOpen || self.modalActive() || e.button !== 0) return;
+        if (e.pointerType === 'touch') return; // Let touchstart handle mobile
+        touchStartX = e.clientX; touchStartY = e.clientY;
+        touching = true; moved = false;
+      });
+      document.addEventListener('pointermove', function(e) {
+        if (!touching || self.panelOpen || e.pointerType === 'touch') return;
+        var dx = e.clientX - touchStartX;
+        var dy = e.clientY - touchStartY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < DEAD_ZONE) return;
+        moved = true;
+        self.keys.left = dx < -DEAD_ZONE;
+        self.keys.right = dx > DEAD_ZONE;
+        self.keys.up = dy < -DEAD_ZONE;
+        self.keys.down = dy > DEAD_ZONE;
+      });
+      document.addEventListener('pointerup', function(e) {
+        if (touching && e.pointerType !== 'touch') stopTouch();
+      });
 
       // Store moved flag for click-to-move detection
       this._touchMoved = function() { return moved; };
@@ -219,7 +245,7 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
           '<div class="hud-item hud-reset" id="hudMenu">\u2630</div>' +
-          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:15;">' +
+          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:15;flex-direction:column;gap:4px;">' +
             '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
             '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
             '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
@@ -1415,7 +1441,7 @@
       });
       var self = this;
       startBtn.addEventListener('click', function() {
-        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 750, y: 1560 };
+        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 473, y: 1315 };
         if (selectedBonus === 'trustfund') Game.state.usd += 50;
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();

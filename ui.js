@@ -191,6 +191,7 @@
 
     updateHUD: function() {
       this._renderGuide();
+      this._checkNpcEvent();
       var s = Game.state;
       var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats);
       el = document.getElementById('hudUsd'); if (el) el.textContent = Game.formatNumber(s.usd);
@@ -1195,6 +1196,39 @@
           bubble.remove();
         });
       }
+    },
+
+    // ═══════════════════════════════════════
+    // NPC EVENT POPUP
+    // ═══════════════════════════════════════
+    _npcShowing: false,
+    _checkNpcEvent: function() {
+      var s = Game.state;
+      if (!s.pendingNpcEvent || this._npcShowing || this.panelOpen || this.modalActive()) return;
+      this._npcShowing = true;
+      var evt = s.pendingNpcEvent;
+      var modal = document.getElementById('modal');
+      modal.classList.add('active');
+      modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
+        '<div style="font-size:36px;margin-bottom:8px;">' + evt.icon + '</div>' +
+        '<div class="modal-title" style="font-size:18px;">' + evt.name + '</div>' +
+        '<p style="color:var(--dim);margin-bottom:16px;font-size:14px;">' + evt.desc + '</p>' +
+        '<div style="display:flex;gap:10px;">' +
+          '<button class="modal-btn" id="npcDecline" style="background:var(--card);color:var(--text);border:1px solid var(--border);">' + evt.decline + '</button>' +
+          '<button class="modal-btn" id="npcAccept" style="background:var(--gold);color:var(--bg);">' + evt.accept + '</button>' +
+        '</div></div>';
+      var self = this;
+      document.getElementById('npcDecline').addEventListener('click', function() {
+        s.pendingNpcEvent = null; self._npcShowing = false;
+        modal.classList.remove('active'); modal.innerHTML = '';
+      });
+      document.getElementById('npcAccept').addEventListener('click', function() {
+        var npcDef = Game.NPC_EVENTS.find(function(e) { return e.id === evt.id; });
+        var result = npcDef ? npcDef.effect(s) : 'Something happened.';
+        s.pendingNpcEvent = null; self._npcShowing = false;
+        modal.classList.remove('active'); modal.innerHTML = '';
+        if (result) self.toast(evt.icon + ' ' + result);
+      });
     },
 
     // ═══════════════════════════════════════

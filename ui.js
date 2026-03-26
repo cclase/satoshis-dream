@@ -172,6 +172,8 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
           '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
+          '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
+          '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
@@ -186,6 +188,11 @@
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
+      document.getElementById('hudMute').addEventListener('click', function() {
+        var m = Sound.toggleMute();
+        document.getElementById('hudMute').textContent = m ? '\u{1F507}' : '\u{1F50A}';
+      });
+      document.getElementById('hudDailies').addEventListener('click', function() { UI.showDailiesPanel(); });
       document.getElementById('hudSaveSlots').addEventListener('click', function() { UI.showSaveSlotsModal(); });
     },
 
@@ -215,6 +222,42 @@
           eb.textContent = (s.priceEvent.type === 'bull' ? '\u{1F4C8} BULL +' : '\u{1F4C9} CRASH -') + s.priceEvent.magnitude + '% (' + tl + 's)';
           eb.style.display = 'block';
         } else { eb.style.display = 'none'; }
+      }
+      // Weather icon
+      var weatherEl = document.getElementById('weatherIcon');
+      if (!weatherEl) {
+        weatherEl = document.createElement('div');
+        weatherEl.id = 'weatherIcon';
+        weatherEl.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);font-size:18px;z-index:11;';
+        document.body.appendChild(weatherEl);
+      }
+      var wi = {clear:'\u2600\uFE0F',cloudy:'\u26C5',rain:'\u{1F327}\uFE0F',storm:'\u26C8\uFE0F'};
+      weatherEl.textContent = wi[Game.weather] || '\u2600\uFE0F';
+      // Active delivery indicator
+      var deliveryBar = document.getElementById('deliveryBar');
+      if (!deliveryBar) {
+        deliveryBar = document.createElement('div');
+        deliveryBar.id = 'deliveryBar';
+        deliveryBar.style.cssText = 'position:fixed;top:62px;left:50%;transform:translateX(-50%);background:rgba(16,16,37,0.85);border:1px solid var(--gold);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--gold);z-index:11;display:none;';
+        document.body.appendChild(deliveryBar);
+      }
+      if (s.activeDelivery) {
+        deliveryBar.style.display = 'block';
+        deliveryBar.textContent = '\u{1F4E6} Deliver to: ' + s.activeDelivery.targetName;
+      } else { deliveryBar.style.display = 'none'; }
+      // Power cut warning
+      if (s.powerCut) {
+        var pcEl = document.getElementById('powerCutWarn');
+        if (!pcEl) {
+          pcEl = document.createElement('div');
+          pcEl.id = 'powerCutWarn';
+          pcEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,0,0,0.15);border:2px solid var(--red);border-radius:12px;padding:16px 24px;font-size:16px;font-weight:800;color:var(--red);z-index:25;text-align:center;';
+          pcEl.textContent = '\u26A1 POWER CUT \u26A1\nProduction halted!';
+          document.body.appendChild(pcEl);
+        }
+      } else {
+        var pcEl2 = document.getElementById('powerCutWarn');
+        if (pcEl2) pcEl2.remove();
       }
       // Minimap
       this._renderMinimap();
@@ -268,6 +311,12 @@
         ctx.strokeStyle = '#f7931a';
         ctx.lineWidth = 1;
         ctx.stroke();
+      }
+      // Treasure map X
+      if (Game.state.treasureMap) {
+        var tm = Game.state.treasureMap;
+        ctx.fillStyle = '#ff0000'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('X', tm.x * sx, tm.y * sy + 3);
       }
       // Move target
       if (Town.moveTarget) {
@@ -338,14 +387,44 @@
       this._hwDirty = true;
       // Tutorial: step 1 (go to mine) → step 2
       if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
+      // Track building visits
+      Game.visitBuilding(building.panelType);
+      // Auto-complete delivery quest
+      if (Game.state.activeDelivery && Game.state.activeDelivery.targetId === building.id) {
+        Game.completeDelivery();
+      }
+
+      var level = Game.getBuildingLevel(building.panelType);
+      var stars = '';
+      for (var si = 0; si < level; si++) stars += '\u2B50';
+      var visits = (Game.state.buildingVisits || {})[building.panelType] || 0;
+      var discount = Game.getBuildingDiscount(building.panelType);
 
       var header = '<div class="panel-header">' +
-        '<div class="panel-title">' + building.emoji + ' ' + building.name + '</div>' +
-        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div>';
+        '<div class="panel-title">' + building.emoji + ' ' + building.name + (stars ? ' ' + stars : '') +
+        (discount > 0 ? ' <span style="font-size:11px;color:var(--green);">-' + Math.round(discount*100) + '%</span>' : '') +
+        '</div><button class="panel-close" id="panelCloseBtn">\u2715</button></div>';
 
       var body = this.buildPanel(building.panelType);
+
+      // Add upgrade button if < level 3
+      if (level < 3 && building.panelType !== 'apartment') {
+        var upgCost = Game.UPGRADE_COSTS[level + 1] || 99999;
+        body += '<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">' +
+          '<button class="panel-btn btn-gold" id="upgradeBtn"' + (Game.state.usd < upgCost ? ' disabled style="opacity:0.4"' : '') +
+          '>\u2B50 Upgrade to Level ' + (level+1) + ' ($' + Game.formatNumber(upgCost) + ')</button></div>';
+      }
+
       panel.innerHTML = header + body;
       document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+      var upBtn = document.getElementById('upgradeBtn');
+      if (upBtn) upBtn.addEventListener('click', function() {
+        if (Game.upgradeBuilding(building.panelType)) {
+          if (window.Sound) Sound.levelUp();
+          UI.toast('\u2B50 ' + building.name + ' upgraded to Level ' + Game.getBuildingLevel(building.panelType) + '!');
+          UI.showPanel(building);
+        }
+      });
       this.wirePanel(building.panelType);
     },
 
@@ -444,6 +523,7 @@
       var doTap = function(e) {
         if (e) e.preventDefault();
         var gain = Game.tapMine();
+        if (window.Sound) Sound.tapMine();
         var av = Game.state.avatar;
         if (av) Game.addFloatingText('+' + Game.formatNumber(gain), av.x, av.y - 20, '#f7931a');
         btn.classList.add('tapped');
@@ -741,6 +821,23 @@
             '<div class="hw-cost">Borrow</div></div>';
         });
       }
+      // Bribe option
+      if (s.policeRisk > 0 && s.policeRisk < 75) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+        html += '<button class="panel-btn btn-gold" id="bribeBtn"' + (s.usd < 500 ? ' disabled style="opacity:0.4"' : '') + '>\u{1F46E} Bribe Officer ($500, -10% risk)</button>';
+        html += '</div>';
+      }
+      // Pay tickets
+      if (s.tickets && s.tickets.length > 0) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">';
+        html += '<div style="font-weight:800;margin-bottom:6px;color:var(--red);">\u{1F4CB} Unpaid Tickets (' + s.tickets.length + ')</div>';
+        s.tickets.forEach(function(t, i) {
+          html += '<div class="hw-card" data-payticket="' + i + '"><div class="hw-icon">\u{1F4CB}</div>' +
+            '<div class="hw-info"><div class="hw-name">Traffic Ticket</div><div class="hw-sub">Fine: $' + Game.formatNumber(t.fine) + '</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Pay</div></div>';
+        });
+        html += '</div>';
+      }
       return html + '</div>';
     },
     wireBankPanel: function() {
@@ -749,6 +846,15 @@
       document.querySelectorAll('[data-loan]').forEach(function(el) {
         el.addEventListener('click', function() {
           if (Game.takeLoan(el.dataset.loan)) { UI.toast('Loan received!'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
+      var bribe = document.getElementById('bribeBtn');
+      if (bribe) bribe.addEventListener('click', function() {
+        if (Game.bribePolice()) { UI.toast('\u{1F46E} Officer bribed! -10% risk'); UI.showPanel(UI.currentBuilding); }
+      });
+      document.querySelectorAll('[data-payticket]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          if (Game.payTicket(parseInt(el.dataset.payticket))) { UI.toast('\u{1F4CB} Ticket paid!'); UI.showPanel(UI.currentBuilding); }
         });
       });
     },
@@ -790,6 +896,23 @@
     // ═══════════════════════════════════════
     buildPostOfficePanel: function() {
       var s = Game.state, html = '<div class="panel-body">';
+      // Delivery quests
+      Game.generateDeliveries();
+      if (s.activeDelivery) {
+        html += '<div class="hw-card" style="border-color:var(--gold);"><div class="hw-icon">\u{1F4E6}</div>' +
+          '<div class="hw-info"><div class="hw-name">Active: Deliver to ' + s.activeDelivery.targetName + '</div>' +
+          '<div class="hw-sub">Reward: ' + Game.formatNumber(s.activeDelivery.sats) + ' sats + $' + Game.formatNumber(s.activeDelivery.usd) + '</div></div></div>';
+      } else if (s.deliveries.length > 0) {
+        html += '<div style="font-weight:800;margin-bottom:8px;">\u{1F4E6} Delivery Jobs</div>';
+        s.deliveries.forEach(function(d, i) {
+          html += '<div class="hw-card" data-delivery="' + i + '">' +
+            '<div class="hw-icon">\u{1F4E6}</div>' +
+            '<div class="hw-info"><div class="hw-name">Deliver to ' + d.targetName + '</div>' +
+            '<div class="hw-sub">Reward: ' + Game.formatNumber(d.sats) + ' sats + $' + Game.formatNumber(d.usd) + '</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Accept</div></div>';
+        });
+      }
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
       html += '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Order hardware at 30% off! Delivery in 2 minutes.</p>';
       if (s.mailOrders.length > 0) {
         html += '<div style="margin-bottom:12px;">';
@@ -806,9 +929,15 @@
           '<div class="hw-info"><div class="hw-name">' + u.name + '</div><div class="hw-sub">30% off! 2 min delivery</div></div>' +
           '<div class="hw-cost">' + Game.formatNumber(cost) + ' sats</div></div>';
       });
-      return html + '</div>';
+      return html + '</div></div>';
     },
     wirePostOfficePanel: function() {
+      document.querySelectorAll('[data-delivery]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var idx = parseInt(el.dataset.delivery);
+          if (Game.acceptDelivery(idx)) UI.showPanel(UI.currentBuilding);
+        });
+      });
       document.querySelectorAll('[data-order]').forEach(function(el) {
         el.addEventListener('click', function() {
           var item = Game.HARDWARE.find(function(u){return u.id===el.dataset.order;});
@@ -1053,9 +1182,27 @@
           '<div class="hw-info"><div class="hw-name">' + f.name + '</div><div class="hw-sub">' + f.desc + '</div></div>' +
           '<div class="hw-cost">' + (owned ? '\u2705 Placed' : '$' + Game.formatNumber(f.cost)) + '</div></div>';
       });
+      // Seeds section
+      if (Game.getMaxPlots() > 0) {
+        html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+        html += '<div style="font-weight:800;margin-bottom:6px;">\u{1F331} Garden Seeds</div>';
+        Game.SEEDS.forEach(function(se) {
+          html += '<div class="hw-card' + (s.usd < se.cost ? ' locked' : '') + '" data-seed="' + se.id + '">' +
+            '<div class="hw-icon">' + se.icon + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + se.name + '</div><div class="hw-sub">' + se.desc + '</div></div>' +
+            '<div class="hw-cost">$' + Game.formatNumber(se.cost) + '</div></div>';
+        });
+        html += '</div>';
+      }
       return html + '</div>';
     },
     wireHomegoodsPanel: function() {
+      document.querySelectorAll('[data-seed]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          if (Game.plantSeed(el.dataset.seed)) { UI.toast('\u{1F331} Planted!'); UI.showPanel(UI.currentBuilding); }
+          else UI.toast('No garden plots available or not enough USD');
+        });
+      });
       document.querySelectorAll('[data-furn]').forEach(function(el) {
         el.addEventListener('click', function() {
           var f = Game.FURNITURE.find(function(x) { return x.id === el.dataset.furn; });
@@ -1095,9 +1242,62 @@
         ownedFurn.forEach(function(f) { html += '<span style="font-size:20px;" title="' + f.name + ' - ' + f.desc + '">' + f.icon + '</span> '; });
         html += '</div>';
       }
+      // Garden
+      if (Game.getMaxPlots() > 0) {
+        html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">GARDEN (' + s.garden.length + '/' + Game.getMaxPlots() + ' plots)</div>';
+        s.garden.forEach(function(p, i) {
+          var seed = Game.SEEDS.find(function(se) { return se.id === p.seedId; });
+          var elapsed = Date.now() - p.plantedAt;
+          var ready = seed && elapsed >= seed.growTime;
+          var timeLeft = seed ? Math.max(0, Math.ceil((seed.growTime - elapsed) / 1000)) : 0;
+          html += '<div class="hw-card' + (ready ? '' : ' locked') + '" data-harvest="' + i + '">' +
+            '<div class="hw-icon">' + (seed ? seed.icon : '\u{1F331}') + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + (seed ? seed.name : 'Plant') + '</div>' +
+            '<div class="hw-sub">' + (ready ? 'Ready to harvest!' : timeLeft + 's remaining') + '</div></div>' +
+            '<div class="hw-cost" style="color:' + (ready ? 'var(--green)' : 'var(--dim)') + ';">' + (ready ? 'Harvest' : '\u231B') + '</div></div>';
+        });
+        html += '</div>';
+      }
+      // Garden inventory (eat at home)
+      var inv = s.gardenInventory || {};
+      var hasFood = Object.keys(inv).length > 0;
+      if (hasFood) {
+        html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><div style="font-weight:800;margin-bottom:6px;font-size:12px;color:var(--dim);">PANTRY</div>';
+        Game.SEEDS.forEach(function(se) {
+          if (!inv[se.id]) return;
+          html += '<div class="hw-card" data-eat="' + se.id + '"><div class="hw-icon">' + se.icon + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + se.name + ' x' + inv[se.id] + '</div>' +
+            '<div class="hw-sub">Eat for +' + se.energy + ' energy</div></div>' +
+            '<div class="hw-cost" style="color:var(--green);">Eat</div></div>';
+        });
+        html += '</div>';
+      }
+      // Sleep button
+      var canSleep = Date.now() - (s.lastSleepTime || 0) >= 180000;
+      html += '<button class="panel-btn btn-purple" id="sleepBtn"' + (canSleep ? '' : ' disabled style="opacity:0.4"') + '>\u{1F6CC} Sleep' + (canSleep ? '' : ' (cooldown)') + '</button>';
       return html + '</div>';
     },
-    wireApartmentPanel: function() {},
+    wireApartmentPanel: function() {
+      document.querySelectorAll('[data-harvest]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var seed = Game.harvestPlant(parseInt(el.dataset.harvest));
+          if (seed) { UI.toast(seed.icon + ' Harvested ' + seed.name + '!'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
+      document.querySelectorAll('[data-eat]').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var seed = Game.eatGardenItem(el.dataset.eat);
+          if (seed) { UI.toast(seed.icon + ' Ate ' + seed.name + '! +' + seed.energy + ' energy'); UI.showPanel(UI.currentBuilding); }
+        });
+      });
+      var el = document.getElementById('sleepBtn');
+      if (el) el.addEventListener('click', function() {
+        var result = Game.sleep();
+        if (result.error) { UI.toast(result.error); return; }
+        UI.toast('\u{1F6CC} Slept! +' + result.energy + ' energy, +' + Game.formatNumber(result.sats) + ' sats');
+        UI.showPanel(UI.currentBuilding);
+      });
+    },
 
     // ═══════════════════════════════════════
     // Random Name / Avatar Creation
@@ -1256,7 +1456,29 @@
           '<div class="hw-info"><div class="hw-name">' + a.name + '</div><div class="hw-sub">' + a.desc + '</div></div>' +
           '<div class="hw-cost" style="color:' + (done ? 'var(--green)' : 'var(--dim)') + ';">' + (done ? '\u2705' : (a.reward > 0 ? '+' + Game.formatNumber(a.reward) : '')) + '</div></div>';
       });
-      html += '</div>';
+
+      // Rare Collection
+      var coll = s.collection || {};
+      var collCount = Object.keys(coll).length;
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+      html += '<div style="font-weight:800;margin-bottom:8px;">\u{1F48E} Collection (' + collCount + '/' + Game.RARE_ITEMS.length + ')</div>';
+      var sets = {};
+      Game.RARE_ITEMS.forEach(function(r) {
+        if (!sets[r.set]) sets[r.set] = [];
+        sets[r.set].push(r);
+      });
+      for (var setName in sets) {
+        var setItems = sets[setName];
+        var setOwned = setItems.filter(function(r) { return coll[r.id]; }).length;
+        var setComplete = setOwned >= 5;
+        html += '<div style="margin-bottom:6px;"><span style="font-weight:700;text-transform:capitalize;">' + setName + '</span> (' + setOwned + '/5)' +
+          (setComplete ? ' <span style="color:var(--green);">+' + Math.round((Game.SET_BONUSES[setName]||0)*100) + '% bonus!</span>' : '') + '<br>';
+        setItems.forEach(function(r) {
+          html += '<span style="font-size:18px;opacity:' + (coll[r.id] ? '1' : '0.2') + ';" title="' + r.name + '">' + r.icon + '</span> ';
+        });
+        html += '</div>';
+      }
+      html += '</div></div>';
       panel.innerHTML = html;
       document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
     },
@@ -1305,6 +1527,43 @@
           }
         });
       });
+    },
+
+    // ═══════════════════════════════════════
+    // ═══════════════════════════════════════
+    // DAILY CHALLENGES PANEL
+    // ═══════════════════════════════════════
+    showDailiesPanel: function() {
+      var panel = document.getElementById('panel');
+      panel.style.display = 'block';
+      this.panelOpen = true;
+      this.currentPanel = 'dailies';
+      this.currentBuilding = null;
+      var s = Game.state;
+      Game.generateDailyChallenges();
+      var html = '<div class="panel-header"><div class="panel-title">\u{1F4C5} Daily Challenges</div>' +
+        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div><div class="panel-body">';
+      if (s.dailyChallenges && s.dailyChallenges.length > 0) {
+        s.dailyChallenges.forEach(function(ch) {
+          html += '<div class="hw-card' + (ch.completed ? '' : '') + '">' +
+            '<div class="hw-icon">' + (ch.completed ? '\u2705' : '\u{1F3AF}') + '</div>' +
+            '<div class="hw-info"><div class="hw-name">' + ch.desc + '</div>' +
+            '<div class="hw-sub">Reward: ' + Game.formatNumber(ch.reward) + ' sats' + (ch.completed ? ' — DONE!' : '') + '</div></div></div>';
+        });
+      } else {
+        html += '<p style="color:var(--dim);">No challenges today.</p>';
+      }
+      // Stats section
+      var st = s.stats || {};
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">' +
+        '<div style="font-weight:800;margin-bottom:6px;">\u{1F4CA} Lifetime Stats</div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Total Taps</span><span>' + Game.formatNumber(st.taps||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Items Collected</span><span>' + (st.itemsCollected||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Buildings Visited</span><span>' + (st.buildingsVisited||0) + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:4px;"><span class="ex-stat-label">Deliveries</span><span>' + (st.deliveriesCompleted||0) + '</span></div>' +
+        '</div>';
+      panel.innerHTML = html + '</div>';
+      document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
     },
 
     // ═══════════════════════════════════════
@@ -1438,6 +1697,7 @@
       el.classList.add('show');
       if (this.toastTimer) clearTimeout(this.toastTimer);
       this.toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+      if (window.Sound) Sound.toast();
     },
   };
 

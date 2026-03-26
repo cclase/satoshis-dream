@@ -73,6 +73,16 @@
     { id: 'fu_rug',     name: 'Persian Rug',     icon: '\u{1F9F6}', cost: 1000,  cur: 'usd', desc: '+5% income',     bonus: 'income', val: 0.05 },
     { id: 'fu_tv',      name: 'Big Screen TV',   icon: '\u{1F4FA}', cost: 3000,  cur: 'usd', desc: '+3 energy regen',bonus: 'eregen', val: 3 },
     { id: 'fu_safe',    name: 'Safe',            icon: '\u{1F512}', cost: 5000,  cur: 'usd', desc: 'Protect 10% sats on default', bonus: 'protect', val: 0.1 },
+    { id: 'fu_bed_good',name: 'Comfy Bed',       icon: '\u{1F6CF}\uFE0F', cost: 500,  cur: 'usd', desc: 'Sleep restores 75 energy', bonus: 'bed', val: 75 },
+    { id: 'fu_bed_luxury',name:'Luxury Bed',     icon: '\u{1F6CC}', cost: 5000, cur: 'usd', desc: 'Sleep restores 100 energy', bonus: 'bed', val: 100 },
+    { id: 'fu_kitchen', name: 'Kitchen',         icon: '\u{1F373}', cost: 1000, cur: 'usd', desc: '+25% energy from home food', bonus: 'kitchen', val: 0.25 },
+    { id: 'fu_garage',  name: 'Garage',          icon: '\u{1F3CE}\uFE0F', cost: 2000, cur: 'usd', desc: 'Use vehicle anywhere', bonus: 'garage', val: 0 },
+  ];
+
+  var SEEDS = [
+    { id: 'seed_herb',  name: 'Herb Seeds',    icon: '\u{1F33F}', cost: 20,   growTime: 120000, reward: 25,  energy: 15, desc: '2min grow, +25 sats or +15 energy' },
+    { id: 'seed_flower',name: 'Flower Seeds',  icon: '\u{1F33B}', cost: 100,  growTime: 300000, reward: 150, energy: 10, desc: '5min grow, +150 sats or +10 energy' },
+    { id: 'seed_money', name: 'Money Tree',    icon: '\u{1F4B0}', cost: 1000, growTime: 900000, reward: 2000,energy: 50, desc: '15min grow, +2000 sats or +50 energy' },
   ];
 
   var NPC_EVENTS = [
@@ -133,8 +143,22 @@
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
-      tutorialStep: 0, // 0=not started, 1-6=active, 7=done
+      tutorialStep: 0,
       pendingNpcEvent: null, lastNpcTime: 0,
+      // Delivery quests
+      deliveries: [], activeDelivery: null,
+      // Police
+      tickets: [], policeChaseActive: false,
+      // Electricity
+      powerCut: false, powerCutUntil: 0,
+      // Sleep
+      lastSleepTime: 0,
+      // Garden
+      garden: [], gardenInventory: {},
+      dailyChallenges: [], dailyDate: '',
+      buildingLevels: {}, buildingVisits: {},
+      collection: {}, // rare drops
+      stats: { taps: 0, satsSold: 0, buildingsVisited: 0, itemsCollected: 0, deliveriesCompleted: 0 },
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -363,6 +387,7 @@
       if (this.hasPrestigeUpgrade('pu_megaprod')) mul *= 1.5;
       mul *= (1 + this._getItemBonus('income'));
       mul *= (1 + this._getItemBonus('prod'));
+      mul *= (1 + this.getCollectionBonus());
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
@@ -402,11 +427,24 @@
     getSpeedMultiplier: function() {
       var base = 1.0;
       if (this.state.vehicle) {
-        var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
-        if (v) base = v.speed;
+        // Vehicle speed only works with garage or when near home
+        var hasGarage = !!(this.state.furniture && this.state.furniture.fu_garage);
+        var nearHome = false;
+        if (!hasGarage && this.state.avatar) {
+          var hb = (window.Town && window.Town.BUILDINGS) ? window.Town.BUILDINGS.find(function(b){return b.id==='apartment';}) : null;
+          if (hb) {
+            var dx = this.state.avatar.x - (hb.x + hb.w/2), dy = this.state.avatar.y - (hb.y + hb.h/2);
+            nearHome = Math.sqrt(dx*dx+dy*dy) < 100;
+          }
+        }
+        if (hasGarage || nearHome) {
+          var v = VEHICLES.find(function(v) { return v.id === Game.state.vehicle; });
+          if (v) base = v.speed;
+        }
       }
       if (this.hasPrestigeUpgrade('pu_sprint')) base *= 1.5;
       base *= (1 + this._getItemBonus('speed'));
+      base *= this.getWeatherSpeedMod();
       return base;
     },
 
@@ -432,12 +470,296 @@
       return 0.5 + (this.state.gymLevel * 0.2);
     },
 
+    // ── Delivery Quests ──
+    generateDeliveries: function() {
+      var s = this.state;
+      if (s.deliveries.length >= 3) return;
+      var allBuildings = (window.Town && window.Town.BUILDINGS) || [];
+      var targets = allBuildings.filter(function(b) { return b.panelType !== 'post_office' && b.panelType !== 'apartment'; });
+      while (s.deliveries.length < 3 && targets.length > 0) {
+        var idx = Math.floor(Math.random() * targets.length);
+        var t = targets.splice(idx, 1)[0];
+        var dist = Math.sqrt(Math.pow(t.x - 960, 2) + Math.pow(t.y - 768, 2));
+        var reward = Math.floor(50 + dist * 0.3 + Math.random() * 100);
+        var usdReward = Math.floor(reward * 0.01 + Math.random() * 5);
+        s.deliveries.push({ targetId: t.id, targetName: t.name, sats: reward, usd: usdReward });
+      }
+    },
+    acceptDelivery: function(index) {
+      var s = this.state;
+      if (s.activeDelivery || index >= s.deliveries.length) return false;
+      s.activeDelivery = s.deliveries.splice(index, 1)[0];
+      if (UI && UI.toast) UI.toast('\u{1F4E6} Delivering to ' + s.activeDelivery.targetName + '!');
+      return true;
+    },
+    completeDelivery: function() {
+      var s = this.state;
+      if (!s.activeDelivery) return false;
+      s.sats += s.activeDelivery.sats;
+      s.totalSats += s.activeDelivery.sats;
+      s.lifetimeSats += s.activeDelivery.sats;
+      s.usd += s.activeDelivery.usd;
+      if (UI && UI.toast) UI.toast('\u{1F4E6} Delivered! +' + Game.formatNumber(s.activeDelivery.sats) + ' sats, +$' + Game.formatNumber(s.activeDelivery.usd));
+      s.activeDelivery = null;
+      this.generateDeliveries();
+      return true;
+    },
+
+    // ── Sleep ──
+    sleep: function() {
+      var s = this.state;
+      var now = Date.now();
+      if (now - s.lastSleepTime < 180000) return { error: 'Too soon! Wait ' + Math.ceil((180000 - (now - s.lastSleepTime)) / 1000) + 's' };
+      s.lastSleepTime = now;
+      // Energy restore based on bed
+      var restore = 50;
+      if (s.furniture && s.furniture.fu_bed_luxury) restore = 100;
+      else if (s.furniture && s.furniture.fu_bed_good) restore = 75;
+      s.energy = Math.min(this.getEnergyMax(), s.energy + restore);
+      // Fast-forward 30s of production
+      var rate = this.getProductionRate() * this.getMultiplier();
+      var gain = Math.floor(rate * 30);
+      s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
+      s.heat = Math.max(0, s.heat - 10);
+      return { energy: restore, sats: gain };
+    },
+
+    // ── Police ──
+    bribePolice: function(amount) {
+      var s = this.state;
+      if (s.policeRisk <= 0 || s.policeRisk >= 75) return false;
+      var cost = 500;
+      if (s.usd < cost) return false;
+      s.usd -= cost;
+      s.policeRisk = Math.max(0, s.policeRisk - 10);
+      return true;
+    },
+    payTicket: function(index) {
+      var s = this.state;
+      if (index >= s.tickets.length) return false;
+      var ticket = s.tickets[index];
+      if (s.usd < ticket.fine) return false;
+      s.usd -= ticket.fine;
+      s.tickets.splice(index, 1);
+      return true;
+    },
+
+    // ── Garden ──
+    getMaxPlots: function() {
+      var h = { studio: 0, apartment: 1, house: 2, warehouse: 3, solar: 3 };
+      return h[this.state.housing] || 0;
+    },
+    plantSeed: function(seedId) {
+      var s = this.state;
+      var seed = SEEDS.find(function(se) { return se.id === seedId; });
+      if (!seed || s.garden.length >= this.getMaxPlots()) return false;
+      if (s.usd < seed.cost) return false;
+      s.usd -= seed.cost;
+      s.garden.push({ seedId: seedId, plantedAt: Date.now() });
+      return true;
+    },
+    harvestPlant: function(index) {
+      var s = this.state;
+      if (index >= s.garden.length) return false;
+      var plant = s.garden[index];
+      var seed = SEEDS.find(function(se) { return se.id === plant.seedId; });
+      if (!seed || Date.now() - plant.plantedAt < seed.growTime) return false;
+      s.garden.splice(index, 1);
+      if (!s.gardenInventory) s.gardenInventory = {};
+      s.gardenInventory[seed.id] = (s.gardenInventory[seed.id] || 0) + 1;
+      return seed;
+    },
+    eatGardenItem: function(seedId) {
+      var s = this.state;
+      if (!s.gardenInventory || !s.gardenInventory[seedId]) return false;
+      var seed = SEEDS.find(function(se) { return se.id === seedId; });
+      if (!seed) return false;
+      s.gardenInventory[seedId]--;
+      if (s.gardenInventory[seedId] <= 0) delete s.gardenInventory[seedId];
+      var bonus = s.furniture && s.furniture.fu_kitchen ? 1.25 : 1;
+      s.energy = Math.min(this.getEnergyMax(), s.energy + Math.floor(seed.energy * bonus));
+      return seed;
+    },
+
+    // ── Treasure Maps ──
+    checkTreasureDrop: function() {
+      var s = this.state;
+      if (s.treasureMap) return;
+      if (Math.random() < 0.005) { // 0.5% per tap
+        var tx = 100 + Math.random() * (WORLD_W - 200);
+        var ty = 100 + Math.random() * (WORLD_H - 200);
+        var reward = 500 + Math.floor(Math.random() * 4500);
+        s.treasureMap = { x: tx, y: ty, reward: reward, expiresAt: Date.now() + 600000 };
+        if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Found a treasure map! Check your minimap!');
+      }
+    },
+    digTreasure: function() {
+      var s = this.state;
+      if (!s.treasureMap || !s.avatar) return false;
+      var dx = s.avatar.x - s.treasureMap.x, dy = s.avatar.y - s.treasureMap.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 30) return false;
+      var reward = s.treasureMap.reward;
+      s.sats += reward; s.totalSats += reward; s.lifetimeSats += reward;
+      s.treasureMap = null;
+      if (UI && UI.toast) UI.toast('\u{1F4B0} Treasure! +' + Game.formatNumber(reward) + ' sats!');
+      return true;
+    },
+
+    // ── Building Reputation ──
+    visitBuilding: function(panelType) {
+      var s = this.state;
+      if (!s.buildingVisits) s.buildingVisits = {};
+      s.buildingVisits[panelType] = (s.buildingVisits[panelType] || 0) + 1;
+      if (!s.stats) s.stats = {};
+      s.stats.buildingsVisited = (s.stats.buildingsVisited || 0) + 1;
+    },
+    getBuildingDiscount: function(panelType) {
+      var visits = (this.state.buildingVisits || {})[panelType] || 0;
+      if (visits >= 30) return 0.15; // VIP
+      if (visits >= 15) return 0.10;
+      if (visits >= 5) return 0.05;
+      return 0;
+    },
+
+    // ── Weather ──
+    weather: 'clear',
+    _weatherTimer: 0,
+    updateWeather: function(dt) {
+      this._weatherTimer += dt;
+      if (this._weatherTimer > 180 + Math.random() * 300) { // 3-8 min
+        this._weatherTimer = 0;
+        var weathers = ['clear', 'clear', 'cloudy', 'rain'];
+        if (this.weather === 'rain' && Math.random() < 0.1) weathers.push('storm');
+        this.weather = weathers[Math.floor(Math.random() * weathers.length)];
+      }
+    },
+    getWeatherSpeedMod: function() {
+      return this.weather === 'rain' ? 0.85 : this.weather === 'storm' ? 0.7 : 1.0;
+    },
+
+    // ── Daily Challenges ──
+    generateDailyChallenges: function() {
+      var s = this.state;
+      var today = new Date().toDateString();
+      if (s.dailyDate === today) return;
+      s.dailyDate = today;
+      // Seed from date
+      var seed = 0; for (var ci = 0; ci < today.length; ci++) seed += today.charCodeAt(ci);
+      function dr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+      var types = [
+        { desc: 'Mine {n} sats', key: 'sats', target: function() { return Math.floor(500 + dr() * 5000); }, check: function(s,t) { return s.lifetimeSats >= t._start + t.target; } },
+        { desc: 'Visit {n} buildings', key: 'visits', target: function() { return Math.floor(3 + dr() * 5); }, check: function(s,t) { return (s.stats.buildingsVisited||0) >= t._startVisits + t.target; } },
+        { desc: 'Collect {n} street items', key: 'collect', target: function() { return Math.floor(3 + dr() * 5); }, check: function(s,t) { return (s.stats.itemsCollected||0) >= t._startItems + t.target; } },
+      ];
+      s.dailyChallenges = [];
+      for (var di = 0; di < 3; di++) {
+        var type = types[di % types.length];
+        var target = type.target();
+        s.dailyChallenges.push({ desc: type.desc.replace('{n}', target), key: type.key, target: target, completed: false, reward: Math.floor(100 + dr() * 500),
+          _start: s.lifetimeSats, _startVisits: s.stats.buildingsVisited||0, _startItems: s.stats.itemsCollected||0 });
+      }
+    },
+    checkDailyChallenges: function() {
+      var s = this.state;
+      if (!s.dailyChallenges) return;
+      for (var ci = 0; ci < s.dailyChallenges.length; ci++) {
+        var ch = s.dailyChallenges[ci];
+        if (ch.completed) continue;
+        var done = false;
+        if (ch.key === 'sats') done = s.lifetimeSats >= ch._start + ch.target;
+        else if (ch.key === 'visits') done = (s.stats.buildingsVisited||0) >= ch._startVisits + ch.target;
+        else if (ch.key === 'collect') done = (s.stats.itemsCollected||0) >= ch._startItems + ch.target;
+        if (done) {
+          ch.completed = true;
+          s.sats += ch.reward; s.totalSats += ch.reward; s.lifetimeSats += ch.reward;
+          if (UI && UI.toast) UI.toast('\u{1F3C6} Challenge done! +' + Game.formatNumber(ch.reward) + ' sats');
+        }
+      }
+    },
+
+    // ── Building Upgrades ──
+    UPGRADE_COSTS: { 1: 500, 2: 5000, 3: 50000 },
+    getBuildingLevel: function(panelType) { return (this.state.buildingLevels || {})[panelType] || 0; },
+    upgradeBuilding: function(panelType) {
+      var s = this.state;
+      if (!s.buildingLevels) s.buildingLevels = {};
+      var level = s.buildingLevels[panelType] || 0;
+      if (level >= 3) return false;
+      var cost = this.UPGRADE_COSTS[level + 1] || 99999;
+      if (s.usd < cost) return false;
+      s.usd -= cost;
+      s.buildingLevels[panelType] = level + 1;
+      return true;
+    },
+    getBuildingUpgradeBonus: function(panelType) {
+      var level = this.getBuildingLevel(panelType);
+      // Returns a multiplier bonus per building type per level
+      if (panelType === 'hardware') return level * 0.05; // -5/10/15% cost
+      if (panelType === 'exchange') return level * 0.05; // +5/10/15% sell
+      if (panelType === 'mine') return level * 0.1; // +10/20/30% tap
+      if (panelType === 'casino') return level * 0.02; // +2/4/6% win
+      return level * 0.03; // generic 3% per level
+    },
+
+    // ── Rare Drops ──
+    RARE_ITEMS: [
+      {id:'r_whitepaper',name:'Satoshi\'s Whitepaper',set:'satoshi',icon:'\u{1F4DC}'},
+      {id:'r_genesis',name:'Genesis Block',set:'satoshi',icon:'\u{1F4A0}'},
+      {id:'r_pizza',name:'Pizza Receipt',set:'satoshi',icon:'\u{1F355}'},
+      {id:'r_key',name:'Genesis Key',set:'satoshi',icon:'\u{1F511}'},
+      {id:'r_wallet',name:'Satoshi\'s Wallet',set:'satoshi',icon:'\u{1F4B0}'},
+      {id:'r_cpu',name:'Vintage CPU',set:'hardware',icon:'\u{1F4BE}'},
+      {id:'r_gpu',name:'Gold GPU',set:'hardware',icon:'\u{1F4BB}'},
+      {id:'r_asic',name:'Diamond ASIC',set:'hardware',icon:'\u{1F48E}'},
+      {id:'r_quantum',name:'Quantum Chip',set:'hardware',icon:'\u2699\uFE0F'},
+      {id:'r_alien',name:'Alien Tech',set:'hardware',icon:'\u{1F47D}'},
+      {id:'r_alt',name:'Alt Coin',set:'crypto',icon:'\u{1FA99}'},
+      {id:'r_defi',name:'DeFi Token',set:'crypto',icon:'\u{1F4B1}'},
+      {id:'r_nft',name:'NFT Art',set:'crypto',icon:'\u{1F5BC}\uFE0F'},
+      {id:'r_contract',name:'Smart Contract',set:'crypto',icon:'\u{1F4C4}'},
+      {id:'r_dao',name:'DAO Vote',set:'crypto',icon:'\u{1F5F3}\uFE0F'},
+      {id:'r_moon',name:'Moon Rock',set:'legend',icon:'\u{1F311}'},
+      {id:'r_lambo',name:'Lambo Keys',set:'legend',icon:'\u{1F511}'},
+      {id:'r_diamond',name:'Diamond Hands',set:'legend',icon:'\u{1F48E}'},
+      {id:'r_hodl',name:'HODL Certificate',set:'legend',icon:'\u{1F4C3}'},
+      {id:'r_flag',name:'Moon Flag',set:'legend',icon:'\u{1F3F3}\uFE0F'},
+    ],
+    SET_BONUSES: { satoshi: 0.25, hardware: 0.25, crypto: 0.25, legend: 1.0 },
+    checkRareDrop: function() {
+      var s = this.state;
+      if (!s.collection) s.collection = {};
+      if (Math.random() > 0.001) return; // 0.1% chance
+      var unowned = this.RARE_ITEMS.filter(function(r) { return !s.collection[r.id]; });
+      if (unowned.length === 0) return;
+      var item = unowned[Math.floor(Math.random() * unowned.length)];
+      s.collection[item.id] = true;
+      if (UI && UI.toast) UI.toast(item.icon + ' RARE: ' + item.name + '!');
+      if (window.Sound) Sound.levelUp();
+    },
+    getCollectionBonus: function() {
+      var s = this.state, self = this;
+      if (!s.collection) return 0;
+      var total = 0;
+      var sets = {};
+      this.RARE_ITEMS.forEach(function(r) { if (s.collection[r.id]) { if (!sets[r.set]) sets[r.set] = 0; sets[r.set]++; } });
+      for (var setName in sets) {
+        if (sets[setName] >= 5) total += self.SET_BONUSES[setName] || 0;
+      }
+      // +2% per individual item
+      total += Object.keys(s.collection).length * 0.02;
+      return total;
+    },
+
+    SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
+
     collectStreetItem: function() {
       var rate = Math.max(1, this.getProductionRate());
       var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
       this.state.sats += gain;
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.itemsCollected = (this.state.stats.itemsCollected || 0) + 1;
       if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
       return gain;
     },
@@ -454,6 +776,10 @@
       this.state.heat = Math.min(100, this.state.heat + 0.05);
       // Tutorial: step 2 (tap mine) → step 3
       if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
+      this.checkTreasureDrop();
+      this.checkRareDrop();
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.taps = (this.state.stats.taps || 0) + 1;
       return gain;
     },
 
@@ -566,8 +892,8 @@
       var now = Date.now();
       s.lastTick = now; // Update every tick so offline calc is accurate
 
-      // Production
-      var rate = this.getProductionRate();
+      // Production (zero during power cut)
+      var rate = s.powerCut ? 0 : this.getProductionRate();
       var mul = this.getMultiplier();
       var gain = rate * mul * dt;
       s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
@@ -694,6 +1020,72 @@
           s.pendingNpcEvent = { id: evt.id, name: evt.name, icon: evt.icon, desc: evt.desc, accept: evt.accept, decline: evt.decline };
           s.lastNpcTime = now;
         }
+      }
+
+      // Police consequences
+      if (s.policeRisk >= 100 && !s.policeChaseActive) {
+        s.policeChaseActive = true;
+        s.policeChaseEnd = now + 15000;
+        if (UI && UI.toast) UI.toast('\u{1F6A8} POLICE CHASE! Run home!');
+      }
+      if (s.policeChaseActive && now >= s.policeChaseEnd) {
+        // Caught!
+        s.policeChaseActive = false;
+        s.owned.d1 = 0; s.owned.d2 = 0; s.owned.d3 = 0;
+        s.sats = Math.floor(s.sats * 0.5);
+        s.usd = Math.max(0, s.usd * 0.5);
+        s.policeRisk = 0;
+        if (UI && UI.toast) UI.toast('\u{1F6A8} ARRESTED! Lost dark web items, 50% sats & USD!');
+      }
+      if (s.policeRisk >= 50 && !s._lastRaidTime) s._lastRaidTime = now;
+      if (s.policeRisk >= 50 && now - (s._lastRaidTime || 0) > 300000) {
+        s._lastRaidTime = now;
+        var confiscated = '';
+        if (s.owned.d1 > 0) { s.owned.d1--; confiscated = 'Botnet'; }
+        else if (s.owned.d3 > 0) { s.owned.d3--; confiscated = 'Relay'; }
+        if (confiscated) {
+          s.tickets.push({ fine: 100 + Math.floor(Math.random() * 400), issuedAt: now });
+          if (UI && UI.toast) UI.toast('\u{1F46E} Police raid! Confiscated ' + confiscated + ' + ticket issued!');
+        }
+      }
+      // Unpaid tickets → auto-arrest
+      if (s.tickets.length >= 3 && s.policeRisk >= 25) {
+        s.policeRisk = 100; // triggers chase next tick
+      }
+
+      // Electricity enforcement
+      if (s.powerCut) {
+        if (now >= s.powerCutUntil) s.powerCut = false;
+      }
+      if (!s.powerCut && s.electricityBill > 0 && s.usd < 0) {
+        s.powerCut = true;
+        s.powerCutUntil = now + 30000;
+        s.usd = 0;
+        if (UI && UI.toast) UI.toast('\u26A1 BLACKOUT! Power cut for 30s!');
+      }
+
+      // Weather
+      this.updateWeather(dt);
+      // Storm hardware damage
+      if (this.weather === 'storm') {
+        if (!s._stormDmgCheck) s._stormDmgCheck = now;
+        if (now - s._stormDmgCheck > 60000) {
+          s._stormDmgCheck = now;
+          if (Math.random() < 0.02) {
+            for (var hi = HARDWARE.length - 1; hi >= 0; hi--) {
+              if ((s.owned[HARDWARE[hi].id] || 0) > 0) { s.owned[HARDWARE[hi].id]--; if (UI && UI.toast) UI.toast('\u26A1 Lightning fried a ' + HARDWARE[hi].name + '!'); break; }
+            }
+          }
+        }
+      }
+      // Daily challenges
+      this.generateDailyChallenges();
+      this.checkDailyChallenges();
+
+      // Treasure map expiry
+      if (s.treasureMap && Date.now() > s.treasureMap.expiresAt) {
+        s.treasureMap = null;
+        if (UI && UI.toast) UI.toast('\u{1F5FA}\uFE0F Treasure map expired!');
       }
 
       // Check achievements

@@ -262,6 +262,8 @@
 
       canvasEl.addEventListener('pointerup', function(evt) {
         if (!Game.state.avatar || UI.panelOpen || UI.modalActive()) return;
+        // Skip click-to-move if this was a drag gesture
+        if (UI._touchMoved && UI._touchMoved()) return;
         // Try picking ground first, then any mesh
         var pick = self._scene.pick(self._scene.pointerX, self._scene.pointerY);
         if (!pick.hit) return;

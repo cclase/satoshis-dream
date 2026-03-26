@@ -220,11 +220,11 @@
       this.canvas = canvasEl;
       this._engine = new BABYLON.Engine(canvasEl, true);
       this._scene = new BABYLON.Scene(this._engine);
-      this._scene.clearColor = new BABYLON.Color4(0.35, 0.2, 0.25, 1);
-      this._scene.ambientColor = new BABYLON.Color3(0.3, 0.25, 0.2);
+      this._scene.clearColor = new BABYLON.Color4(0.55, 0.75, 0.95, 1);
+      this._scene.ambientColor = new BABYLON.Color3(0.5, 0.5, 0.5);
       this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-      this._scene.fogDensity = 0.00015;
-      this._scene.fogColor = new BABYLON.Color3(0.35, 0.2, 0.25);
+      this._scene.fogDensity = 0.0001;
+      this._scene.fogColor = new BABYLON.Color3(0.6, 0.78, 0.95);
 
       this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, Math.PI/3.5, 800,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
@@ -233,11 +233,11 @@
       this._camera3.upperRadiusLimit = 1500;
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
-      hemi.intensity = 0.5; hemi.diffuse = new BABYLON.Color3(1,0.9,0.7);
-      hemi.groundColor = new BABYLON.Color3(0.2,0.25,0.3);
+      hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);
+      hemi.groundColor = new BABYLON.Color3(0.4,0.45,0.5);
 
-      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-1,-2,-0.5), this._scene);
-      sun.intensity = 0.8; sun.diffuse = new BABYLON.Color3(1,0.8,0.5);
+      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.5,-3,-1), this._scene);
+      sun.intensity = 1.0; sun.diffuse = new BABYLON.Color3(1,0.95,0.85);
       sun.position = new BABYLON.Vector3(2000,800,-200);
       this._shadowGen = new BABYLON.ShadowGenerator(1024, sun);
       this._shadowGen.useBlurExponentialShadowMap = true;
@@ -271,9 +271,9 @@
       var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
       ground.position.x=WORLD_W/2; ground.position.z=WORLD_H/2; ground.receiveShadows=true;
       var gc=document.createElement('canvas'); gc.width=256; gc.height=256;
-      var gctx=gc.getContext('2d'); gctx.fillStyle='#7a6e5e'; gctx.fillRect(0,0,256,256);
+      var gctx=gc.getContext('2d'); gctx.fillStyle='#5a8a4a'; gctx.fillRect(0,0,256,256);
       var gid=gctx.getImageData(0,0,256,256);
-      for(var i=0;i<gid.data.length;i+=4){var n=(Math.random()-0.5)*30;gid.data[i]=Math.min(255,Math.max(0,gid.data[i]+n));gid.data[i+1]=Math.min(255,Math.max(0,gid.data[i+1]+n));gid.data[i+2]=Math.min(255,Math.max(0,gid.data[i+2]+n));}
+      for(var i=0;i<gid.data.length;i+=4){var n=(Math.random()-0.5)*15;gid.data[i]=Math.min(255,Math.max(0,gid.data[i]+n));gid.data[i+1]=Math.min(255,Math.max(0,gid.data[i+1]+n));gid.data[i+2]=Math.min(255,Math.max(0,gid.data[i+2]+n));}
       gctx.putImageData(gid,0,0);
       var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=40; gtex.vScale=40;
       var gmat=new BABYLON.StandardMaterial('gmat',s); gmat.diffuseTexture=gtex;
@@ -282,8 +282,8 @@
 
     _buildRoads: function() {
       var s=this._scene;
-      var rmat=new BABYLON.StandardMaterial('rmat',s); rmat.diffuseColor=new BABYLON.Color3(0.27,0.27,0.25);
-      var swmat=new BABYLON.StandardMaterial('swmat',s); swmat.diffuseColor=new BABYLON.Color3(0.63,0.6,0.53);
+      var rmat=new BABYLON.StandardMaterial('rmat',s); rmat.diffuseColor=new BABYLON.Color3(0.42,0.42,0.4);
+      var swmat=new BABYLON.StandardMaterial('swmat',s); swmat.diffuseColor=new BABYLON.Color3(0.78,0.75,0.7);
       var lmat=new BABYLON.StandardMaterial('lmat',s); lmat.diffuseColor=new BABYLON.Color3(0.8,0.8,0.4); lmat.emissiveColor=new BABYLON.Color3(0.2,0.2,0.1);
       for(var ri=0;ri<H_ROADS.length;ri++){
         var hr=H_ROADS[ri]; var cz=hr.y+hr.h/2;
@@ -359,24 +359,27 @@
           var bh = BLDG_HEIGHTS[b.panelType] || 40;
           var ltex = new BABYLON.DynamicTexture('lt' + b.id, {width: 512, height: 128}, s, false);
           var lctx = ltex.getContext();
+          // Dark background for readability
+          lctx.fillStyle = 'rgba(0,0,0,0.5)';
+          lctx.beginPath(); lctx.roundRect(40, 20, 432, 80, 12); lctx.fill();
           lctx.font = 'bold 48px sans-serif'; lctx.fillStyle = '#ffffff';
-          lctx.textAlign = 'center'; lctx.fillText(b.name, 256, 80);
+          lctx.textAlign = 'center'; lctx.fillText(b.name, 256, 72);
           ltex.update(); ltex.hasAlpha = true;
           var lmat = new BABYLON.StandardMaterial('lm' + b.id, s);
           lmat.diffuseTexture = ltex; lmat.emissiveColor = new BABYLON.Color3(1, 1, 1); lmat.backFaceCulling = false;
-          var lp = BABYLON.MeshBuilder.CreatePlane('lp' + b.id, {width: 60, height: 15}, s);
-          lp.position.set(b.x + b.w / 2, bh * 1.3 + 15, b.y + b.h / 2);
+          var lp = BABYLON.MeshBuilder.CreatePlane('lp' + b.id, {width: 80, height: 20}, s);
+          lp.position.set(b.x + b.w / 2, bh * 1.3 + 18, b.y + b.h / 2);
           lp.material = lmat; lp.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
           // Emoji above label
           var etex = new BABYLON.DynamicTexture('et' + b.id, {width: 128, height: 128}, s, false);
-          var ectx = etex.getContext(); ectx.font = '80px sans-serif'; ectx.textAlign = 'center';
+          var ectx = etex.getContext(); ectx.font = '88px sans-serif'; ectx.textAlign = 'center';
           ectx.textBaseline = 'middle'; ectx.fillText(b.emoji || '', 64, 64);
           etex.update(); etex.hasAlpha = true;
           var emat = new BABYLON.StandardMaterial('em' + b.id, s);
           emat.diffuseTexture = etex; emat.emissiveColor = new BABYLON.Color3(1, 1, 1); emat.backFaceCulling = false;
-          var ep = BABYLON.MeshBuilder.CreatePlane('ep' + b.id, {width: 20, height: 20}, s);
-          ep.position.set(b.x + b.w / 2, bh * 1.3 + 30, b.y + b.h / 2);
+          var ep = BABYLON.MeshBuilder.CreatePlane('ep' + b.id, {width: 28, height: 28}, s);
+          ep.position.set(b.x + b.w / 2, bh * 1.3 + 38, b.y + b.h / 2);
           ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
         })(i);
       }
@@ -419,18 +422,18 @@
     _buildAvatar: function() {
       var s=this._scene;
       this._avatarRoot=new BABYLON.TransformNode('avRoot',s);
-      this._avatarBody=BABYLON.MeshBuilder.CreateCylinder('avBody',{diameterTop:10,diameterBottom:14,height:20,tessellation:8},s);
+      this._avatarBody=BABYLON.MeshBuilder.CreateCylinder('avBody',{diameterTop:14,diameterBottom:18,height:26,tessellation:8},s);
       var bmat=new BABYLON.StandardMaterial('avBM',s); bmat.diffuseColor=new BABYLON.Color3(0.97,0.58,0.1);
-      this._avatarBody.material=bmat; this._avatarBody.position.y=10; this._avatarBody.parent=this._avatarRoot;
-      this._avatarHead=BABYLON.MeshBuilder.CreateSphere('avHead',{diameter:12,segments:8},s);
+      this._avatarBody.material=bmat; this._avatarBody.position.y=13; this._avatarBody.parent=this._avatarRoot;
+      this._avatarHead=BABYLON.MeshBuilder.CreateSphere('avHead',{diameter:16,segments:8},s);
       var hmat=new BABYLON.StandardMaterial('avHM',s); hmat.diffuseColor=new BABYLON.Color3(0.95,0.82,0.68);
-      this._avatarHead.material=hmat; this._avatarHead.position.y=24; this._avatarHead.parent=this._avatarRoot;
-      var shadow=BABYLON.MeshBuilder.CreateDisc('avSh',{radius:8,tessellation:16},s);
+      this._avatarHead.material=hmat; this._avatarHead.position.y=32; this._avatarHead.parent=this._avatarRoot;
+      var shadow=BABYLON.MeshBuilder.CreateDisc('avSh',{radius:10,tessellation:16},s);
       var smat=new BABYLON.StandardMaterial('avSM',s); smat.diffuseColor=new BABYLON.Color3(0,0,0); smat.alpha=0.3;
       shadow.material=smat; shadow.rotation.x=Math.PI/2; shadow.position.y=0.2; shadow.parent=this._avatarRoot;
       // Label
-      var lp=BABYLON.MeshBuilder.CreatePlane('avLabel',{width:40,height:10},s);
-      lp.position.y=35; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL; lp.parent=this._avatarRoot;
+      var lp=BABYLON.MeshBuilder.CreatePlane('avLabel',{width:50,height:12},s);
+      lp.position.y=44; lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL; lp.parent=this._avatarRoot;
       this._avatarLabelTex=new BABYLON.DynamicTexture('avLT',{width:256,height:64},s,false);
       this._avatarLabelTex.hasAlpha=true;
       var almat=new BABYLON.StandardMaterial('avLM',s);

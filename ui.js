@@ -215,6 +215,67 @@
           eb.style.display = 'block';
         } else { eb.style.display = 'none'; }
       }
+      // Minimap
+      this._renderMinimap();
+    },
+
+    _minimapCanvas: null,
+    _renderMinimap: function() {
+      if (!this._minimapCanvas) {
+        this._minimapCanvas = document.createElement('canvas');
+        this._minimapCanvas.id = 'minimap';
+        this._minimapCanvas.width = 180;
+        this._minimapCanvas.height = 128;
+        document.body.appendChild(this._minimapCanvas);
+        // Click on minimap to navigate
+        var self = this;
+        this._minimapCanvas.addEventListener('click', function(e) {
+          var rect = self._minimapCanvas.getBoundingClientRect();
+          var mx = (e.clientX - rect.left) / rect.width * 2400;
+          var my = (e.clientY - rect.top) / rect.height * 1700;
+          Town._pathWaypoints = null;
+          Town.moveTarget = { x: mx, y: my };
+          Town.autoEnterBuilding = null;
+        });
+      }
+      var c = this._minimapCanvas;
+      var ctx = c.getContext('2d');
+      var sx = c.width / 2400, sy = c.height / 1700;
+      // Background
+      ctx.fillStyle = '#4a7a3a';
+      ctx.fillRect(0, 0, c.width, c.height);
+      // Roads
+      ctx.fillStyle = '#555';
+      var hr = [{ y: 330, h: 50 },{ y: 650, h: 50 },{ y: 970, h: 50 },{ y: 1290, h: 50 }];
+      var vr = [{ x: 448, w: 50 },{ x: 832, w: 50 },{ x: 1216, w: 50 }];
+      for (var ri = 0; ri < hr.length; ri++) ctx.fillRect(0, hr[ri].y * sy, c.width, hr[ri].h * sy);
+      for (var vi = 0; vi < vr.length; vi++) ctx.fillRect(vr[vi].x * sx, 0, vr[vi].w * sx, c.height);
+      // Buildings
+      var bldgs = Town.BUILDINGS;
+      for (var bi = 0; bi < bldgs.length; bi++) {
+        var b = bldgs[bi];
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy);
+      }
+      // Avatar
+      var av = Game.state.avatar;
+      if (av) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(av.x * sx, av.y * sy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#f7931a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // Move target
+      if (Town.moveTarget) {
+        ctx.strokeStyle = '#ff0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(Town.moveTarget.x * sx, Town.moveTarget.y * sy, 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     },
 
     showResetConfirm: function() {

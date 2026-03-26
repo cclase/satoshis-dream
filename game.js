@@ -156,6 +156,8 @@
       // Garden
       garden: [], gardenInventory: {},
       dailyChallenges: [], dailyDate: '',
+      buildingLevels: {}, buildingVisits: {},
+      collection: {}, // rare drops
       stats: { taps: 0, satsSold: 0, buildingsVisited: 0, itemsCollected: 0, deliveriesCompleted: 0 },
       priceEvent: null, nextEventAt: 0,
       // New systems
@@ -385,6 +387,7 @@
       if (this.hasPrestigeUpgrade('pu_megaprod')) mul *= 1.5;
       mul *= (1 + this._getItemBonus('income'));
       mul *= (1 + this._getItemBonus('prod'));
+      mul *= (1 + this.getCollectionBonus());
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
       return mul;
@@ -674,6 +677,79 @@
       }
     },
 
+    // ── Building Upgrades ──
+    UPGRADE_COSTS: { 1: 500, 2: 5000, 3: 50000 },
+    getBuildingLevel: function(panelType) { return (this.state.buildingLevels || {})[panelType] || 0; },
+    upgradeBuilding: function(panelType) {
+      var s = this.state;
+      if (!s.buildingLevels) s.buildingLevels = {};
+      var level = s.buildingLevels[panelType] || 0;
+      if (level >= 3) return false;
+      var cost = this.UPGRADE_COSTS[level + 1] || 99999;
+      if (s.usd < cost) return false;
+      s.usd -= cost;
+      s.buildingLevels[panelType] = level + 1;
+      return true;
+    },
+    getBuildingUpgradeBonus: function(panelType) {
+      var level = this.getBuildingLevel(panelType);
+      // Returns a multiplier bonus per building type per level
+      if (panelType === 'hardware') return level * 0.05; // -5/10/15% cost
+      if (panelType === 'exchange') return level * 0.05; // +5/10/15% sell
+      if (panelType === 'mine') return level * 0.1; // +10/20/30% tap
+      if (panelType === 'casino') return level * 0.02; // +2/4/6% win
+      return level * 0.03; // generic 3% per level
+    },
+
+    // ── Rare Drops ──
+    RARE_ITEMS: [
+      {id:'r_whitepaper',name:'Satoshi\'s Whitepaper',set:'satoshi',icon:'\u{1F4DC}'},
+      {id:'r_genesis',name:'Genesis Block',set:'satoshi',icon:'\u{1F4A0}'},
+      {id:'r_pizza',name:'Pizza Receipt',set:'satoshi',icon:'\u{1F355}'},
+      {id:'r_key',name:'Genesis Key',set:'satoshi',icon:'\u{1F511}'},
+      {id:'r_wallet',name:'Satoshi\'s Wallet',set:'satoshi',icon:'\u{1F4B0}'},
+      {id:'r_cpu',name:'Vintage CPU',set:'hardware',icon:'\u{1F4BE}'},
+      {id:'r_gpu',name:'Gold GPU',set:'hardware',icon:'\u{1F4BB}'},
+      {id:'r_asic',name:'Diamond ASIC',set:'hardware',icon:'\u{1F48E}'},
+      {id:'r_quantum',name:'Quantum Chip',set:'hardware',icon:'\u2699\uFE0F'},
+      {id:'r_alien',name:'Alien Tech',set:'hardware',icon:'\u{1F47D}'},
+      {id:'r_alt',name:'Alt Coin',set:'crypto',icon:'\u{1FA99}'},
+      {id:'r_defi',name:'DeFi Token',set:'crypto',icon:'\u{1F4B1}'},
+      {id:'r_nft',name:'NFT Art',set:'crypto',icon:'\u{1F5BC}\uFE0F'},
+      {id:'r_contract',name:'Smart Contract',set:'crypto',icon:'\u{1F4C4}'},
+      {id:'r_dao',name:'DAO Vote',set:'crypto',icon:'\u{1F5F3}\uFE0F'},
+      {id:'r_moon',name:'Moon Rock',set:'legend',icon:'\u{1F311}'},
+      {id:'r_lambo',name:'Lambo Keys',set:'legend',icon:'\u{1F511}'},
+      {id:'r_diamond',name:'Diamond Hands',set:'legend',icon:'\u{1F48E}'},
+      {id:'r_hodl',name:'HODL Certificate',set:'legend',icon:'\u{1F4C3}'},
+      {id:'r_flag',name:'Moon Flag',set:'legend',icon:'\u{1F3F3}\uFE0F'},
+    ],
+    SET_BONUSES: { satoshi: 0.25, hardware: 0.25, crypto: 0.25, legend: 1.0 },
+    checkRareDrop: function() {
+      var s = this.state;
+      if (!s.collection) s.collection = {};
+      if (Math.random() > 0.001) return; // 0.1% chance
+      var unowned = this.RARE_ITEMS.filter(function(r) { return !s.collection[r.id]; });
+      if (unowned.length === 0) return;
+      var item = unowned[Math.floor(Math.random() * unowned.length)];
+      s.collection[item.id] = true;
+      if (UI && UI.toast) UI.toast(item.icon + ' RARE: ' + item.name + '!');
+      if (window.Sound) Sound.levelUp();
+    },
+    getCollectionBonus: function() {
+      var s = this.state, self = this;
+      if (!s.collection) return 0;
+      var total = 0;
+      var sets = {};
+      this.RARE_ITEMS.forEach(function(r) { if (s.collection[r.id]) { if (!sets[r.set]) sets[r.set] = 0; sets[r.set]++; } });
+      for (var setName in sets) {
+        if (sets[setName] >= 5) total += self.SET_BONUSES[setName] || 0;
+      }
+      // +2% per individual item
+      total += Object.keys(s.collection).length * 0.02;
+      return total;
+    },
+
     SEEDS: SEEDS, WORLD_W: 2400, WORLD_H: 1700,
 
     collectStreetItem: function() {
@@ -701,6 +777,7 @@
       // Tutorial: step 2 (tap mine) → step 3
       if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
       this.checkTreasureDrop();
+      this.checkRareDrop();
       if (!this.state.stats) this.state.stats = {};
       this.state.stats.taps = (this.state.stats.taps || 0) + 1;
       return gain;

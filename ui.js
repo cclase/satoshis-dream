@@ -394,13 +394,37 @@
         Game.completeDelivery();
       }
 
+      var level = Game.getBuildingLevel(building.panelType);
+      var stars = '';
+      for (var si = 0; si < level; si++) stars += '\u2B50';
+      var visits = (Game.state.buildingVisits || {})[building.panelType] || 0;
+      var discount = Game.getBuildingDiscount(building.panelType);
+
       var header = '<div class="panel-header">' +
-        '<div class="panel-title">' + building.emoji + ' ' + building.name + '</div>' +
-        '<button class="panel-close" id="panelCloseBtn">\u2715</button></div>';
+        '<div class="panel-title">' + building.emoji + ' ' + building.name + (stars ? ' ' + stars : '') +
+        (discount > 0 ? ' <span style="font-size:11px;color:var(--green);">-' + Math.round(discount*100) + '%</span>' : '') +
+        '</div><button class="panel-close" id="panelCloseBtn">\u2715</button></div>';
 
       var body = this.buildPanel(building.panelType);
+
+      // Add upgrade button if < level 3
+      if (level < 3 && building.panelType !== 'apartment') {
+        var upgCost = Game.UPGRADE_COSTS[level + 1] || 99999;
+        body += '<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px;">' +
+          '<button class="panel-btn btn-gold" id="upgradeBtn"' + (Game.state.usd < upgCost ? ' disabled style="opacity:0.4"' : '') +
+          '>\u2B50 Upgrade to Level ' + (level+1) + ' ($' + Game.formatNumber(upgCost) + ')</button></div>';
+      }
+
       panel.innerHTML = header + body;
       document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+      var upBtn = document.getElementById('upgradeBtn');
+      if (upBtn) upBtn.addEventListener('click', function() {
+        if (Game.upgradeBuilding(building.panelType)) {
+          if (window.Sound) Sound.levelUp();
+          UI.toast('\u2B50 ' + building.name + ' upgraded to Level ' + Game.getBuildingLevel(building.panelType) + '!');
+          UI.showPanel(building);
+        }
+      });
       this.wirePanel(building.panelType);
     },
 
@@ -1432,7 +1456,29 @@
           '<div class="hw-info"><div class="hw-name">' + a.name + '</div><div class="hw-sub">' + a.desc + '</div></div>' +
           '<div class="hw-cost" style="color:' + (done ? 'var(--green)' : 'var(--dim)') + ';">' + (done ? '\u2705' : (a.reward > 0 ? '+' + Game.formatNumber(a.reward) : '')) + '</div></div>';
       });
-      html += '</div>';
+
+      // Rare Collection
+      var coll = s.collection || {};
+      var collCount = Object.keys(coll).length;
+      html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">';
+      html += '<div style="font-weight:800;margin-bottom:8px;">\u{1F48E} Collection (' + collCount + '/' + Game.RARE_ITEMS.length + ')</div>';
+      var sets = {};
+      Game.RARE_ITEMS.forEach(function(r) {
+        if (!sets[r.set]) sets[r.set] = [];
+        sets[r.set].push(r);
+      });
+      for (var setName in sets) {
+        var setItems = sets[setName];
+        var setOwned = setItems.filter(function(r) { return coll[r.id]; }).length;
+        var setComplete = setOwned >= 5;
+        html += '<div style="margin-bottom:6px;"><span style="font-weight:700;text-transform:capitalize;">' + setName + '</span> (' + setOwned + '/5)' +
+          (setComplete ? ' <span style="color:var(--green);">+' + Math.round((Game.SET_BONUSES[setName]||0)*100) + '% bonus!</span>' : '') + '<br>';
+        setItems.forEach(function(r) {
+          html += '<span style="font-size:18px;opacity:' + (coll[r.id] ? '1' : '0.2') + ';" title="' + r.name + '">' + r.icon + '</span> ';
+        });
+        html += '</div>';
+      }
+      html += '</div></div>';
       panel.innerHTML = html;
       document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
     },

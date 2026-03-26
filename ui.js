@@ -471,6 +471,7 @@
 
     // ── Panel System ──
     showPanel: function(building) {
+      if (window.Sound) Sound.doorOpen();
       var panel = document.getElementById('panel');
       panel.style.display = 'block';
       this.panelOpen = true;
@@ -701,6 +702,7 @@
         if (!item) return;
         var n = Game.getBuyCount(item);
         if (Game.buyItem(item, n)) {
+          if (window.Sound) Sound.purchase();
           UI.toast('Bought ' + n + 'x ' + item.name);
           container.innerHTML = UI.renderHardwareCards();
           // Update slots display
@@ -729,7 +731,7 @@
         '<div class="exchange-lifetime"><span class="ex-stat-label">Lifetime Sats</span> <span id="exLifetime">' + Game.formatNumber(s.lifetimeSats) + '</span></div></div>';
     },
     wireExchangePanel: function() {
-      var sell = function(f) { var u = Game.sellSats(f); if (u > 0) UI.toast('Sold for $' + Game.formatNumber(u)); };
+      var sell = function(f) { var u = Game.sellSats(f); if (u > 0) { if(window.Sound) Sound.sell(); UI.toast('Sold for $' + Game.formatNumber(u)); } };
       var e; e = document.getElementById('exSell25'); if (e) e.onclick = function() { sell(0.25); };
       e = document.getElementById('exSell50'); if (e) e.onclick = function() { sell(0.50); };
       e = document.getElementById('exSellAll'); if (e) e.onclick = function() { sell(1.0); };
@@ -1070,9 +1072,9 @@
         var bet = parseInt(document.getElementById('casinoBet').value) || 0;
         var result = Game.coinFlip(bet);
         var el = document.getElementById('casinoResult');
-        if (result === null) { el.textContent = 'Invalid bet!'; el.style.color = 'var(--dim)'; }
-        else if (result > 0) { el.textContent = '\u{1F389} Won ' + Game.formatNumber(result * 2) + ' sats!'; el.style.color = 'var(--green)'; }
-        else { el.textContent = '\u{1F4A8} Lost ' + Game.formatNumber(-result) + ' sats!'; el.style.color = 'var(--red)'; }
+        if (result === null) { if(window.Sound) Sound.error(); el.textContent = 'Invalid bet!'; el.style.color = 'var(--dim)'; }
+        else if (result > 0) { if(window.Sound) Sound.coinCollect(); el.textContent = '\u{1F389} Won ' + Game.formatNumber(result * 2) + ' sats!'; el.style.color = 'var(--green)'; }
+        else { if(window.Sound) Sound.error(); el.textContent = '\u{1F4A8} Lost ' + Game.formatNumber(-result) + ' sats!'; el.style.color = 'var(--red)'; }
       });
       document.getElementById('casinoSlots').addEventListener('click', function() {
         var bet = parseInt(document.getElementById('casinoBet').value) || 0;

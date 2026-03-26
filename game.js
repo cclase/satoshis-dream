@@ -925,6 +925,7 @@
       this.state.lifetimeSats += gain;
       if (!this.state.stats) this.state.stats = {};
       this.state.stats.itemsCollected = (this.state.stats.itemsCollected || 0) + 1;
+      if (window.Sound) Sound.coinCollect();
       if (UI && UI.toast) UI.toast('\u20BF Found +' + Game.formatNumber(gain) + ' sats!');
       return gain;
     },
@@ -1197,6 +1198,7 @@
       if (s.policeRisk >= 100 && !s.policeChaseActive) {
         s.policeChaseActive = true;
         s.policeChaseEnd = now + 15000;
+        if (window.Sound) Sound.policeSiren();
         if (UI && UI.toast) UI.toast('\u{1F6A8} POLICE CHASE! Run home!');
       }
       if (s.policeChaseActive && now >= s.policeChaseEnd) {

@@ -64,6 +64,7 @@ body {
   display: flex;
   gap: 6px;
   align-items: center;
+  position: relative;
 }
 
 .heat-bar-wrap {
@@ -933,18 +934,7 @@ body {
     width: 40px; height: 40px;
     font-size: 16px; border-radius: 10px;
   }
-  #dpad {
-    grid-template-columns: 44px 44px 44px;
-    grid-template-rows: 44px 44px 44px;
-    gap: 2px;
-    bottom: 12px; left: 10px;
-  }
-  .dpad-btn { width: 44px; height: 44px; font-size: 18px; }
-  #dpad-action {
-    width: 52px; height: 52px;
-    bottom: 56px; right: 14px;
-    font-size: 11px;
-  }
+  #dpad, #dpad-action { display: none; }
   #toast { font-size: 11px; padding: 8px 14px; bottom: 20px; }
 }
 

@@ -247,7 +247,7 @@
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
           '<div class="hud-item hud-reset" id="hudMenu">\u2630</div>' +
-          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:15;flex-direction:column;gap:4px;">' +
+          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:200;flex-direction:column;gap:4px;pointer-events:auto;">' +
             '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
             '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
             '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
@@ -316,7 +316,7 @@
       if (!weatherEl) {
         weatherEl = document.createElement('div');
         weatherEl.id = 'weatherIcon';
-        weatherEl.style.cssText = 'position:fixed;top:4px;left:50%;transform:translateX(-50%);font-size:18px;z-index:11;';
+        weatherEl.style.cssText = 'position:fixed;top:72px;left:50%;transform:translateX(-50%);font-size:18px;z-index:11;pointer-events:none;';
         document.body.appendChild(weatherEl);
       }
       var wi = {clear:'\u2600\uFE0F',cloudy:'\u26C5',rain:'\u{1F327}\uFE0F',storm:'\u26C8\uFE0F'};

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Save Transfer — Satoshi's Dream</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,system-ui,sans-serif; }
+        :root {
+            --bg:#050510; --card:#101025; --border:#1a1a35;
+            --gold:#f7931a; --green:#00d4aa; --blue:#4a9eff;
+            --text:#e8e8f0; --dim:#6a6a8a; --red:#ff4466;
+        }
+        body { background:var(--bg); color:var(--text); min-height:100vh; padding:24px 20px; padding-bottom:40px; }
+        h1 { color:var(--gold); font-size:18px; font-weight:800; margin-bottom:4px; }
+        .sub { font-size:11px; color:var(--dim); margin-bottom:24px; line-height:1.5; }
+        .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
+        .label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; font-weight:800; margin-bottom:10px; }
+        textarea { width:100%; height:130px; background:#08081a; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px; font-size:10px; font-family:monospace; resize:none; word-break:break-all; line-height:1.4; }
+        .btn { display:block; width:100%; padding:14px; border:none; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; margin-top:10px; }
+        .btn-gold { background:var(--gold); color:#000; }
+        .btn-blue { background:var(--blue); color:#fff; }
+        .btn-green { background:var(--green); color:#000; }
+        .btn-dim { background:var(--card); color:var(--dim); border:1px solid var(--border); text-decoration:none; text-align:center; line-height:1; display:flex; align-items:center; justify-content:center; }
+        .status { font-size:11px; padding:10px 12px; border-radius:8px; margin-top:10px; font-weight:700; line-height:1.5; }
+        .ok  { background:rgba(0,212,170,0.12); color:var(--green); border:1px solid var(--green); }
+        .warn { background:rgba(255,68,102,0.12); color:var(--red); border:1px solid var(--red); }
+        .info { background:rgba(74,158,255,0.12); color:var(--blue); border:1px solid var(--blue); }
+    </style>
+</head>
+<body>
+    <h1>Save Transfer</h1>
+    <p class="sub">Move your Satoshi's Dream save between the PWA shortcut and Safari.</p>
+
+    <div class="card">
+        <div class="label">Export Save</div>
+        <div id="exportStatus"></div>
+        <textarea id="exportData" readonly placeholder="No save found in this context."></textarea>
+        <button class="btn btn-gold" id="copyBtn" style="display:none">SELECT ALL & COPY</button>
+    </div>
+
+    <div class="card">
+        <div class="label">Import Save</div>
+        <p style="font-size:11px; color:var(--dim); margin-bottom:10px;">Paste an exported save string here to restore it in this context.</p>
+        <textarea id="importData" placeholder="Paste save string here..."></textarea>
+        <button class="btn btn-green" id="importBtn">IMPORT &amp; LOAD</button>
+        <div id="importStatus"></div>
+    </div>
+
+    <div class="card">
+        <div class="label">Back to Game</div>
+        <a href="/" class="btn btn-dim" style="margin-top:0; padding:14px;">BACK TO GAME</a>
+    </div>
+
+    <script>
+        const KEY = 'sd_v2_5';
+
+        // --- EXPORT ---
+        const saved = localStorage.getItem(KEY);
+        const exportData = document.getElementById('exportData');
+        const exportStatus = document.getElementById('exportStatus');
+        const copyBtn = document.getElementById('copyBtn');
+
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                const sats = Math.floor(parsed.sats || 0).toLocaleString();
+                const tokens = parsed.tokens || 0;
+                exportData.value = btoa(saved);
+                exportStatus.innerHTML = `<div class="status ok">Save found — ${sats} sats, ${tokens} tokens. Copy the string below.</div>`;
+                copyBtn.style.display = 'block';
+                setTimeout(() => { exportData.focus(); exportData.setSelectionRange(0, exportData.value.length); }, 150);
+            } catch(e) {
+                exportData.value = btoa(saved);
+                exportStatus.innerHTML = '<div class="status ok">Save found. Copy the string below.</div>';
+                copyBtn.style.display = 'block';
+            }
+        } else {
+            exportStatus.innerHTML = '<div class="status info">No save found here. If your save is in the old PWA shortcut, open this page from within that shortcut to see it.</div>';
+        }
+
+        copyBtn.onclick = () => {
+            exportData.focus();
+            exportData.setSelectionRange(0, exportData.value.length);
+            try {
+                document.execCommand('copy');
+                copyBtn.textContent = 'COPIED!';
+                setTimeout(() => copyBtn.textContent = 'SELECT ALL & COPY', 2500);
+            } catch(e) {
+                copyBtn.textContent = 'SELECT THE TEXT ABOVE & COPY MANUALLY';
+            }
+        };
+
+        // --- IMPORT ---
+        // Auto-fill if ?data= param present
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('data')) document.getElementById('importData').value = params.get('data');
+
+        document.getElementById('importBtn').onclick = () => {
+            const val = document.getElementById('importData').value.trim();
+            const status = document.getElementById('importStatus');
+            if (!val) { status.innerHTML = '<div class="status warn">Paste a save string first.</div>'; return; }
+            try {
+                const json = atob(val);
+                const parsed = JSON.parse(json);
+                localStorage.setItem(KEY, JSON.stringify(parsed));
+                const sats = Math.floor(parsed.sats || 0).toLocaleString();
+                const tokens = parsed.tokens || 0;
+                status.innerHTML = `<div class="status ok">Imported! ${sats} sats, ${tokens} tokens. <a href="/" style="color:var(--green)">Open the game →</a></div>`;
+            } catch(e) {
+                status.innerHTML = '<div class="status warn">Invalid save string — check you copied it completely and try again.</div>';
+            }
+        };
+    </script>
+</body>
+</html>

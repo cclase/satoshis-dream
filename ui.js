@@ -12,6 +12,7 @@
     init: function() {
       this.setupKeyboard();
       this.setupDpad();
+      this.setupTouchMove();
       this.setupNavMenu();
       this.setupHUD();
       if (!Game.state.avatar) this.showAvatarCreation();
@@ -108,6 +109,46 @@
       document.body.appendChild(actionBtn);
     },
 
+    // ── Touch Drag-to-Move ──
+    setupTouchMove: function() {
+      var self = this;
+      var canvas = document.getElementById('town');
+      var touchStartX = 0, touchStartY = 0, touching = false, moved = false;
+      var DEAD_ZONE = 15;
+
+      canvas.addEventListener('pointerdown', function(e) {
+        if (self.panelOpen || self.modalActive()) return;
+        touchStartX = e.clientX; touchStartY = e.clientY;
+        touching = true; moved = false;
+      });
+
+      canvas.addEventListener('pointermove', function(e) {
+        if (!touching || self.panelOpen) return;
+        var dx = e.clientX - touchStartX;
+        var dy = e.clientY - touchStartY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < DEAD_ZONE) return;
+        moved = true;
+        // Convert screen drag to world movement direction
+        // Screen right = world right, screen up = world "up" (negative z)
+        self.keys.left = dx < -DEAD_ZONE;
+        self.keys.right = dx > DEAD_ZONE;
+        self.keys.up = dy < -DEAD_ZONE;
+        self.keys.down = dy > DEAD_ZONE;
+      });
+
+      var stopTouch = function() {
+        touching = false;
+        self.keys.up = self.keys.down = self.keys.left = self.keys.right = false;
+      };
+      canvas.addEventListener('pointerup', stopTouch);
+      canvas.addEventListener('pointercancel', stopTouch);
+      canvas.addEventListener('pointerleave', stopTouch);
+
+      // Store moved flag for click-to-move detection
+      this._touchMoved = function() { return moved; };
+    },
+
     // ── Building Nav Menu ──
     setupNavMenu: function() {
       var navBtn = document.getElementById('nav-menu-btn');
@@ -136,10 +177,16 @@
         el.addEventListener('click', function() {
           var b = Town.BUILDINGS.find(function(x) { return x.id === el.dataset.nav; });
           if (!b) return;
-          // Set move target to building entrance (center-bottom)
-          Town.moveTarget = { x: b.x + b.w / 2, y: b.y + b.h + 30 };
-          Town.autoEnterBuilding = b;
+          // Instant teleport to building entrance
+          if (Game.state.avatar) {
+            Game.state.avatar.x = b.x + b.w / 2;
+            Game.state.avatar.y = b.y + b.h + 30;
+          }
+          Town.moveTarget = null;
+          Town._pathWaypoints = null;
           self.hideNavMenu();
+          // Auto-open building panel
+          setTimeout(function() { UI.showPanel(b); }, 200);
         });
       });
     },
@@ -170,13 +217,16 @@
           '<div class="hud-item hud-price">BTC <span id="hudPrice">$65,000</span></div>' +
           '<div class="hud-item hud-rate"><span id="hudRate">0</span>/s</div>' +
           '<div class="hud-item hud-reset" id="hudReset">\u{1F504}</div>' +
-          '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
-          '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
-          '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
-          '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
-          '<div class="hud-item hud-reset" id="hudRival">\u{1F9D4}</div>' +
-          '<div class="hud-item hud-reset" id="hudSkills">\u{1F3AF}</div>' +
           '<div class="hud-item hud-reset" id="hudSaveSlots">\u{1F4BE}</div>' +
+          '<div class="hud-item hud-reset" id="hudMenu">\u2630</div>' +
+          '<div id="hudDropdown" style="display:none;position:absolute;top:32px;right:0;background:rgba(16,16,37,0.95);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:15;">' +
+            '<div class="hud-item hud-reset" id="hudAchievements">\u{1F3C6}</div>' +
+            '<div class="hud-item hud-reset" id="hudPrestigeShop">\u{1F6D2}</div>' +
+            '<div class="hud-item hud-reset" id="hudDailies">\u{1F4C5}</div>' +
+            '<div class="hud-item hud-reset" id="hudRival">\u{1F9D4}</div>' +
+            '<div class="hud-item hud-reset" id="hudSkills">\u{1F3AF}</div>' +
+            '<div class="hud-item hud-reset" id="hudMute">' + (Sound.isMuted() ? '\u{1F507}' : '\u{1F50A}') + '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="heat-bar-wrap">' +
           '<div class="heat-bar"><div class="heat-fill" id="heatFill"></div></div>' +
@@ -188,6 +238,10 @@
         '</div>' +
         '<div class="event-bar" id="eventBar"></div>';
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
+      document.getElementById('hudMenu').addEventListener('click', function() {
+        var dd = document.getElementById('hudDropdown');
+        dd.style.display = dd.style.display === 'none' ? 'flex' : 'none';
+      });
       document.getElementById('hudAchievements').addEventListener('click', function() { UI.showAchievementsPanel(); });
       document.getElementById('hudPrestigeShop').addEventListener('click', function() { UI.showPrestigeShopPanel(); });
       document.getElementById('hudRival').addEventListener('click', function() { UI.showRivalPanel(); });
@@ -304,6 +358,10 @@
         var b = bldgs[bi];
         ctx.fillStyle = b.color;
         ctx.fillRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy);
+        // Label abbreviation
+        ctx.fillStyle = '#fff'; ctx.font = '6px sans-serif'; ctx.textAlign = 'center';
+        var abbr = b.name.substring(0, 3);
+        ctx.fillText(abbr, (b.x + b.w/2) * sx, (b.y + b.h/2) * sy + 2);
       }
       // Avatar
       var av = Game.state.avatar;
@@ -534,7 +592,15 @@
         setTimeout(function() { btn.classList.remove('tapped'); }, 100);
       };
       btn.addEventListener('click', doTap);
-      btn.addEventListener('touchstart', doTap);
+      // Auto-tap on hold (5x/second)
+      var holdInterval = null;
+      btn.addEventListener('mousedown', function() { holdInterval = setInterval(doTap, 200); });
+      btn.addEventListener('touchstart', function(e) { e.preventDefault(); doTap(); holdInterval = setInterval(doTap, 200); });
+      var stopHold = function() { if (holdInterval) { clearInterval(holdInterval); holdInterval = null; } };
+      btn.addEventListener('mouseup', stopHold);
+      btn.addEventListener('mouseleave', stopHold);
+      btn.addEventListener('touchend', stopHold);
+      btn.addEventListener('touchcancel', stopHold);
       document.getElementById('mineVentBtn').addEventListener('click', function() {
         var c = Game.ventHeat();
         if (c > 0) UI.toast('\u2744\uFE0F Vented ' + Math.floor(c) + '% heat');
@@ -1562,10 +1628,28 @@
         '</div>' +
         '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Craig\'s Hardware</span><span>' + c.hardware + ' units</span></div>' +
         '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Difficulty</span><span>' + Math.round(Game.getCraigPace() * 100) + '% of your pace</span></div>' +
-        '<div class="ex-stat"><span class="ex-stat-label">Status</span><span style="color:' + (playerAhead ? 'var(--green)' : 'var(--red)') + ';">' + (playerAhead ? 'You\'re winning!' : 'Craig is ahead!') + '</span></div>' +
-        '</div>';
+        '<div class="ex-stat"><span class="ex-stat-label">Status</span><span style="color:' + (playerAhead ? 'var(--green)' : 'var(--red)') + ';">' + (playerAhead ? 'You\'re winning!' : 'Craig is ahead! (-1%/s)') + '</span></div>' +
+        (c._sabotageUntil && Date.now() < c._sabotageUntil ? '<div class="ex-stat" style="color:var(--green);"><span class="ex-stat-label">Sabotage</span><span>Active! Craig at 50% speed</span></div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+          '<button class="panel-btn btn-gold" id="craigChallenge">\u2694\uFE0F Challenge Duel</button>' +
+          '<button class="panel-btn btn-red" id="craigSabotage"' + (s.sats < 1000 ? ' disabled style="opacity:0.4"' : '') + '>\u{1F4A3} Sabotage (1K sats)</button>' +
+        '</div></div>';
       panel.innerHTML = html;
       document.getElementById('panelCloseBtn').onclick = function() { UI.hidePanel(); };
+      document.getElementById('craigChallenge').addEventListener('click', function() {
+        var result = Game.challengeCraig();
+        if (!result) return;
+        UI.toast(result.won ? '\u2694\uFE0F You won! +' + Game.formatNumber(result.prize) + ' sats!' : '\u2694\uFE0F Craig won! Lost ' + Game.formatNumber(Math.floor(result.prize*0.3)) + ' sats');
+        if (window.Sound) result.won ? Sound.levelUp() : Sound.error();
+        UI.showRivalPanel();
+      });
+      document.getElementById('craigSabotage').addEventListener('click', function() {
+        if (Game.sabotageCraig()) {
+          UI.toast('\u{1F4A3} Craig sabotaged! 50% speed for 5min');
+          if (window.Sound) Sound.purchase();
+          UI.showRivalPanel();
+        }
+      });
     },
 
     // ═══════════════════════════════════════

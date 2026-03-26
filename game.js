@@ -403,6 +403,7 @@
       if (this.hasSkill('sk_trade1')) mul *= 1.0; // trade skill affects sell, not production
       if (s.heat > 90) mul *= 0.1;
       if (s.energy <= 0) mul *= 0.05;
+      else if (s.energy < 25) mul *= 0.5; // 50% production when low energy
       return mul;
     },
 
@@ -599,7 +600,7 @@
     checkTreasureDrop: function() {
       var s = this.state;
       if (s.treasureMap) return;
-      if (Math.random() < 0.005) { // 0.5% per tap
+      if (Math.random() < 0.01) { // 1% per tap (was 0.5%)
         var tx = 100 + Math.random() * (WORLD_W - 200);
         var ty = 100 + Math.random() * (WORLD_H - 200);
         var reward = 500 + Math.floor(Math.random() * 4500);
@@ -742,7 +743,7 @@
     checkRareDrop: function() {
       var s = this.state;
       if (!s.collection) s.collection = {};
-      if (Math.random() > 0.001) return; // 0.1% chance
+      if (Math.random() > 0.005) return; // 0.5% chance per tap (was 0.1%)
       var unowned = this.RARE_ITEMS.filter(function(r) { return !s.collection[r.id]; });
       if (unowned.length === 0) return;
       var item = unowned[Math.floor(Math.random() * unowned.length)];
@@ -781,9 +782,16 @@
       var s = this.state;
       if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
       var pace = this.getCraigPace();
+      // Sabotage slows Craig 50%
+      if (s.craig._sabotageUntil && Date.now() < s.craig._sabotageUntil) pace *= 0.5;
       // Craig mirrors player production at pace%
       var playerRate = this.getProductionRate() * this.getMultiplier();
       s.craig.sats += playerRate * pace * dt;
+      // Craig steals from you if he's ahead
+      if (s.craig.sats > s.lifetimeSats * 1.1) {
+        var steal = playerRate * 0.01 * dt; // 1% production per second
+        s.sats = Math.max(0, s.sats - steal);
+      }
       s.craig.hardware = Math.floor(s.craig.sats / 5000);
       // Craig taunts
       var now = Date.now();
@@ -797,6 +805,29 @@
           if (UI && UI.toast) UI.toast('\u{1F9D4} ' + nice[Math.floor(Math.random() * nice.length)]);
         }
       }
+    },
+
+    challengeCraig: function() {
+      var s = this.state;
+      if (!s.craig) return null;
+      // 30-second duel: compare production rates
+      var playerRate = this.getProductionRate() * this.getMultiplier();
+      var craigRate = playerRate * this.getCraigPace();
+      var playerScore = playerRate * 30 * (0.8 + Math.random() * 0.4); // some randomness
+      var craigScore = craigRate * 30 * (0.8 + Math.random() * 0.4);
+      var won = playerScore > craigScore;
+      var prize = Math.floor(Math.max(playerScore, craigScore) * 0.5);
+      if (won) { s.sats += prize; s.totalSats += prize; s.lifetimeSats += prize; }
+      else { s.sats = Math.max(0, s.sats - Math.floor(prize * 0.3)); }
+      return { won: won, prize: prize, playerScore: Math.floor(playerScore), craigScore: Math.floor(craigScore) };
+    },
+    sabotageCraig: function() {
+      var s = this.state;
+      if (s.sats < 1000) return false;
+      s.sats -= 1000;
+      if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
+      s.craig._sabotageUntil = Date.now() + 300000; // 5 min
+      return true;
     },
 
     // ── Skill Tree ──
@@ -840,7 +871,7 @@
     checkStoryDrop: function() {
       var s = this.state;
       if (!s.storyFound) s.storyFound = {};
-      if (Math.random() > 0.0003) return; // Very rare per tick
+      if (Math.random() > 0.002) return; // 0.2% per tick (was 0.03%)
       var unread = this.STORY_FRAGMENTS.filter(function(f) { return !s.storyFound[f.id]; });
       if (unread.length === 0) return;
       var frag = unread[Math.floor(Math.random() * unread.length)];
@@ -886,7 +917,7 @@
 
     collectStreetItem: function() {
       var rate = Math.max(1, this.getProductionRate());
-      var gain = Math.max(5, Math.min(500, Math.floor(rate * 0.5 + Math.random() * rate)));
+      var gain = Math.max(10, Math.min(5000, Math.floor(rate * 0.1 + Math.random() * rate * 0.2)));
       this.state.sats += gain;
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
@@ -897,7 +928,7 @@
     },
 
     tapMine: function() {
-      var gain = 1;
+      var gain = 3; // base 3 sats per tap (was 1)
       if (this.state.avatar && this.state.avatar.bonus === 'quickhands') gain += 5;
       if (this.state.pet === 'hamster') gain += 10;
       if (this.hasPrestigeUpgrade('pu_double_tap')) gain *= 2;
@@ -1045,8 +1076,8 @@
       s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() / 3 * dt) - (0.5 * dt)));
 
       // Energy - drains slowly, regens slowly
-      var energyDrain = 0.15; // per second base
-      if (this.getProductionRate() > 0) energyDrain = 0.3;
+      var energyDrain = 0.3; // per second base
+      if (this.getProductionRate() > 0) energyDrain = 0.6;
       s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + (this.getEnergyRegen() * dt * 0.1)));
 
       // Electricity bill

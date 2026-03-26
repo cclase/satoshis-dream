@@ -287,7 +287,8 @@
       this._renderGuide();
       this._checkNpcEvent();
       var s = Game.state;
-      var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats);
+      var satValue = (s.sats / 1e8) * Game.getEffectivePrice();
+      var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats) + (satValue >= 0.01 ? ' (\u2248$' + Game.formatNumber(satValue) + ')' : '');
       el = document.getElementById('hudUsd'); if (el) el.textContent = Game.formatNumber(s.usd);
       el = document.getElementById('hudTokens'); if (el) el.textContent = s.tokens;
       el = document.getElementById('hudPrice'); if (el) el.textContent = '$' + Game.formatNumber(Game.getEffectivePrice());
@@ -1375,7 +1376,8 @@
       }
       // Sleep button
       var canSleep = Date.now() - (s.lastSleepTime || 0) >= 180000;
-      html += '<button class="panel-btn btn-purple" id="sleepBtn"' + (canSleep ? '' : ' disabled style="opacity:0.4"') + '>\u{1F6CC} Sleep' + (canSleep ? '' : ' (cooldown)') + '</button>';
+      var sleepSats = Math.floor(Game.getProductionRate() * Game.getMultiplier() * 30);
+      html += '<button class="panel-btn btn-purple" id="sleepBtn"' + (canSleep ? '' : ' disabled style="opacity:0.4"') + '>\u{1F6CC} Sleep' + (canSleep ? ' (+energy, +' + Game.formatNumber(sleepSats) + ' sats from 30s production)' : ' (cooldown)') + '</button>';
       return html + '</div>';
     },
     wireApartmentPanel: function() {

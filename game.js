@@ -120,6 +120,7 @@
       sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
+      tutorialStep: 0, // 0=not started, 1-6=active, 7=done
       priceEvent: null, nextEventAt: 0,
       // New systems
       housing: 'studio',
@@ -425,6 +426,8 @@
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
       this.state.heat = Math.min(100, this.state.heat + 0.05);
+      // Tutorial: step 2 (tap mine) → step 3
+      if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
       return gain;
     },
 

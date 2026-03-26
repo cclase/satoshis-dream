@@ -190,6 +190,7 @@
     },
 
     updateHUD: function() {
+      this._renderGuide();
       var s = Game.state;
       var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats);
       el = document.getElementById('hudUsd'); if (el) el.textContent = Game.formatNumber(s.usd);
@@ -273,6 +274,8 @@
       this.currentPanel = building.panelType;
       this.currentBuilding = building;
       this._hwDirty = true;
+      // Tutorial: step 1 (go to mine) → step 2
+      if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
 
       var header = '<div class="panel-header">' +
         '<div class="panel-title">' + building.emoji + ' ' + building.name + '</div>' +
@@ -1085,6 +1088,8 @@
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();
         document.getElementById('town').focus();
+        // Start tutorial for new characters
+        if (Game.state.tutorialStep === 0) Game.state.tutorialStep = 1;
         Game.save();
         self.startGame();
       });
@@ -1092,6 +1097,44 @@
     },
 
     startGame: function() { Game.start(); },
+
+    // ═══════════════════════════════════════
+    // NPC TUTORIAL GUIDE
+    // ═══════════════════════════════════════
+    _guideMessages: [
+      '', // step 0: not started
+      '\u{1F9D9} Welcome! Head to Mining HQ \u26CF\uFE0F to earn your first Bitcoin! Use the map button or walk there.',
+      '\u{1F9D9} Tap the \u20BF button to mine sats! Try it!',
+      '\u{1F9D9} Nice! You earned your first sat! Keep tapping to earn more.',
+      '\u{1F9D9} You can afford a Laptop now! Visit the Hardware Shop \u{1F527} to buy one.',
+      '\u{1F9D9} You\'re mining automatically! Visit the Exchange \u{1F4C8} to sell sats for USD.',
+      '\u{1F9D9} You\'re a real miner now! Explore the town \u2014 there\'s lots to discover. Good luck! \u{1F680}',
+    ],
+    _lastGuideStep: -1,
+
+    _renderGuide: function() {
+      var step = Game.state.tutorialStep;
+      if (!step || step <= 0 || step >= 7) {
+        var existing = document.getElementById('guide-bubble');
+        if (existing) existing.remove();
+        return;
+      }
+      var bubble = document.getElementById('guide-bubble');
+      if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.id = 'guide-bubble';
+        document.body.appendChild(bubble);
+      }
+      if (this._lastGuideStep !== step) {
+        this._lastGuideStep = step;
+        bubble.innerHTML = '<div class="guide-text">' + (this._guideMessages[step] || '') + '</div>' +
+          '<button class="guide-dismiss" id="guideDismiss">Skip tutorial</button>';
+        document.getElementById('guideDismiss').addEventListener('click', function() {
+          Game.state.tutorialStep = 7;
+          bubble.remove();
+        });
+      }
+    },
 
     // ═══════════════════════════════════════
     // ACHIEVEMENTS PANEL (HUD button)

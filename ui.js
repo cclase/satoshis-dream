@@ -309,7 +309,12 @@
       var el = document.getElementById('hudSats'); if (el) el.textContent = Game.formatNumber(s.sats) + (satValue >= 0.01 ? ' (\u2248$' + Game.formatNumber(satValue) + ')' : '');
       el = document.getElementById('hudUsd'); if (el) el.textContent = Game.formatNumber(s.usd);
       el = document.getElementById('hudTokens'); if (el) el.textContent = s.tokens;
-      el = document.getElementById('hudPrice'); if (el) el.textContent = '$' + Game.formatNumber(Game.getEffectivePrice());
+      el = document.getElementById('hudPrice'); if (el) {
+        var priceText = '$' + Game.formatNumber(Game.getEffectivePrice());
+        var trend = Game.getPriceTrend();
+        if (trend) priceText += ' ' + (trend.trend === 'up' ? '\u2191' : trend.trend === 'down' ? '\u2193' : '\u2192');
+        el.textContent = priceText;
+      }
       el = document.getElementById('hudRate'); if (el) el.textContent = Game.formatNumber(Game.getProductionRate() * Game.getMultiplier());
 
       var hp = Math.floor(s.heat);
@@ -1211,6 +1216,7 @@
           Game.state.usd -= cost;
           Game.state.owned[item.id] = (Game.state.owned[item.id] || 0) + n;
           Game.state.policeRisk = Math.min(100, Game.state.policeRisk + 5);
+          if (Game.hasSkill('sk_shadow3')) Game.state._immuneUntil = Date.now() + 300000; // 5min immunity
           UI.toast('Bought ' + n + 'x ' + item.name);
           UI.showPanel(UI.currentBuilding);
         });
@@ -1723,7 +1729,7 @@
         '</div>' +
         '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Craig\'s Hardware</span><span>' + c.hardware + ' units</span></div>' +
         '<div class="ex-stat" style="margin-bottom:6px;"><span class="ex-stat-label">Difficulty</span><span>' + Math.round(Game.getCraigPace() * 100) + '% of your pace</span></div>' +
-        '<div class="ex-stat"><span class="ex-stat-label">Status</span><span style="color:' + (playerAhead ? 'var(--green)' : 'var(--red)') + ';">' + (playerAhead ? 'You\'re winning!' : 'Craig is ahead! (-1%/s)') + '</span></div>' +
+        '<div class="ex-stat"><span class="ex-stat-label">Status</span><span style="color:' + (playerAhead ? 'var(--green)' : 'var(--red)') + ';">' + (playerAhead ? 'You\'re winning!' : 'Craig is ahead! (-0.2%/s)') + '</span></div>' +
         (c._sabotageUntil && Date.now() < c._sabotageUntil ? '<div class="ex-stat" style="color:var(--green);"><span class="ex-stat-label">Sabotage</span><span>Active! Craig at 50% speed</span></div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
           '<button class="panel-btn btn-gold" id="craigChallenge">\u2694\uFE0F Challenge Duel</button>' +
@@ -1740,7 +1746,7 @@
       });
       document.getElementById('craigSabotage').addEventListener('click', function() {
         if (Game.sabotageCraig()) {
-          UI.toast('\u{1F4A3} Craig sabotaged! 50% speed for 5min');
+          UI.toast('\u{1F4A3} Craig sabotaged! 50% speed for 10min');
           if (window.Sound) Sound.purchase();
           UI.showRivalPanel();
         }

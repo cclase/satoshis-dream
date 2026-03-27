@@ -350,14 +350,35 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Map each building to a Kenney model (cycle through 5 models)
-      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      // Map each building to its model file
+      var BUILDING_MODELS = {
+        mine: 'building-mining-hq.glb',
+        hardware: 'building-hardware-shop.glb',
+        exchange: 'building-exchange.glb',
+        bank: 'building-bank-refined.glb',
+        diner: 'building-diner.glb',
+        coffee: 'building-coffee-shop.glb',
+        university: 'building-university.glb',
+        hospital: 'building-hospital.glb',
+        internet_cafe: 'building-internet-cafe.glb',
+        casino: 'building-casino.glb',
+        post_office: 'building-post-office.glb',
+        gym: 'building-gym.glb',
+        real_estate: 'building-real-estate.glb',
+        car_dealer: 'building-car-dealership.glb',
+        pet_shop: 'building-pet-shop-refined.glb',
+        pawn_shop: 'building-pawn-shop.glb',
+        utility: 'building-utility-company.glb',
+        clothing: 'building-clothing-store.glb',
+        apartment: 'building-home.glb',
+        homegoods: 'building-home-goods-store.glb'
+      };
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
+          var modelFile = BUILDING_MODELS[b.panelType] || 'building-home.glb';
 
           // Load glb model
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
@@ -372,10 +393,10 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale model (1x1 unit) to fit building footprint (128-256 units)
-            var scaleX = b.w;
-            var scaleZ = b.h;
-            var scaleY = Math.min(b.w, b.h) * 0.8;
+            // Scale model to fit building footprint
+            var scaleX = b.w / modelW;
+            var scaleZ = b.h / modelD;
+            var scaleY = Math.min(scaleX, scaleZ);
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location
@@ -383,16 +404,20 @@
             root.position.z = b.y + b.h / 2;
             root.position.y = 0;
 
-            // Enable shadows and apply color tinting
+            // Enable shadows; only tint if model has no texture
             var wallColor = hexToColor3(WALL_COLORS[b.panelType] || '#c0b0a0');
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
               if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
-              // Tint each mesh with the building's signature color
-              var tintMat = new BABYLON.StandardMaterial('tint_' + b.id + '_' + mi, s);
-              tintMat.diffuseColor = wallColor;
-              tintMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-              meshes[mi].material = tintMat;
+              // Only override material if model has no diffuse texture
+              var mat = meshes[mi].material;
+              var hasTexture = mat && mat.diffuseTexture;
+              if (!hasTexture) {
+                var tintMat = new BABYLON.StandardMaterial('tint_' + b.id + '_' + mi, s);
+                tintMat.diffuseColor = wallColor;
+                tintMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+                meshes[mi].material = tintMat;
+              }
             }
             self._buildingMeshes.push(root);
           });

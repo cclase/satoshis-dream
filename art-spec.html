@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Satoshi's Dream — Art Asset Specification</title>
+<style>
+body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.6; }
+h1 { color: #f7931a; border-bottom: 3px solid #f7931a; padding-bottom: 10px; }
+h2 { color: #333; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+h3 { color: #555; margin-top: 20px; }
+ul, li { margin: 4px 0; }
+strong { color: #333; }
+hr { border: none; border-top: 2px solid #f7931a; margin: 30px 0; }
+.building { background: #f9f9f9; border-left: 4px solid #f7931a; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+.building h3 { margin-top: 0; color: #f7931a; }
+@media print { body { max-width: 100%; margin: 0; } .building { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<h1>Satoshi's Dream — Art Asset Specification</h1>
+
+<h2>Game Overview</h2>
+<p>Satoshi's Dream is a 3D idle/RPG Bitcoin mining game played in a web browser. The player walks around a small town, entering buildings to mine Bitcoin, buy hardware, trade, and progress. The town is rendered using Babylon.js (WebGL) with a camera looking down at ~45 degrees.</p>
+
+<h2>Technical Requirements</h2>
+<ul>
+<li><strong>Format</strong>: GLB (binary glTF 2.0)</li>
+<li><strong>Poly count</strong>: 500-3,000 triangles per model (low-poly stylized)</li>
+<li><strong>Textures</strong>: Baked into vertex colors OR single shared texture atlas (PNG, max 1024x1024)</li>
+<li><strong>Scale</strong>: 1 unit = ~1 meter. Buildings should be 8-15 units tall, 10-20 units wide</li>
+<li><strong>Style</strong>: Stylized low-poly, colorful, clean. Think Kenney assets, POLYGON packs, or Crossy Road buildings. NOT photorealistic.</li>
+<li><strong>Colors</strong>: Warm, inviting palette. Each building should be visually distinct and recognizable from a distance.</li>
+</ul>
+
+<hr>
+<h2>BUILDINGS NEEDED (20 models)</h2>
+
+<div class="building"><h3>1. Mining HQ</h3><ul><li><strong>Purpose</strong>: Main Bitcoin mining facility</li><li><strong>Look</strong>: Industrial building with satellite dishes on roof, server room vibe, orange/gold accent color</li><li><strong>Size</strong>: Large (20x15 units, 12 units tall)</li><li><strong>Key details</strong>: Antenna/satellite dish on roof, glowing windows, "digital" feel</li></ul></div>
+
+<div class="building"><h3>2. Hardware Shop</h3><ul><li><strong>Purpose</strong>: Buy mining equipment</li><li><strong>Look</strong>: Electronics store/computer shop with a display window</li><li><strong>Size</strong>: Medium (15x15 units, 10 units tall)</li><li><strong>Color</strong>: Blue accents</li><li><strong>Key details</strong>: Display window showing computers, small sign</li></ul></div>
+
+<div class="building"><h3>3. Exchange</h3><ul><li><strong>Purpose</strong>: Sell Bitcoin for USD</li><li><strong>Look</strong>: Modern financial office, glass front, stock ticker vibe</li><li><strong>Size</strong>: Medium (15x10 units, 10 units tall)</li><li><strong>Color</strong>: Green/teal accents</li><li><strong>Key details</strong>: Large windows, modern architecture</li></ul></div>
+
+<div class="building"><h3>4. Bank</h3><ul><li><strong>Purpose</strong>: Loans, bribes, ticket payment</li><li><strong>Look</strong>: Classical bank building with columns, imposing</li><li><strong>Size</strong>: Large (20x15 units, 15 units tall — tallest building)</li><li><strong>Color</strong>: Gold/cream</li><li><strong>Key details</strong>: Columns at entrance, grand doors, clock on facade</li></ul></div>
+
+<div class="building"><h3>5. Diner</h3><ul><li><strong>Purpose</strong>: Buy food for energy</li><li><strong>Look</strong>: Classic American diner, red/chrome, retro</li><li><strong>Size</strong>: Small (15x10 units, 6 units tall)</li><li><strong>Color</strong>: Red with chrome/silver trim</li><li><strong>Key details</strong>: Neon sign, large windows, awning over entrance</li></ul></div>
+
+<div class="building"><h3>6. Coffee Shop</h3><ul><li><strong>Purpose</strong>: Buy drinks for energy</li><li><strong>Look</strong>: Cozy cafe with outdoor seating area</li><li><strong>Size</strong>: Small (10x10 units, 6 units tall)</li><li><strong>Color</strong>: Brown/warm wood tones</li><li><strong>Key details</strong>: Small awning, cafe tables outside, coffee cup sign</li></ul></div>
+
+<div class="building"><h3>7. University</h3><ul><li><strong>Purpose</strong>: Research upgrades</li><li><strong>Look</strong>: Academic building with tower/bell tower</li><li><strong>Size</strong>: Large (20x15 units, 13 units tall)</li><li><strong>Color</strong>: Purple/stone</li><li><strong>Key details</strong>: Clock tower or bell tower, arched windows, ivy</li></ul></div>
+
+<div class="building"><h3>8. Hospital</h3><ul><li><strong>Purpose</strong>: Full energy/heat restore</li><li><strong>Look</strong>: Modern hospital with red cross</li><li><strong>Size</strong>: Medium-large (15x15 units, 12 units tall)</li><li><strong>Color</strong>: White with red accents</li><li><strong>Key details</strong>: Red cross symbol, ambulance bay, clean modern look</li></ul></div>
+
+<div class="building"><h3>9. Internet Cafe</h3><ul><li><strong>Purpose</strong>: Dark web purchases</li><li><strong>Look</strong>: Sketchy cyber cafe, neon signs, dark</li><li><strong>Size</strong>: Medium (15x10 units, 8 units tall)</li><li><strong>Color</strong>: Dark teal/cyan with neon glow</li><li><strong>Key details</strong>: Neon signs, dark windows, slightly run-down look</li></ul></div>
+
+<div class="building"><h3>10. Casino</h3><ul><li><strong>Purpose</strong>: Gambling mini-games</li><li><strong>Look</strong>: Flashy casino with lights</li><li><strong>Size</strong>: Medium-large (20x15 units, 10 units tall)</li><li><strong>Color</strong>: Purple/magenta with gold</li><li><strong>Key details</strong>: Marquee lights, grand entrance, flashy facade</li></ul></div>
+
+<div class="building"><h3>11. Post Office</h3><ul><li><strong>Purpose</strong>: Mail orders, delivery quests</li><li><strong>Look</strong>: Government/postal building, flag</li><li><strong>Size</strong>: Medium (15x10 units, 8 units tall)</li><li><strong>Color</strong>: Gray/blue</li><li><strong>Key details</strong>: Flag, mailbox outside, official look</li></ul></div>
+
+<div class="building"><h3>12. Gym</h3><ul><li><strong>Purpose</strong>: Increase max energy</li><li><strong>Look</strong>: Fitness center with large windows</li><li><strong>Size</strong>: Small-medium (15x10 units, 7 units tall)</li><li><strong>Color</strong>: Orange</li><li><strong>Key details</strong>: Large windows showing equipment, strong/bold signage</li></ul></div>
+
+<div class="building"><h3>13. Real Estate</h3><ul><li><strong>Purpose</strong>: Housing upgrades</li><li><strong>Look</strong>: Real estate office with house models in window</li><li><strong>Size</strong>: Small-medium (15x10 units, 7 units tall)</li><li><strong>Color</strong>: Green</li><li><strong>Key details</strong>: "For Sale" signs, model houses in display</li></ul></div>
+
+<div class="building"><h3>14. Car Dealership</h3><ul><li><strong>Purpose</strong>: Buy vehicles</li><li><strong>Look</strong>: Car showroom with large glass front, car on display</li><li><strong>Size</strong>: Large (20x10 units, 6 units tall — wide and low)</li><li><strong>Color</strong>: Silver/gray</li><li><strong>Key details</strong>: Large glass panels, car visible inside, parking lot area</li></ul></div>
+
+<div class="building"><h3>15. Pet Shop</h3><ul><li><strong>Purpose</strong>: Adopt pets for bonuses</li><li><strong>Look</strong>: Cute pet store with paw print decorations</li><li><strong>Size</strong>: Small (10x10 units, 6 units tall)</li><li><strong>Color</strong>: Pink/coral</li><li><strong>Key details</strong>: Paw prints, cute facade, pet silhouettes in windows</li></ul></div>
+
+<div class="building"><h3>16. Pawn Shop</h3><ul><li><strong>Purpose</strong>: Sell hardware for USD</li><li><strong>Look</strong>: Small cluttered shop, "We Buy Gold" vibe</li><li><strong>Size</strong>: Small (10x10 units, 6 units tall)</li><li><strong>Color</strong>: Dark gold/brown</li><li><strong>Key details</strong>: Cluttered look, barred windows, neon "OPEN" sign</li></ul></div>
+
+<div class="building"><h3>17. Utility Company</h3><ul><li><strong>Purpose</strong>: Electricity management, solar panels</li><li><strong>Look</strong>: Industrial utility building with power lines</li><li><strong>Size</strong>: Medium (15x10 units, 8 units tall)</li><li><strong>Color</strong>: Blue-gray</li><li><strong>Key details</strong>: Power lines, transformer, industrial equipment</li></ul></div>
+
+<div class="building"><h3>18. Clothing Store</h3><ul><li><strong>Purpose</strong>: Buy stat-boosting clothing</li><li><strong>Look</strong>: Boutique/fashion shop with mannequins</li><li><strong>Size</strong>: Small-medium (15x10 units, 7 units tall)</li><li><strong>Color</strong>: Pink/mauve</li><li><strong>Key details</strong>: Display window with mannequins, stylish facade</li></ul></div>
+
+<div class="building"><h3>19. Your Home (Apartment)</h3><ul><li><strong>Purpose</strong>: Player's home, sleep, garden, furniture display</li><li><strong>Look</strong>: Cozy apartment/house — should look residential, not commercial</li><li><strong>Size</strong>: Small (10x10 units, 7 units tall)</li><li><strong>Color</strong>: Warm tan/beige</li><li><strong>Key details</strong>: Residential door, windows with curtains, small yard/balcony</li></ul></div>
+
+<div class="building"><h3>20. Home Goods Store</h3><ul><li><strong>Purpose</strong>: Buy furniture and garden seeds</li><li><strong>Look</strong>: Home improvement/furniture store</li><li><strong>Size</strong>: Medium (15x10 units, 8 units tall)</li><li><strong>Color</strong>: Olive green</li><li><strong>Key details</strong>: Display of furniture in windows, "HOME" signage</li></ul></div>
+
+<hr>
+<h2>OTHER MODELS NEEDED</h2>
+
+<div class="building"><h3>21. Trees (3 variations)</h3><ul><li>Variation A: Round canopy deciduous tree (green sphere on brown trunk)</li><li>Variation B: Tall pine/conifer (cone shape)</li><li>Variation C: Small bush/shrub</li><li><strong>Size</strong>: 3-8 units tall</li><li><strong>Colors</strong>: Various greens + brown trunk</li></ul></div>
+
+<div class="building"><h3>22. Avatar/Character</h3><ul><li>Simple humanoid character, ~2 units tall</li><li>Stylized (not realistic) — could be chibi/cute proportions</li><li>Gold/orange Bitcoin-themed outfit</li><li>Should be visible and recognizable from the 45-degree camera angle</li></ul></div>
+
+<div class="building"><h3>23. Street Lamp</h3><ul><li>Post with light on top, ~4 units tall</li><li>Should glow at night (emissive material on light part)</li></ul></div>
+
+<div class="building"><h3>24. Bench</h3><ul><li>Simple park bench, ~2 units wide</li><li>Wood + metal</li></ul></div>
+
+<div class="building"><h3>25. Mailbox</h3><ul><li>Small blue mailbox for near Post Office, ~1.5 units tall</li></ul></div>
+
+<div class="building"><h3>26. Bitcoin Collectible Orb</h3><ul><li>Glowing golden sphere with ₿ symbol, ~0.5 units diameter</li><li>Should have emissive/glow material</li></ul></div>
+
+<div class="building"><h3>27. Craig (Rival NPC)</h3><ul><li>Different-looking humanoid character</li><li>Red/dark outfit to contrast with player's gold</li><li>Slightly taller than player avatar</li><li>Smug posture if possible</li></ul></div>
+
+<div class="building"><h3>28. Vehicles (3 types)</h3><ul><li>Bicycle: simple bike, ~2 units long</li><li>Car: compact sedan, ~4 units long</li><li>Sports car: sleeker, ~4.5 units long</li></ul></div>
+
+<hr>
+<h2>ROAD PIECES (optional)</h2>
+<ul>
+<li>Straight road piece (10x10 units)</li>
+<li>Road intersection (10x10)</li>
+<li>Road corner (10x10)</li>
+<li>Sidewalk strip</li>
+</ul>
+
+<hr>
+<h2>DELIVERY FORMAT</h2>
+<ul>
+<li>Each model as a separate <strong>.glb</strong> file</li>
+<li>Named: <code>building-mining-hq.glb</code>, <code>building-bank.glb</code>, <code>tree-round.glb</code>, <code>avatar-player.glb</code>, etc.</li>
+<li>Place in <code>/models/</code> directory</li>
+<li>No external texture dependencies (bake everything into the GLB)</li>
+</ul>
+
+<h2>STYLE REFERENCE</h2>
+<ul>
+<li>Kenney City Kit: kenney.nl/assets/city-kit-suburban</li>
+<li>POLYGON City Pack: syntystore.com/products/polygon-city-pack</li>
+<li>Infinitown: demos.littleworkshop.fr/infinitown</li>
+<li>The key qualities: <strong>colorful, consistent style, recognizable silhouettes, clean geometry</strong></li>
+</ul>
+
+<p style="margin-top:40px;color:#888;font-size:12px;">Generated for Satoshi's Dream game development. Print this page to PDF: Ctrl+P → Save as PDF</p>
+</body>
+</html>

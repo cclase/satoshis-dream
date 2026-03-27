@@ -1,0 +1,146 @@
+{
+  "building-mining-hq": {
+    "faces": 1668,
+    "vertices": 964
+  },
+  "building-hardware-shop": {
+    "faces": 556,
+    "vertices": 364
+  },
+  "building-exchange": {
+    "faces": 480,
+    "vertices": 320
+  },
+  "building-bank": {
+    "faces": 816,
+    "vertices": 510
+  },
+  "building-diner": {
+    "faces": 412,
+    "vertices": 268
+  },
+  "building-coffee-shop": {
+    "faces": 748,
+    "vertices": 452
+  },
+  "building-university": {
+    "faces": 792,
+    "vertices": 486
+  },
+  "building-hospital": {
+    "faces": 432,
+    "vertices": 288
+  },
+  "building-internet-cafe": {
+    "faces": 324,
+    "vertices": 216
+  },
+  "building-casino": {
+    "faces": 1176,
+    "vertices": 682
+  },
+  "building-post-office": {
+    "faces": 356,
+    "vertices": 234
+  },
+  "building-gym": {
+    "faces": 396,
+    "vertices": 264
+  },
+  "building-real-estate": {
+    "faces": 448,
+    "vertices": 294
+  },
+  "building-car-dealership": {
+    "faces": 540,
+    "vertices": 348
+  },
+  "building-pet-shop": {
+    "faces": 700,
+    "vertices": 410
+  },
+  "building-pawn-shop": {
+    "faces": 408,
+    "vertices": 272
+  },
+  "building-utility-company": {
+    "faces": 444,
+    "vertices": 286
+  },
+  "building-clothing-store": {
+    "faces": 588,
+    "vertices": 358
+  },
+  "building-home": {
+    "faces": 120,
+    "vertices": 80
+  },
+  "building-home-goods-store": {
+    "faces": 400,
+    "vertices": 260
+  },
+  "tree-round": {
+    "faces": 520,
+    "vertices": 268
+  },
+  "tree-pine": {
+    "faces": 112,
+    "vertices": 64
+  },
+  "tree-bush": {
+    "faces": 240,
+    "vertices": 126
+  },
+  "avatar-player": {
+    "faces": 552,
+    "vertices": 298
+  },
+  "npc-craig": {
+    "faces": 516,
+    "vertices": 274
+  },
+  "street-lamp": {
+    "faces": 172,
+    "vertices": 94
+  },
+  "bench": {
+    "faces": 152,
+    "vertices": 88
+  },
+  "mailbox": {
+    "faces": 60,
+    "vertices": 34
+  },
+  "bitcoin-collectible-orb": {
+    "faces": 380,
+    "vertices": 202
+  },
+  "vehicle-bicycle": {
+    "faces": 220,
+    "vertices": 126
+  },
+  "vehicle-car": {
+    "faces": 292,
+    "vertices": 160
+  },
+  "vehicle-sports-car": {
+    "faces": 316,
+    "vertices": 176
+  },
+  "road-straight": {
+    "faces": 96,
+    "vertices": 64
+  },
+  "road-intersection": {
+    "faces": 180,
+    "vertices": 120
+  },
+  "road-corner": {
+    "faces": 108,
+    "vertices": 72
+  },
+  "sidewalk-strip": {
+    "faces": 36,
+    "vertices": 24
+  }
+}

@@ -199,7 +199,7 @@
   }
 
   // ── Building Style Data ──
-  var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',clothing:'#d8a8b8',apartment:'#c0b0a0',homegoods:'#a8b890'};
+  var WALL_COLORS = {mine:'#ff8800',hardware:'#3388ff',exchange:'#00cc88',bank:'#ffdd44',diner:'#ee3333',coffee:'#8B4513',university:'#8844cc',hospital:'#ffffff',internet_cafe:'#00ddbb',casino:'#cc00cc',post_office:'#6688bb',gym:'#ff6600',real_estate:'#44aa44',car_dealer:'#aabbcc',pet_shop:'#ff88aa',pawn_shop:'#aa7733',utility:'#5588cc',clothing:'#dd66aa',apartment:'#ddbb88',homegoods:'#77aa44'};
   var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,clothing:35,apartment:40,homegoods:38};
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
@@ -350,38 +350,17 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Map each building to its custom art model
-      var ART_PATH = 'models/';
-      var BUILDING_MODELS = {
-        mine: 'building-mining-hq.glb',
-        hardware: 'building-hardware-shop.glb',
-        exchange: 'building-exchange.glb',
-        bank: 'building-bank.glb',
-        diner: 'building-diner.glb',
-        coffee: 'building-coffee-shop.glb',
-        university: 'building-university.glb',
-        hospital: 'building-hospital.glb',
-        internet_cafe: 'building-internet-cafe.glb',
-        casino: 'building-casino.glb',
-        post_office: 'building-post-office.glb',
-        gym: 'building-gym.glb',
-        real_estate: 'building-real-estate.glb',
-        car_dealer: 'building-car-dealership.glb',
-        pet_shop: 'building-pet-shop.glb',
-        pawn_shop: 'building-pawn-shop.glb',
-        utility: 'building-utility-company.glb',
-        clothing: 'building-clothing-store.glb',
-        apartment: 'building-home.glb',
-        homegoods: 'building-home-goods-store.glb'
-      };
+      // Map each building to a Kenney model (cycle through 5 models)
+      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = BUILDING_MODELS[b.panelType] || 'building-home.glb';
+          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
 
-          BABYLON.SceneLoader.ImportMesh('', ART_PATH, modelFile, s, function(meshes) {
+          // Load glb model
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
             // Get bounding info to scale properly
@@ -393,10 +372,10 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale model to fit building footprint in world coordinates
-            var scaleX = b.w / modelW;
-            var scaleZ = b.h / modelD;
-            var scaleY = Math.min(scaleX, scaleZ); // Uniform height scaling
+            // Scale model (1x1 unit) to fit building footprint (128-256 units)
+            var scaleX = b.w;
+            var scaleZ = b.h;
+            var scaleY = Math.min(b.w, b.h) * 0.8;
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location
@@ -404,10 +383,16 @@
             root.position.z = b.y + b.h / 2;
             root.position.y = 0;
 
-            // Enable shadows on all child meshes
+            // Enable shadows and apply color tinting
+            var wallColor = hexToColor3(WALL_COLORS[b.panelType] || '#c0b0a0');
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
               if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
+              // Tint each mesh with the building's signature color
+              var tintMat = new BABYLON.StandardMaterial('tint_' + b.id + '_' + mi, s);
+              tintMat.diffuseColor = wallColor;
+              tintMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+              meshes[mi].material = tintMat;
             }
             self._buildingMeshes.push(root);
           });
@@ -444,8 +429,7 @@
 
     _buildTrees: function() {
       var s = this._scene;
-      var TREE_MODELS = ['tree-round.glb', 'tree-pine.glb', 'tree-bush.glb'];
-      var TREE_PATH = 'models/';
+      var TREE_MODELS = ['grass-trees.glb', 'grass-trees-tall.glb'];
       var seed = 12345;
       function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
 
@@ -465,7 +449,7 @@
 
         (function(x, z, idx) {
           var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
-          BABYLON.SceneLoader.ImportMesh('', TREE_PATH, modelFile, s, function(meshes) {
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
             var sc = 30 + sr() * 20;

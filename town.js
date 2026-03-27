@@ -626,12 +626,10 @@
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
-      // Rotate input direction by camera angle so movement matches screen direction
-      // Camera right in XZ = perpendicular CW to camera forward = (-sin(a), cos(a))
-      // Camera forward (from camera TO target) in XZ = (-cos(a), -sin(a))
-      // Screen UP (dy=-1) should move in camera forward direction: rdx=-(-cos(a))=cos(a), rdy=sin(a)
+      // Rotate input direction by FIXED camera angle so arrow keys always map to consistent world directions
+      // Using initial camera alpha (-PI/4) rather than live alpha to prevent circular movement
       if ((dx !== 0 || dy !== 0) && this._camera3) {
-        var a = this._camera3.alpha;
+        var a = -Math.PI / 4; // Fixed initial camera angle
         var rightX = -Math.sin(a), rightY = Math.cos(a);
         var fwdX =  Math.cos(a), fwdY =  Math.sin(a);
         var rdx = dx * rightX + dy * fwdX;

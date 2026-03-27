@@ -350,17 +350,38 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Map each building to a Kenney model (cycle through 5 models)
-      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      // Map each building to its custom art model
+      var ART_PATH = 'models/';
+      var BUILDING_MODELS = {
+        mine: 'building-mining-hq.glb',
+        hardware: 'building-hardware-shop.glb',
+        exchange: 'building-exchange.glb',
+        bank: 'building-bank.glb',
+        diner: 'building-diner.glb',
+        coffee: 'building-coffee-shop.glb',
+        university: 'building-university.glb',
+        hospital: 'building-hospital.glb',
+        internet_cafe: 'building-internet-cafe.glb',
+        casino: 'building-casino.glb',
+        post_office: 'building-post-office.glb',
+        gym: 'building-gym.glb',
+        real_estate: 'building-real-estate.glb',
+        car_dealer: 'building-car-dealership.glb',
+        pet_shop: 'building-pet-shop.glb',
+        pawn_shop: 'building-pawn-shop.glb',
+        utility: 'building-utility-company.glb',
+        clothing: 'building-clothing-store.glb',
+        apartment: 'building-home.glb',
+        homegoods: 'building-home-goods-store.glb'
+      };
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
+          var modelFile = BUILDING_MODELS[b.panelType] || 'building-home.glb';
 
-          // Load glb model
-          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+          BABYLON.SceneLoader.ImportMesh('', ART_PATH, modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
             // Get bounding info to scale properly
@@ -372,10 +393,10 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale model (1x1 unit) to fit building footprint (128-256 units)
-            var scaleX = b.w;
-            var scaleZ = b.h;
-            var scaleY = Math.min(b.w, b.h) * 0.8;
+            // Scale model to fit building footprint in world coordinates
+            var scaleX = b.w / modelW;
+            var scaleZ = b.h / modelD;
+            var scaleY = Math.min(scaleX, scaleZ); // Uniform height scaling
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location
@@ -423,7 +444,8 @@
 
     _buildTrees: function() {
       var s = this._scene;
-      var TREE_MODELS = ['grass-trees.glb', 'grass-trees-tall.glb'];
+      var TREE_MODELS = ['tree-round.glb', 'tree-pine.glb', 'tree-bush.glb'];
+      var TREE_PATH = 'models/';
       var seed = 12345;
       function sr() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
 
@@ -443,7 +465,7 @@
 
         (function(x, z, idx) {
           var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
-          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+          BABYLON.SceneLoader.ImportMesh('', TREE_PATH, modelFile, s, function(meshes) {
             if (!meshes.length) return;
             var root = meshes[0];
             var sc = 30 + sr() * 20;

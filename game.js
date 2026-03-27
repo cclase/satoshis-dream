@@ -232,8 +232,12 @@
       var mul = this.getMultiplier();
       // Remove heat/energy penalties for offline calc (use base mult)
       var offlineMul = mul;
-      if (s.heat > 90) offlineMul /= 0.1; // undo heat penalty
-      if (s.energy <= 0) offlineMul /= 0.05; // undo energy penalty
+      if (s.heat > 50) {
+        var heatPenalty = Math.max(0.1, 1 - (s.heat - 50) / 55.5);
+        offlineMul /= heatPenalty;
+      }
+      if (s.energy <= 0) offlineMul /= 0.05;
+      else if (s.energy < 25) offlineMul /= 0.5;
       var baseRate = rate;
       if (this.hasPrestigeUpgrade('pu_automine')) baseRate += 1;
       var efficiency = this.hasPrestigeUpgrade('pu_offline') ? 0.75 : 0.5;
@@ -325,6 +329,9 @@
     getBulkCost: function(item, count) {
       var total = 0, owned = this.state.owned[item.id] || 0;
       var discount = (item.cur === 'sats' && this.hasPrestigeUpgrade('pu_haggle')) ? 0.9 : 1;
+      if (item.slots && this.hasSkill('sk_hash3')) discount *= 0.8; // Bulk Discount: hardware -20%
+      if (item.heat !== undefined && this.hasSkill('sk_shadow2')) discount *= 0.7; // Discount Goods: dark web -30%
+      if (item.heat !== undefined && this.activeEvent && this.activeEvent.bonus === 'darkweb50') discount *= 0.5; // Halloween event
       for (var i = 0; i < count; i++) total += Math.floor(item.base * Math.pow(COST_SCALE, owned + i) * discount);
       return total;
     },
@@ -401,6 +408,11 @@
       mul *= (1 + this.getCollectionBonus());
       if (this.hasSkill('sk_hash1')) mul *= 1.1;
       if (this.hasSkill('sk_trade1')) mul *= 1.0; // trade skill affects sell, not production
+      // Temp boost from NPC events
+      if (s._tempBoost && s._tempBoostEnd && Date.now() < s._tempBoostEnd) mul *= (1 + s._tempBoost);
+      else { s._tempBoost = 0; s._tempBoostEnd = 0; }
+      // Seasonal event multiplier
+      mul *= this.getSeasonalMultiplier();
       // Gradual heat penalty: starts at 50%, scales to 0.1x at 100%
       if (s.heat > 50) mul *= Math.max(0.1, 1 - (s.heat - 50) / 55.5);
       if (s.energy <= 0) mul *= 0.05;
@@ -515,6 +527,8 @@
       s.totalSats += s.activeDelivery.sats;
       s.lifetimeSats += s.activeDelivery.sats;
       s.usd += s.activeDelivery.usd;
+      if (!s.stats) s.stats = {};
+      s.stats.deliveriesCompleted = (s.stats.deliveriesCompleted || 0) + 1;
       if (UI && UI.toast) UI.toast('\u{1F4E6} Delivered! +' + Game.formatNumber(s.activeDelivery.sats) + ' sats, +$' + Game.formatNumber(s.activeDelivery.usd));
       s.activeDelivery = null;
       this.generateDeliveries();
@@ -640,10 +654,12 @@
     // ── Weather ──
     weather: 'clear',
     _weatherTimer: 0,
+    _weatherThreshold: 180 + Math.random() * 300,
     updateWeather: function(dt) {
       this._weatherTimer += dt;
-      if (this._weatherTimer > 180 + Math.random() * 300) { // 3-8 min
+      if (this._weatherTimer > this._weatherThreshold) { // 3-8 min
         this._weatherTimer = 0;
+        this._weatherThreshold = 180 + Math.random() * 300;
         var weathers = ['clear', 'clear', 'cloudy', 'rain'];
         if (this.weather === 'rain' && Math.random() < 0.1) weathers.push('storm');
         this.weather = weathers[Math.floor(Math.random() * weathers.length)];
@@ -921,6 +937,7 @@
     collectStreetItem: function() {
       var rate = Math.max(1, this.getProductionRate());
       var gain = Math.max(10, Math.min(5000, Math.floor(rate * 0.1 + Math.random() * rate * 0.2)));
+      if (this.activeEvent && this.activeEvent.bonus === 'collect5x') gain *= 5;
       this.state.sats += gain;
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
@@ -967,6 +984,8 @@
       var usdGain = btcAmount * this.getEffectivePrice() * this.getSellMultiplier();
       this.state.sats -= satsToSell;
       this.state.usd += usdGain;
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.satsSold = (this.state.stats.satsSold || 0) + satsToSell;
       // Tutorial: step 5 (sell sats) → step 6, then auto-complete to 7
       if (this.state.tutorialStep === 5) {
         this.state.tutorialStep = 6;
@@ -1000,6 +1019,21 @@
       if (this.state.priceEvent) p *= this.state.priceEvent.mult;
       return Math.max(1000, p);
     },
+
+    getPriceTrend: function() {
+      if (!this.hasSkill('sk_trade2')) return null;
+      var s = this.state;
+      if (s.priceEvent) {
+        var remaining = Math.max(0, Math.ceil((s.priceEvent.endsAt - Date.now()) / 1000));
+        return { trend: s.priceEvent.type === 'bull' ? 'up' : 'down', label: (s.priceEvent.type === 'bull' ? 'Bull' : 'Crash') + ' (' + remaining + 's)', active: true };
+      }
+      if (s.nextEventAt) {
+        var eta = Math.max(0, Math.ceil((s.nextEventAt - Date.now()) / 1000));
+        return { trend: 'pending', label: 'Next event ~' + eta + 's', active: false };
+      }
+      return { trend: 'stable', label: 'Stable', active: false };
+    },
+
 
     // ── Loans ──
     takeLoan: function(loanId) {
@@ -1101,7 +1135,10 @@
         s.electricityBill = 0;
         s._lastBillTime = now;
         if (bill > 0.01 && s.usd < 0) {
-          s.usd = 0; // Can't go negative, but lose the sats instead
+          s._billUnpaid = true;
+          s.usd = 0; // Can't go negative
+        } else {
+          s._billUnpaid = false;
         }
       }
 
@@ -1179,7 +1216,8 @@
       }
 
       // Police risk decay
-      if (s.policeRisk > 0) s.policeRisk = Math.max(0, s.policeRisk - 0.01 * dt);
+      var riskDecayRate = this.hasSkill('sk_shadow1') ? 0.02 : 0.01;
+      if (s.policeRisk > 0) s.policeRisk = Math.max(0, s.policeRisk - riskDecayRate * dt);
 
       // Auto-sell (prestige upgrade)
       if (this.hasPrestigeUpgrade('pu_autosell') && s.sats > 10000) {
@@ -1202,7 +1240,7 @@
       }
 
       // Police consequences
-      if (s.policeRisk >= 100 && !s.policeChaseActive) {
+      if (s.policeRisk >= 100 && !s.policeChaseActive && !(s._immuneUntil && now < s._immuneUntil)) {
         s.policeChaseActive = true;
         s.policeChaseEnd = now + 15000;
         if (window.Sound) Sound.policeSiren();
@@ -1255,10 +1293,9 @@
       if (s.powerCut) {
         if (now >= s.powerCutUntil) s.powerCut = false;
       }
-      if (!s.powerCut && s.electricityBill > 0 && s.usd < 0) {
+      if (!s.powerCut && s.electricityBill > 0 && s.usd <= 0 && s._billUnpaid) {
         s.powerCut = true;
         s.powerCutUntil = now + 30000;
-        s.usd = 0;
         if (UI && UI.toast) UI.toast('\u26A1 BLACKOUT! Power cut for 30s!');
       }
 
@@ -1295,7 +1332,7 @@
       // Area unlocks
       this.checkAreaUnlock();
       // Auto-vent skill
-      if (this.hasSkill('sk_hash2') && s.heat >= 80) { s.heat = Math.max(0, s.heat - 20); }
+      if (this.hasSkill('sk_hash2') && s.heat >= 80) { s.heat = Math.max(0, s.heat - 5 * dt); }
       // Auto-sell in bull skill (every 30s, not every frame)
       if (this.hasSkill('sk_trade3') && s.priceEvent && s.priceEvent.type === 'bull' && s.sats > 1000) {
         if (!s._lastTradeSkillSell) s._lastTradeSkillSell = now;
@@ -1380,7 +1417,7 @@
         if (s.achievements[a.id]) continue;
         if (a.check(s)) {
           s.achievements[a.id] = Date.now();
-          if (a.reward > 0) s.sats += a.reward;
+          if (a.reward > 0) { s.sats += a.reward; s.totalSats += a.reward; s.lifetimeSats += a.reward; }
           if (UI && UI.toast) UI.toast(a.icon + ' Achievement: ' + a.name + (a.reward > 0 ? ' (+' + Game.formatNumber(a.reward) + ' sats)' : ''));
         }
       }

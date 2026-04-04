@@ -1,0 +1,9 @@
+{
+  "name": "satoshis-dream",
+  "version": "3.0.0",
+  "description": "Satoshi's Dream - Idle Bitcoin Miner",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

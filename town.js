@@ -259,7 +259,7 @@
       this._buildPostProcess();
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon();
+      this._buildTrees(); this._buildProps(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon();
 
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
@@ -582,6 +582,78 @@
             root.rotation.y = sr() * Math.PI * 2;
           });
         })(tx, tz, ti);
+      }
+    },
+
+    _buildProps: function() {
+      var s = this._scene;
+      // Decorative props placed along sidewalks, intersections, and open areas
+      var PROPS = [
+        // Street lamps along horizontal roads
+        { model: 'street_lamp.glb', x: 200, z: 310, scale: 25 },
+        { model: 'street_lamp.glb', x: 600, z: 310, scale: 25 },
+        { model: 'street_lamp.glb', x: 1000, z: 310, scale: 25 },
+        { model: 'street_lamp.glb', x: 1400, z: 310, scale: 25 },
+        { model: 'street_lamp.glb', x: 200, z: 630, scale: 25 },
+        { model: 'street_lamp.glb', x: 600, z: 630, scale: 25 },
+        { model: 'street_lamp.glb', x: 1000, z: 630, scale: 25 },
+        { model: 'street_lamp.glb', x: 1400, z: 630, scale: 25 },
+        { model: 'street_lamp.glb', x: 200, z: 950, scale: 25 },
+        { model: 'street_lamp.glb', x: 600, z: 950, scale: 25 },
+        { model: 'street_lamp.glb', x: 1000, z: 950, scale: 25 },
+        { model: 'street_lamp.glb', x: 1400, z: 950, scale: 25 },
+        { model: 'street_lamp.glb', x: 200, z: 1270, scale: 25 },
+        { model: 'street_lamp.glb', x: 600, z: 1270, scale: 25 },
+        { model: 'street_lamp.glb', x: 1000, z: 1270, scale: 25 },
+        { model: 'street_lamp.glb', x: 1400, z: 1270, scale: 25 },
+        // Benches near park-like areas (between buildings)
+        { model: 'park_bench.glb', x: 500, z: 400, scale: 15, ry: 0 },
+        { model: 'park_bench.glb', x: 900, z: 720, scale: 15, ry: Math.PI / 2 },
+        { model: 'park_bench.glb', x: 1300, z: 1040, scale: 15, ry: 0 },
+        { model: 'park_bench.glb', x: 500, z: 1360, scale: 15, ry: Math.PI / 2 },
+        // Fire hydrants at intersections
+        { model: 'fire_hydrant.glb', x: 430, z: 315, scale: 8 },
+        { model: 'fire_hydrant.glb', x: 815, z: 635, scale: 8 },
+        { model: 'fire_hydrant.glb', x: 1200, z: 955, scale: 8 },
+        { model: 'fire_hydrant.glb', x: 430, z: 1275, scale: 8 },
+        // Trash cans near diner, coffee, casino
+        { model: 'trash_can.glb', x: 330, z: 450, scale: 8 },
+        { model: 'trash_can.glb', x: 720, z: 450, scale: 8 },
+        { model: 'trash_can.glb', x: 840, z: 770, scale: 8 },
+        // Mailboxes near post office and residential areas
+        { model: 'mailbox.glb', x: 940, z: 910, scale: 10 },
+        { model: 'mailbox.glb', x: 1100, z: 1400, scale: 10 },
+        // Bus stops along main roads
+        { model: 'bus_stop.glb', x: 473, z: 315, scale: 20, ry: Math.PI / 2 },
+        { model: 'bus_stop.glb', x: 857, z: 955, scale: 20, ry: Math.PI / 2 },
+        // Flower planters near shops
+        { model: 'flower_planter.glb', x: 560, z: 130, scale: 12 },
+        { model: 'flower_planter.glb', x: 940, z: 130, scale: 12 },
+        { model: 'flower_planter.glb', x: 1330, z: 450, scale: 12 },
+        { model: 'flower_planter.glb', x: 110, z: 770, scale: 12 },
+        { model: 'flower_planter.glb', x: 1100, z: 1090, scale: 12 },
+        // Garden center near real estate / residential
+        { model: 'garden_center.glb', x: 100, z: 1250, scale: 20 },
+      ];
+
+      for (var i = 0; i < PROPS.length; i++) {
+        (function(prop) {
+          BABYLON.SceneLoader.ImportMesh('', 'models/', prop.model, s, function(meshes) {
+            if (!meshes.length) return;
+            var root = meshes[0];
+            var bounds = root.getHierarchyBoundingVectors(true);
+            var mW = bounds.max.x - bounds.min.x || 1;
+            var mH = bounds.max.y - bounds.min.y || 1;
+            var mD = bounds.max.z - bounds.min.z || 1;
+            var sc = prop.scale;
+            root.scaling = new BABYLON.Vector3(sc / mW, sc / mH, sc / mD);
+            root.position.set(prop.x, 0, prop.z);
+            if (prop.ry) root.rotation.y = prop.ry;
+            for (var mi = 0; mi < meshes.length; mi++) {
+              meshes[mi].receiveShadows = true;
+            }
+          });
+        })(PROPS[i]);
       }
     },
 

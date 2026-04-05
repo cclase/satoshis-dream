@@ -228,28 +228,29 @@
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
-  var BUILDING_MODEL_ROOT = 'models/';
+  var BUILDING_MODEL_ROOT = 'models/satoshis_dream_full_pack/models/';
+  var FULL_PACK_CHARACTER_ROOT = 'models/satoshis_dream_full_pack/models/';
   var BUILDING_MODEL_FILES = {
-    mine: 'mine_hq.glb',
-    hardware: 'hardware_shop.glb',
-    exchange: 'exchange.glb',
-    bank: 'bank.glb',
-    diner: 'diner.glb',
-    coffee: 'coffee_shop.glb',
-    university: 'university.glb',
-    hospital: 'hospital.glb',
-    internet_cafe: 'internet_cafe.glb',
-    casino: 'casino.glb',
-    post_office: 'post_office.glb',
-    gym: 'gym.glb',
-    real_estate: 'real_estate_office.glb',
-    car_dealer: 'hardware_shop.glb',
-    pet_shop: 'pet_shop.glb',
-    pawn_shop: 'pawn_shop.glb',
-    utility: 'bitcoin_atm.glb',
-    clothing: 'clothing_store.glb',
-    apartment: 'apartment_building.glb',
-    homegoods: 'furniture_store.glb'
+    mine: 'building-mining-hq.glb',
+    hardware: 'building-hardware-shop.glb',
+    exchange: 'building-exchange.glb',
+    bank: 'building-bank.glb',
+    diner: 'building-diner.glb',
+    coffee: 'building-coffee-shop.glb',
+    university: 'building-university.glb',
+    hospital: 'building-hospital.glb',
+    internet_cafe: 'building-internet-cafe.glb',
+    casino: 'building-casino.glb',
+    post_office: 'building-post-office.glb',
+    gym: 'building-gym.glb',
+    real_estate: 'building-real-estate.glb',
+    car_dealer: 'building-car-dealership.glb',
+    pet_shop: 'building-pet-shop.glb',
+    pawn_shop: 'building-pawn-shop.glb',
+    utility: 'building-utility-company.glb',
+    clothing: 'building-clothing-store.glb',
+    apartment: 'building-home.glb',
+    homegoods: 'building-home-goods-store.glb'
   };
   var LEGACY_MODEL_FILES = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
 
@@ -937,7 +938,7 @@
       this._craigMesh.position.y = 12;
       var self = this;
       function loadCraigModel() {
-        BABYLON.SceneLoader.ImportMesh('', 'models/', 'npc_craig.glb', s, function(meshes) {
+        BABYLON.SceneLoader.ImportMesh('', FULL_PACK_CHARACTER_ROOT, 'npc-craig.glb', s, function(meshes) {
           if (!meshes.length) return;
           var host = new BABYLON.TransformNode('craigHost', s);
           for (var i = 0; i < meshes.length; i++) {
@@ -1004,7 +1005,7 @@
       this._avatarRoot = new BABYLON.TransformNode('avRoot', s);
       var self = this;
       function loadAvatarModel() {
-        BABYLON.SceneLoader.ImportMesh('', 'models/', 'avatar_player.glb', s, function(meshes) {
+        BABYLON.SceneLoader.ImportMesh('', FULL_PACK_CHARACTER_ROOT, 'avatar-player.glb', s, function(meshes) {
           if (!meshes.length) return;
           var host = new BABYLON.TransformNode('avModelHost', s);
           for (var i = 0; i < meshes.length; i++) {

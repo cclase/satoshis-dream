@@ -190,11 +190,23 @@ function freshTown() {
   BABYLON.Scene = function() { calls.scene = new StubScene(); return calls.scene; };
   BABYLON.Scene.FOGMODE_EXP2 = 2;
 
+  // Stub DOM element for loading screen elements
+  function StubDOMElement() {
+    this.style = { width: '', opacity: '', transition: '' };
+    this.parentNode = { removeChild: function() {} };
+    this.textContent = '';
+  }
+  var loadingElements = {
+    'loading-screen': new StubDOMElement(),
+    'loading-bar': new StubDOMElement(),
+    'loading-status': new StubDOMElement(),
+  };
+
   const context = {
     window: {},
     document: {
       createElement: function(tag) { return new StubCanvas(); },
-      getElementById: function() { return new StubCanvas(); },
+      getElementById: function(id) { return loadingElements[id] || new StubCanvas(); },
     },
     BABYLON: BABYLON,
     Game: { state: { avatar: null }, HARDWARE: [], DARK_WEB: [] },
@@ -322,8 +334,11 @@ describe('post-processing pipeline', () => {
   it('enables vignette', () => {
     assert.equal(calls.pipeline.imageProcessing.vignetteEnabled, true);
   });
-  it('vignette weight is 1.5', () => {
-    assert.equal(calls.pipeline.imageProcessing.vignetteWeight, 1.5);
+  it('vignette weight is 0.5 (subtle, not claustrophobic)', () => {
+    assert.equal(calls.pipeline.imageProcessing.vignetteWeight, 0.5);
+  });
+  it('vignette stretch is 0.3', () => {
+    assert.equal(calls.pipeline.imageProcessing.vignetteStretch, 0.3);
   });
 });
 
@@ -620,5 +635,179 @@ describe('movement polish', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
     assert.ok(src.includes('Math.sqrt(dx * dx + dy * dy)'), 'should normalize diagonal with vector length');
     assert.ok(!src.includes('dx *= 0.707'), 'old hardcoded 0.707 normalization should be removed');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 13. Uniform Scaling (Buildings + Props)
+// ─────────────────────────────────────────────
+describe('uniform scaling', () => {
+  it('buildings use uniform scale (Math.min of width/depth ratios)', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('uniformScale = Math.min(b.w / modelW, b.h / modelD)'), 'should compute uniform scale from footprint');
+    assert.ok(src.includes('Vector3(uniformScale, uniformScale, uniformScale)'), 'should apply same scale to all axes');
+  });
+  it('props use uniform scale (max dimension)', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('maxDim = Math.max(mW, mH, mD)'), 'should find max dimension');
+    assert.ok(src.includes('sc = prop.scale / maxDim'), 'should scale uniformly by max dimension');
+    assert.ok(src.includes('Vector3(sc, sc, sc)'), 'should apply same scale to all axes for props');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 14. Loading Screen
+// ─────────────────────────────────────────────
+describe('loading screen', () => {
+  it('index.html has loading screen HTML', () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(html.includes('id="loading-screen"'), 'should have loading screen div');
+    assert.ok(html.includes('id="loading-bar"'), 'should have loading progress bar');
+    assert.ok(html.includes('id="loading-status"'), 'should have loading status text');
+  });
+  it('town.js tracks loading progress', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_loadingTotal'), 'should track total assets to load');
+    assert.ok(src.includes('_loadingDone'), 'should track loaded assets');
+    assert.ok(src.includes('_updateLoadingBar'), 'should have loading bar update function');
+  });
+  it('loading screen hides when all assets loaded', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_hideLoadingScreen'), 'should have hide loading screen function');
+    assert.ok(src.includes('loading-screen'), 'should reference loading-screen element');
+  });
+  it('has safety timeout to hide loading screen', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('setTimeout(function() { _hideLoadingScreen(); }'), 'should have safety timeout');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 15. Model Error Handling
+// ─────────────────────────────────────────────
+describe('model error handling', () => {
+  it('building model load has error callback with fallback box', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('createFallbackBox'), 'should have fallback box creator');
+    assert.ok(src.includes("console.warn('Failed to load '"), 'should log model load failures');
+  });
+  it('fallback box uses building color', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("b.color || '#888888'"), 'should use building color for fallback');
+    assert.ok(src.includes('parseInt(c.slice('), 'should parse hex color');
+  });
+  it('error callback still updates loading bar', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    // Both success and error paths should call _updateLoadingBar
+    const matches = src.match(/_updateLoadingBar\(\)/g);
+    assert.ok(matches && matches.length >= 2, 'should call _updateLoadingBar in both success and error paths');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 16. Dynamic Label Heights
+// ─────────────────────────────────────────────
+describe('dynamic label heights', () => {
+  it('labels are repositioned based on actual scaled model height', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('actualHeight = modelH * uniformScale'), 'should compute actual height from model');
+    assert.ok(src.includes('_labelMeshes[idx]'), 'should store label meshes for later repositioning');
+    assert.ok(src.includes('_emojiMeshes[idx]'), 'should store emoji meshes for later repositioning');
+  });
+  it('label and emoji Y positions use actual height', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_labelMeshes[idx].position.y = actualHeight + 18'), 'label should be at actualHeight + 18');
+    assert.ok(src.includes('_emojiMeshes[idx].position.y = actualHeight + 38'), 'emoji should be at actualHeight + 38');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 17. Review Fix: Loading screen double-call guard
+// ─────────────────────────────────────────────
+describe('loading screen double-call guard', () => {
+  it('_hideLoadingScreen has _loadingHidden guard', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_loadingHidden'), 'should have guard flag');
+    assert.ok(src.includes('if (_loadingHidden) return'), 'should early-return if already hidden');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 18. Review Fix: Trees and props tracked in loading bar
+// ─────────────────────────────────────────────
+describe('tree and prop loading tracking', () => {
+  it('trees increment _loadingTotal and call _updateLoadingBar', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    // _buildTrees function should have _loadingTotal++ and _updateLoadingBar
+    const treeSection = src.slice(src.indexOf('_buildTrees: function'), src.indexOf('_buildProps: function'));
+    assert.ok(treeSection.includes('_loadingTotal++'), 'trees should increment loading total');
+    assert.ok(treeSection.includes('_updateLoadingBar()'), 'trees should call _updateLoadingBar');
+  });
+  it('props increment _loadingTotal and call _updateLoadingBar', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const propSection = src.slice(src.indexOf('_buildProps: function'), src.indexOf('_buildCollectibles: function'));
+    assert.ok(propSection.includes('_loadingTotal += PROPS.length'), 'props should add to loading total');
+    assert.ok(propSection.includes('_updateLoadingBar()'), 'props should call _updateLoadingBar');
+  });
+  it('tree and prop error callbacks exist', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("console.warn('Failed to load tree:"), 'trees should have error callback');
+    assert.ok(src.includes("console.warn('Failed to load prop"), 'props should have error callback');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 19. Review Fix: Proximity ring built at init, not in render
+// ─────────────────────────────────────────────
+describe('proximity ring initialization', () => {
+  it('_buildProximityRing is called during init', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('this._buildProximityRing()'), 'should call _buildProximityRing during init');
+  });
+  it('_buildProximityRing creates ring mesh', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("_buildProximityRing: function()"), 'should have build method');
+  });
+  it('render loop does not create proximity ring lazily', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const renderSection = src.slice(src.indexOf('render: function'));
+    assert.ok(!renderSection.includes("CreateTorus('proxRing'"), 'render should not create torus');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 20. Review Fix: Render uses real dt, not hardcoded 0.016
+// ─────────────────────────────────────────────
+describe('render uses real dt', () => {
+  it('render function accepts dt parameter', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('render: function(dt)'), 'render should accept dt parameter');
+  });
+  it('game loop passes dt to Town.render', () => {
+    const gameSrc = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
+    assert.ok(gameSrc.includes('Town.render(dt)'), 'game loop should pass dt to render');
+  });
+  it('time accumulation uses dt not hardcoded', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const renderSection = src.slice(src.indexOf('render: function(dt)'));
+    assert.ok(renderSection.includes('this._time += dt'), 'should use dt for time');
+    assert.ok(renderSection.includes('dt / 300'), 'should use dt for day/night cycle');
+    // The only 0.016 should be in the fallback default, not in time calculations
+    assert.ok(!renderSection.includes('this._time += 0.016'), 'should not hardcode 0.016 for time');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 21. Review Fix: Edge flash triggers on rising edge only
+// ─────────────────────────────────────────────
+describe('edge flash rising edge trigger', () => {
+  it('flash only triggers when _atWorldEdge transitions from false to true', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_wasAtWorldEdge'), 'should track previous edge state');
+    assert.ok(src.includes('this._atWorldEdge && !this._wasAtWorldEdge'), 'should check rising edge');
+  });
+  it('edge flash timer decrements with dt', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('this._edgeFlashTimer -= dt'), 'should decrement by dt not hardcoded');
   });
 });

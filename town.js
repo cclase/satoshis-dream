@@ -200,7 +200,31 @@
 
   // ── Building Style Data ──
   var WALL_COLORS = {mine:'#c4956a',hardware:'#b8a88a',exchange:'#d4c8b0',bank:'#e8dcc8',diner:'#cc6655',coffee:'#8b7355',university:'#c8b8a0',hospital:'#e0d8d0',internet_cafe:'#7a8878',casino:'#9a6688',post_office:'#b0a898',gym:'#bb8844',real_estate:'#a8b898',car_dealer:'#c0b8b0',pet_shop:'#d8b8a0',pawn_shop:'#998866',utility:'#8899aa',clothing:'#d8a8b8',apartment:'#c0b0a0',homegoods:'#a8b890'};
+  // Default label heights (used before model loads); updated dynamically once model bounding box is known
   var BLDG_HEIGHTS = {mine:65,hardware:50,exchange:55,bank:95,diner:32,coffee:30,university:70,hospital:65,internet_cafe:40,casino:55,post_office:45,gym:38,real_estate:35,car_dealer:30,pet_shop:32,pawn_shop:30,utility:45,clothing:35,apartment:40,homegoods:38};
+
+  // Loading screen helpers
+  var _loadingTotal = 0;
+  var _loadingDone = 0;
+  function _updateLoadingBar() {
+    _loadingDone++;
+    var bar = document.getElementById('loading-bar');
+    var status = document.getElementById('loading-status');
+    if (bar) bar.style.width = Math.min(100, Math.round((_loadingDone / _loadingTotal) * 100)) + '%';
+    if (status) status.textContent = 'Loading assets... ' + _loadingDone + '/' + _loadingTotal;
+    if (_loadingDone >= _loadingTotal) _hideLoadingScreen();
+  }
+  var _loadingHidden = false;
+  function _hideLoadingScreen() {
+    if (_loadingHidden) return;
+    _loadingHidden = true;
+    var screen = document.getElementById('loading-screen');
+    if (screen) {
+      screen.style.opacity = '0';
+      screen.style.transition = 'opacity 0.5s';
+      setTimeout(function() { if (screen.parentNode) screen.parentNode.removeChild(screen); }, 600);
+    }
+  }
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
@@ -263,7 +287,10 @@
       this._buildPostProcess();
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildProps(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon();
+      this._buildTrees(); this._buildProps(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon(); this._buildProximityRing();
+
+      // Safety: hide loading screen after 15s even if some assets fail silently
+      setTimeout(function() { _hideLoadingScreen(); }, 15000);
 
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
@@ -367,8 +394,8 @@
 
       // Vignette for cinematic feel
       pipeline.imageProcessing.vignetteEnabled = true;
-      pipeline.imageProcessing.vignetteWeight = 1.5;
-      pipeline.imageProcessing.vignetteStretch = 0.5;
+      pipeline.imageProcessing.vignetteWeight = 0.5;
+      pipeline.imageProcessing.vignetteStretch = 0.3;
 
       this._pipeline = pipeline;
     },
@@ -487,49 +514,20 @@
       };
       var GENERIC_MODELS = ['building-garage.glb'];
       var self = this;
+      this._labelMeshes = [];
+      this._emojiMeshes = [];
+
+      _loadingTotal += BUILDINGS.length;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
           var modelFile = BUILDING_MODELS[b.panelType] || GENERIC_MODELS[idx % GENERIC_MODELS.length];
 
-          // Load glb model
-          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
-            if (!meshes.length) return;
-            var root = meshes[0];
-            // Get bounding info to scale properly
-            var bounds = root.getHierarchyBoundingVectors(true);
-            var modelW = bounds.max.x - bounds.min.x;
-            var modelH = bounds.max.y - bounds.min.y;
-            var modelD = bounds.max.z - bounds.min.z;
-            if (modelW < 0.01) modelW = 1;
-            if (modelH < 0.01) modelH = 1;
-            if (modelD < 0.01) modelD = 1;
-
-            // Scale model to fit building footprint, normalizing by actual model size
-            var scaleX = b.w / modelW;
-            var scaleZ = b.h / modelD;
-            var scaleY = (Math.min(b.w, b.h) * 0.8) / modelH;
-            root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
-
-            // Position at building location
-            root.position.x = b.x + b.w / 2;
-            root.position.z = b.y + b.h / 2;
-            root.position.y = 0;
-
-            // Enable shadows on all child meshes
-            for (var mi = 0; mi < meshes.length; mi++) {
-              meshes[mi].receiveShadows = true;
-              if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
-            }
-            self._buildingMeshes.push(root);
-          });
-
           // Floating label (always visible, doesn't need model to load)
           var bh = BLDG_HEIGHTS[b.panelType] || 40;
           var ltex = new BABYLON.DynamicTexture('lt' + b.id, {width: 512, height: 128}, s, false);
           var lctx = ltex.getContext();
-          // Dark background for readability
           lctx.fillStyle = 'rgba(0,0,0,0.5)';
           lctx.beginPath(); lctx.roundRect(40, 20, 432, 80, 12); lctx.fill();
           lctx.font = 'bold 48px sans-serif'; lctx.fillStyle = '#ffffff';
@@ -540,8 +538,8 @@
           var lp = BABYLON.MeshBuilder.CreatePlane('lp' + b.id, {width: 80, height: 20}, s);
           lp.position.set(b.x + b.w / 2, bh * 1.3 + 18, b.y + b.h / 2);
           lp.material = lmat; lp.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+          self._labelMeshes[idx] = lp;
 
-          // Emoji above label
           var etex = new BABYLON.DynamicTexture('et' + b.id, {width: 128, height: 128}, s, false);
           var ectx = etex.getContext(); ectx.font = '88px sans-serif'; ectx.textAlign = 'center';
           ectx.textBaseline = 'middle'; ectx.fillText(b.emoji || '', 64, 64);
@@ -551,6 +549,62 @@
           var ep = BABYLON.MeshBuilder.CreatePlane('ep' + b.id, {width: 28, height: 28}, s);
           ep.position.set(b.x + b.w / 2, bh * 1.3 + 38, b.y + b.h / 2);
           ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+          self._emojiMeshes[idx] = ep;
+
+          // Helper to position model + reposition labels at actual height
+          function placeModel(root, meshes) {
+            var bounds = root.getHierarchyBoundingVectors(true);
+            var modelW = bounds.max.x - bounds.min.x;
+            var modelH = bounds.max.y - bounds.min.y;
+            var modelD = bounds.max.z - bounds.min.z;
+            if (modelW < 0.01) modelW = 1;
+            if (modelH < 0.01) modelH = 1;
+            if (modelD < 0.01) modelD = 1;
+
+            var uniformScale = Math.min(b.w / modelW, b.h / modelD);
+            root.scaling = new BABYLON.Vector3(uniformScale, uniformScale, uniformScale);
+            root.position.x = b.x + b.w / 2;
+            root.position.z = b.y + b.h / 2;
+            root.position.y = 0;
+
+            // Reposition labels based on actual scaled model height
+            var actualHeight = modelH * uniformScale;
+            if (self._labelMeshes[idx]) self._labelMeshes[idx].position.y = actualHeight + 18;
+            if (self._emojiMeshes[idx]) self._emojiMeshes[idx].position.y = actualHeight + 38;
+
+            for (var mi = 0; mi < meshes.length; mi++) {
+              meshes[mi].receiveShadows = true;
+              if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
+            }
+            self._buildingMeshes.push(root);
+          }
+
+          // Helper to create colored fallback box when model fails to load
+          function createFallbackBox() {
+            var box = BABYLON.MeshBuilder.CreateBox('fallback_' + b.id, {width: b.w * 0.8, height: bh, depth: b.h * 0.8}, s);
+            box.position.set(b.x + b.w / 2, bh / 2, b.y + b.h / 2);
+            var mat = new BABYLON.StandardMaterial('fbmat_' + b.id, s);
+            var c = b.color || '#888888';
+            var r = parseInt(c.slice(1,3), 16) / 255;
+            var g = parseInt(c.slice(3,5), 16) / 255;
+            var bl = parseInt(c.slice(5,7), 16) / 255;
+            mat.diffuseColor = new BABYLON.Color3(r, g, bl);
+            box.material = mat;
+            box.receiveShadows = true;
+            if (self._shadowGen) self._shadowGen.addShadowCaster(box);
+            self._buildingMeshes.push(box);
+          }
+
+          // Load glb model with error fallback
+          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
+            if (!meshes.length) { createFallbackBox(); _updateLoadingBar(); return; }
+            placeModel(meshes[0], meshes);
+            _updateLoadingBar();
+          }, null, function(scene, msg, ex) {
+            console.warn('Failed to load ' + modelFile + ': ' + (msg || ex));
+            createFallbackBox();
+            _updateLoadingBar();
+          });
         })(i);
       }
     },
@@ -575,15 +629,20 @@
         } while (!valid && attempts < 20);
         if (!valid) continue;
 
+        _loadingTotal++;
         (function(x, z, idx) {
           var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
-            if (!meshes.length) return;
+            if (!meshes.length) { _updateLoadingBar(); return; }
             var root = meshes[0];
             var sc = 30 + sr() * 20;
             root.scaling = new BABYLON.Vector3(sc, sc, sc);
             root.position.set(x, 0, z);
             root.rotation.y = sr() * Math.PI * 2;
+            _updateLoadingBar();
+          }, null, function(scene, msg, ex) {
+            console.warn('Failed to load tree: ' + (msg || ex));
+            _updateLoadingBar();
           });
         })(tx, tz, ti);
       }
@@ -640,22 +699,29 @@
         { model: 'garden_center.glb', x: 100, z: 1250, scale: 20 },
       ];
 
+      _loadingTotal += PROPS.length;
       for (var i = 0; i < PROPS.length; i++) {
         (function(prop) {
           BABYLON.SceneLoader.ImportMesh('', 'models/', prop.model, s, function(meshes) {
-            if (!meshes.length) return;
+            if (!meshes.length) { _updateLoadingBar(); return; }
             var root = meshes[0];
             var bounds = root.getHierarchyBoundingVectors(true);
             var mW = bounds.max.x - bounds.min.x || 1;
             var mH = bounds.max.y - bounds.min.y || 1;
             var mD = bounds.max.z - bounds.min.z || 1;
-            var sc = prop.scale;
-            root.scaling = new BABYLON.Vector3(sc / mW, sc / mH, sc / mD);
+            // Uniform scaling preserves model proportions
+            var maxDim = Math.max(mW, mH, mD);
+            var sc = prop.scale / maxDim;
+            root.scaling = new BABYLON.Vector3(sc, sc, sc);
             root.position.set(prop.x, 0, prop.z);
             if (prop.ry) root.rotation.y = prop.ry;
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
             }
+            _updateLoadingBar();
+          }, null, function(scene, msg, ex) {
+            console.warn('Failed to load prop ' + prop.model + ': ' + (msg || ex));
+            _updateLoadingBar();
           });
         })(PROPS[i]);
       }
@@ -827,6 +893,19 @@
       this._beaconMesh.position.z = 128 + 192 / 2;
       this._beaconMesh.position.y = 100;
       this._beaconMesh.setEnabled(false);
+    },
+
+    _buildProximityRing: function() {
+      var s = this._scene;
+      this._proximityRing = BABYLON.MeshBuilder.CreateTorus('proxRing', {diameter: 60, thickness: 2, tessellation: 24}, s);
+      var prmat = new BABYLON.StandardMaterial('prmat', s);
+      prmat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+      prmat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.2);
+      prmat.alpha = 0;
+      this._proximityRing.material = prmat;
+      this._proximityRing.rotation.x = Math.PI / 2;
+      this._proximityRing.position.y = 0.5;
+      this._proximityRing.setEnabled(false);
     },
 
     // ── Resize ──
@@ -1049,11 +1128,12 @@
       return 'night';
     },
 
-    render: function() {
+    render: function(dt) {
       if (!this._engine) return;
-      this._time += 0.016;
+      dt = dt || 0.016;
+      this._time += dt;
       // Day/night cycle: 300 seconds (5 minutes)
-      this._dayTime = (this._dayTime + 0.016 / 300) % 1.0;
+      this._dayTime = (this._dayTime + dt / 300) % 1.0;
       this._updateDayNight();
       var av = Game.state.avatar;
 
@@ -1121,17 +1201,7 @@
       }
 
       // Building proximity highlight — glow ring under nearest interactable building
-      if (av && !UI.panelOpen) {
-        if (!this._proximityRing) {
-          this._proximityRing = BABYLON.MeshBuilder.CreateTorus('proxRing', {diameter: 60, thickness: 2, tessellation: 24}, this._scene);
-          var prmat = new BABYLON.StandardMaterial('prmat', this._scene);
-          prmat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
-          prmat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.2);
-          prmat.alpha = 0;
-          this._proximityRing.material = prmat;
-          this._proximityRing.rotation.x = Math.PI / 2;
-          this._proximityRing.position.y = 0.5;
-        }
+      if (av && !UI.panelOpen && this._proximityRing) {
         var nb = this.nearbyBuilding;
         if (nb) {
           this._proximityRing.position.x = nb.x + nb.w / 2;
@@ -1143,19 +1213,19 @@
         }
       }
 
-      // World edge vignette overlay
-      if (this._atWorldEdge) {
-        if (!this._edgeFlashTimer) this._edgeFlashTimer = 0;
+      // World edge vignette overlay — trigger on rising edge only
+      if (this._atWorldEdge && !this._wasAtWorldEdge) {
         this._edgeFlashTimer = 0.3; // flash for 0.3 seconds
       }
+      this._wasAtWorldEdge = this._atWorldEdge;
       if (this._edgeFlashTimer > 0) {
-        this._edgeFlashTimer -= 0.016;
+        this._edgeFlashTimer -= dt;
         var edgeAlpha = Math.max(0, this._edgeFlashTimer / 0.3) * 0.15;
         if (this._pipeline && this._pipeline.imageProcessing) {
-          this._pipeline.imageProcessing.vignetteWeight = 5 + edgeAlpha * 30;
+          this._pipeline.imageProcessing.vignetteWeight = 0.5 + edgeAlpha * 8;
         }
       } else if (this._pipeline && this._pipeline.imageProcessing) {
-        this._pipeline.imageProcessing.vignetteWeight = 5;
+        this._pipeline.imageProcessing.vignetteWeight = 0.5;
       }
 
       this._scene.render();

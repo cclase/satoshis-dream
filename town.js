@@ -486,10 +486,10 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            // Scale model (1x1 unit) to fit building footprint (128-256 units)
-            var scaleX = b.w;
-            var scaleZ = b.h;
-            var scaleY = Math.min(b.w, b.h) * 0.8;
+            // Scale model to fit building footprint, normalizing by actual model size
+            var scaleX = b.w / modelW;
+            var scaleZ = b.h / modelD;
+            var scaleY = (Math.min(b.w, b.h) * 0.8) / modelH;
             root.scaling = new BABYLON.Vector3(scaleX, scaleY, scaleZ);
 
             // Position at building location

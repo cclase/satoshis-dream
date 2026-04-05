@@ -140,10 +140,10 @@
   function defaultState() {
     return {
       avatar: null,
-      sats: 0, usd: 0, totalSats: 0, lifetimeSats: 0,
+      sats: 0, usd: 50, totalSats: 0, lifetimeSats: 0,
       heat: 0, owned: {}, tokens: 0, price: 65000, buyMulti: 1,
       clothing: {}, furniture: {},
-      tutorialStep: 0,
+      tutorialStep: 0, gameStartTime: Date.now(),
       pendingNpcEvent: null, lastNpcTime: 0,
       // Delivery quests
       deliveries: [], activeDelivery: null,
@@ -495,7 +495,7 @@
     },
 
     getEnergyRegen: function() {
-      return 0.5 + (this.state.gymLevel * 0.2);
+      return 0.8 + (this.state.gymLevel * 0.2);
     },
 
     // ── Delivery Quests ──
@@ -957,8 +957,11 @@
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
       this.state.heat = Math.min(100, this.state.heat + 0.05);
-      // Tutorial: step 2 (tap mine) → step 3
-      if (this.state.tutorialStep === 2) this.state.tutorialStep = 3;
+      // Tutorial: first tap grants free Laptop and jumps to step 5 (already mining)
+      if (this.state.tutorialStep === 2) {
+        this.state.owned.u1 = (this.state.owned.u1 || 0) + 1; // Free Laptop
+        this.state.tutorialStep = 5;
+      }
       this.checkTreasureDrop();
       this.checkRareDrop();
       if (!this.state.stats) this.state.stats = {};
@@ -1112,9 +1115,10 @@
       // Heat: direct hGen with 0.3/s passive cooling — heat matters from early game
       s.heat = Math.min(100, Math.max(0, s.heat + (hGen * this.getHeatMultiplier() * dt) - (0.3 * dt)));
 
-      // Energy - drains slowly, regens slowly
-      var energyDrain = 0.4; // per second base
-      if (this.getProductionRate() > 0) energyDrain = 0.6; // drains in ~170s when producing
+      // Energy - drains slowly, regens slowly (no drain during first 10 minutes)
+      var energyGracePeriod = (Date.now() - (s.gameStartTime || 0)) < 600000;
+      var energyDrain = energyGracePeriod ? 0 : 0.4; // per second base
+      if (!energyGracePeriod && this.getProductionRate() > 0) energyDrain = 0.6; // drains in ~170s when producing
       // Reduced regen while producing (50% of normal), full regen when idle
       var energyRegen = this.getEnergyRegen() * dt * (this.getProductionRate() > 0 ? 0.5 : 1.0);
       s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + energyRegen));

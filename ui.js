@@ -1491,7 +1491,7 @@
         {id:'quickhands',name:'Quick Hands',desc:'+5 sats per tap'},
         {id:'investor',name:'Early Investor',desc:'+10% passive income'},
         {id:'coolrunner',name:'Cool Runner',desc:'-20% heat generation'},
-        {id:'trustfund',name:'Trust Fund',desc:'Start with $50 USD'}
+        {id:'trustfund',name:'Trust Fund',desc:'Start with extra $100 USD'}
       ];
       var html = '<div class="modal-card"><div class="modal-title">Satoshi\'s Dream</div>' +
         '<div class="modal-subtitle">Choose your identity</div>' +
@@ -1517,7 +1517,7 @@
       var self = this;
       startBtn.addEventListener('click', function() {
         Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 473, y: 1315 };
-        if (selectedBonus === 'trustfund') Game.state.usd += 50;
+        if (selectedBonus === 'trustfund') Game.state.usd += 100;
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();
         document.getElementById('town').focus();
@@ -1529,18 +1529,53 @@
       setTimeout(function() { nameInput.focus(); }, 100);
     },
 
-    startGame: function() { Game.start(); },
+    startGame: function() {
+      Game.start();
+      // Show control hints on first play (tutorial step 1 = fresh start)
+      if (Game.state.tutorialStep === 1) this._showControlHints();
+    },
+
+    _showControlHints: function() {
+      var overlay = document.createElement('div');
+      overlay.id = 'control-hints';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+      var isMobile = window.innerWidth < 600;
+      var content = isMobile ?
+        '<div style="text-align:center;color:#fff;font-family:monospace;max-width:320px;padding:24px;">' +
+        '<div style="font-size:20px;font-weight:bold;margin-bottom:16px;">Controls</div>' +
+        '<div style="font-size:16px;line-height:1.8;">' +
+        'Tap the ground to walk<br>' +
+        'Tap a building to enter<br>' +
+        'Use the D-pad to move<br>' +
+        'Pinch to zoom in/out' +
+        '</div>' +
+        '<div style="margin-top:24px;font-size:13px;color:#aaa;">Tap anywhere to start</div></div>'
+        :
+        '<div style="text-align:center;color:#fff;font-family:monospace;max-width:400px;padding:24px;">' +
+        '<div style="font-size:22px;font-weight:bold;margin-bottom:16px;">Controls</div>' +
+        '<div style="font-size:16px;line-height:2;">' +
+        'WASD / Arrow keys to move<br>' +
+        'Click the ground to walk<br>' +
+        'Click a building to enter<br>' +
+        'Scroll wheel to zoom' +
+        '</div>' +
+        '<div style="margin-top:24px;font-size:13px;color:#aaa;">Click anywhere to start</div></div>';
+      overlay.innerHTML = content;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', function() { overlay.remove(); });
+      overlay.addEventListener('touchstart', function() { overlay.remove(); });
+    },
 
     // ═══════════════════════════════════════
     // NPC TUTORIAL GUIDE
     // ═══════════════════════════════════════
     _guideMessages: [
       '', // step 0: not started
-      '\u{1F9D9} Welcome! Head to Mining HQ \u26CF\uFE0F to earn your first Bitcoin! Use the map button or walk there.',
+      '\u{1F9D9} Welcome! Head to the glowing Mining HQ \u26CF\uFE0F to earn your first Bitcoin!',
       '\u{1F9D9} Tap the \u20BF button to mine sats! Try it!',
-      '\u{1F9D9} Nice! You earned your first sat! Keep tapping to earn more.',
-      '\u{1F9D9} You can afford a Laptop now! Visit the Hardware Shop \u{1F527} to buy one.',
-      '\u{1F9D9} You\'re mining automatically! Visit the Exchange \u{1F4C8} to sell sats for USD.',
+      '\u{1F9D9} Nice! You earned your first sat! Keep tapping to earn more.', // step 3 (skipped)
+      '\u{1F9D9} You can afford a Laptop now! Visit the Hardware Shop \u{1F527} to buy one.', // step 4 (skipped)
+      '\u{1F9D9} Free Laptop! You\'re mining automatically now. Visit the Exchange \u{1F4C8} to sell sats for USD.',
       '\u{1F9D9} You\'re a real miner now! Explore the town \u2014 there\'s lots to discover. Good luck! \u{1F680}',
     ],
     _lastGuideStep: -1,

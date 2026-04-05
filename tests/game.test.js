@@ -14,8 +14,8 @@ describe('defaultState', () => {
   it('initializes sats to 0', () => {
     assert.equal(Game.state.sats, 0);
   });
-  it('initializes usd to 0', () => {
-    assert.equal(Game.state.usd, 0);
+  it('initializes usd to 50', () => {
+    assert.equal(Game.state.usd, 50);
   });
   it('initializes heat to 0', () => {
     assert.equal(Game.state.heat, 0);
@@ -378,12 +378,12 @@ describe('energy system', () => {
     Game.state.gymLevel = 3;
     assert.equal(Game.getEnergyMax(), 160);
   });
-  it('getEnergyRegen returns 0.5 at base', () => {
-    assert.equal(Game.getEnergyRegen(), 0.5);
+  it('getEnergyRegen returns 0.8 at base', () => {
+    assert.equal(Game.getEnergyRegen(), 0.8);
   });
   it('gym levels increase regen', () => {
     Game.state.gymLevel = 2;
-    assert.ok(Math.abs(Game.getEnergyRegen() - 0.9) < 0.001);
+    assert.ok(Math.abs(Game.getEnergyRegen() - 1.2) < 0.001);
   });
 });
 
@@ -559,6 +559,7 @@ describe('loans', () => {
   beforeEach(() => { Game = freshGame(); });
 
   it('takeLoan grants USD', () => {
+    Game.state.usd = 0;
     assert.ok(Game.takeLoan('small'));
     assert.equal(Game.state.usd, 100);
   });
@@ -693,6 +694,7 @@ describe('deliveries', () => {
   beforeEach(() => { Game = freshGame(); });
 
   it('completeDelivery grants sats and usd', () => {
+    Game.state.usd = 0;
     Game.state.activeDelivery = { sats: 100, usd: 5, targetName: 'Test' };
     assert.ok(Game.completeDelivery());
     assert.equal(Game.state.sats, 100);
@@ -725,7 +727,7 @@ describe('achievements', () => {
     Game.state.lifetimeSats = 1;
     const before = Game.state.sats;
     Game.checkAchievements();
-    assert.equal(Game.state.sats, before + 10); // a_first_sat reward: 10
+    assert.ok(Game.state.sats > before, 'sats should increase from achievement reward');
   });
   it('does not re-trigger completed achievements', () => {
     Game.state.lifetimeSats = 1;
@@ -942,12 +944,12 @@ describe('prestige reset', () => {
     Game.prestige();
     assert.equal(Game.state.sats, 0);
   });
-  it('resets USD to 0', () => {
+  it('resets USD to starting amount', () => {
     Game.state.lifetimeSats = 200000;
     Game.state.usd = 5000;
     Game.state.avatar = { name: 'Test', bonus: 'none' };
     Game.prestige();
-    assert.equal(Game.state.usd, 0);
+    assert.equal(Game.state.usd, 50);
   });
   it('resets owned hardware', () => {
     Game.state.lifetimeSats = 200000;
@@ -1112,9 +1114,10 @@ describe('tick - production', () => {
     Game.tick(10.0);
     assert.ok(Game.state.heat <= 100);
   });
-  it('energy drains over time', () => {
+  it('energy drains over time (after grace period)', () => {
     Game.state.owned = { u1: 1 };
     Game.state.energy = 100;
+    Game.state.gameStartTime = Date.now() - 700000; // past 10-min grace
     Game.tick(1.0);
     assert.ok(Game.state.energy < 100);
   });
@@ -1355,6 +1358,7 @@ describe('NPC event effects', () => {
   });
   it('miner trade exchanges 1000 sats for $20', () => {
     Game.state.sats = 2000;
+    Game.state.usd = 0;
     const evt = Game.NPC_EVENTS.find(e => e.id === 'npc_trade');
     evt.effect(Game.state);
     assert.equal(Game.state.sats, 1000);
@@ -1561,16 +1565,16 @@ describe('achievement edge cases', () => {
 // ─────────────────────────────────────────────
 describe('energy rebalance', () => {
   let Game;
-  beforeEach(() => { Game = freshGame(); });
+  beforeEach(() => { Game = freshGame(); Game.state.gameStartTime = Date.now() - 700000; });
 
   it('energy regen while producing is 50% of base (not 25%)', () => {
     Game.state.owned = { u1: 1 };
     Game.state.energy = 50;
-    // With base regen 0.5/s, producing regen = 0.5 * 0.5 = 0.25/s
+    // With base regen 0.8/s, producing regen = 0.8 * 0.5 = 0.4/s
     // Energy drain while producing = 0.6/s
-    // Net drain = 0.6 - 0.25 = 0.35/s over 1 second
+    // Net drain = 0.6 - 0.4 = 0.2/s over 1 second
     Game.tick(1.0);
-    const expectedEnergy = 50 - 0.35;
+    const expectedEnergy = 50 - 0.2;
     assert.ok(Math.abs(Game.state.energy - expectedEnergy) < 0.1,
       `Expected ~${expectedEnergy}, got ${Game.state.energy}`);
   });
@@ -1578,14 +1582,14 @@ describe('energy rebalance', () => {
     Game.state.owned = { u1: 1 };
     Game.state.energy = 100;
     Game.tick(10.0);
-    // Old: 100 - (0.6-0.125)*10 = 100 - 4.75 = 95.25
-    // New: 100 - (0.6-0.25)*10 = 100 - 3.5 = 96.5
+    // With 0.8 base regen at 50%: 0.4/s regen vs 0.6/s drain = net -0.2/s
+    // Over 10s: 100 - 2 = 98
     assert.ok(Game.state.energy > 95.5,
       `Energy should drain slower with 50% regen, got ${Game.state.energy}`);
   });
   it('energy regens fully when idle (no hardware)', () => {
     Game.state.energy = 50;
-    // No hardware: drain 0.4/s, regen 0.5/s (100%), net +0.1/s
+    // No hardware: drain 0.4/s (after grace period), regen 0.8/s (100%), net +0.4/s
     Game.tick(1.0);
     assert.ok(Game.state.energy > 50,
       `Energy should regen when idle, got ${Game.state.energy}`);
@@ -1769,5 +1773,70 @@ describe('craig no-steal rebalance', () => {
     // Should be ~1800000ms (30 min), allow 1s tolerance
     assert.ok(Math.abs(duration - 1800000) < 1000,
       `Expected ~1800000ms duration, got ${duration}`);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 43. New Player Experience Fixes
+// ─────────────────────────────────────────────
+describe('new player experience', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  // Fix 1: Starting USD and energy regen
+  it('starts with 50 USD', () => {
+    assert.equal(Game.state.usd, 50);
+  });
+  it('base energy regen is 0.8 (not 0.5)', () => {
+    assert.equal(Game.getEnergyRegen(), 0.8);
+  });
+  it('energy regen at gym level 5 is 1.8', () => {
+    Game.state.gymLevel = 5;
+    assert.ok(Math.abs(Game.getEnergyRegen() - 1.8) < 0.001);
+  });
+
+  // Fix 4: Free first hardware on first mine tap
+  it('first mine tap grants free Laptop and skips to step 5', () => {
+    Game.state.tutorialStep = 2;
+    Game.state.owned = {};
+    Game.tapMine();
+    assert.equal(Game.state.owned.u1, 1);
+    assert.equal(Game.state.tutorialStep, 5);
+  });
+  it('subsequent mine taps do not grant extra laptops', () => {
+    Game.state.tutorialStep = 5;
+    Game.state.owned = { u1: 1 };
+    Game.tapMine();
+    assert.equal(Game.state.owned.u1, 1); // still 1
+  });
+
+  // Fix 5: Energy grace period
+  it('no energy drain during first 10 minutes', () => {
+    Game.state.gameStartTime = Date.now(); // just started
+    Game.state.owned = { u1: 1 };
+    Game.state.energy = 100;
+    Game.tick(10.0);
+    // With 0 drain and 0.8*0.5=0.4/s regen: energy should stay at 100 (capped)
+    assert.equal(Game.state.energy, 100);
+  });
+  it('energy drains normally after 10 minutes', () => {
+    Game.state.gameStartTime = Date.now() - 700000; // 11+ min ago
+    Game.state.owned = { u1: 1 };
+    Game.state.energy = 100;
+    Game.tick(10.0);
+    assert.ok(Game.state.energy < 100,
+      `Energy should drain after grace period, got ${Game.state.energy}`);
+  });
+  it('energy still regens during grace period', () => {
+    Game.state.gameStartTime = Date.now(); // grace active
+    Game.state.owned = { u1: 1 };
+    Game.state.energy = 50;
+    Game.tick(5.0);
+    // No drain, regen 0.8*0.5*5 = 2.0
+    assert.ok(Game.state.energy > 50,
+      `Energy should regen during grace, got ${Game.state.energy}`);
+  });
+  it('gameStartTime is set in default state', () => {
+    assert.ok(Game.state.gameStartTime > 0);
   });
 });

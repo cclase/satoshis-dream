@@ -69,6 +69,9 @@ def _run_generation(
     retry_count: int,
     pause_seconds: float,
     limit: int | None,
+    remesh: bool,
+    remesh_band: int,
+    remesh_project: int,
 ) -> None:
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -128,9 +131,9 @@ def _run_generation(
                     aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
                     decimation_target=decimation_target,
                     texture_size=texture_size,
-                    remesh=True,
-                    remesh_band=1,
-                    remesh_project=0,
+                    remesh=remesh,
+                    remesh_band=remesh_band,
+                    remesh_project=remesh_project,
                     verbose=True,
                 )
                 glb.export(str(out_path), extension_webp=True)
@@ -191,6 +194,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--retry-count", type=int, default=2)
     parser.add_argument("--pause-seconds", type=float, default=4.0)
     parser.add_argument(
+        "--remesh",
+        action="store_true",
+        help="Enable remesh step in o_voxel.postprocess.to_glb (heavier dependencies).",
+    )
+    parser.add_argument("--remesh-band", type=int, default=1)
+    parser.add_argument("--remesh-project", type=int, default=0)
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -213,6 +223,9 @@ def main() -> int:
         retry_count=args.retry_count,
         pause_seconds=args.pause_seconds,
         limit=args.limit,
+        remesh=args.remesh,
+        remesh_band=args.remesh_band,
+        remesh_project=args.remesh_project,
     )
     return 0
 

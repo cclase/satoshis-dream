@@ -18,13 +18,14 @@ This pipeline generates a full replacement `.glb` set for Satoshi's Dream on a f
 
 ```bash
 %%bash
+set -e
 cd TRELLIS.2
 pip install -U pip
-pip install -r requirements.txt
+. ./setup.sh --basic --o-voxel
 pip install -e .
 ```
 
-If the repo's `requirements.txt` changes upstream, follow the latest official setup steps in the TRELLIS.2 README.
+Note: TRELLIS.2 does not use a root `requirements.txt` in the current main branch.
 
 ## 4) Generate asset pack
 

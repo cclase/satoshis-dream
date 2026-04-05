@@ -233,10 +233,14 @@
       var camRadius = canvasEl.clientWidth < 600 ? 1000 : 700; // farther on mobile
       this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, 0.65, camRadius,
         new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
-      // Only enable scroll wheel zoom — NO pointer drag (conflicts with touch-to-move)
+      // Remove all default inputs, then only add scroll wheel zoom
+      this._camera3.inputs.clear();
       this._camera3.inputs.addMouseWheel();
       this._camera3.lowerRadiusLimit = 400;
       this._camera3.upperRadiusLimit = 1200;
+      // Lock alpha (horizontal rotation) so arrow keys stay consistent
+      this._camera3.lowerAlphaLimit = -Math.PI / 4;
+      this._camera3.upperAlphaLimit = -Math.PI / 4;
       this._camera3.lowerBetaLimit = 0.5;  // ~29° from vertical (steepest)
       this._camera3.upperBetaLimit = 0.8;  // ~46° from vertical (lowest)
 
@@ -844,11 +848,13 @@
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
-      // Rotate input from screen space to world space for isometric camera (alpha = -PI/4)
-      // Derived empirically: screen-up = game(-x,+y), screen-right = game(+x,+y)
-      if (dx !== 0 || dy !== 0) {
-        var rdx = (dx + dy) * 0.707;
-        var rdy = (dx - dy) * 0.707;
+      // Rotate input from screen space to world space using live camera alpha
+      // BabylonJS left-handed: screen-right = (-sinA, cosA), screen-down = (cosA, sinA)
+      if ((dx !== 0 || dy !== 0) && this._camera3) {
+        var a = this._camera3.alpha;
+        var sinA = Math.sin(a), cosA = Math.cos(a);
+        var rdx = dx * (-sinA) + dy * cosA;
+        var rdy = dx * cosA + dy * sinA;
         dx = rdx; dy = rdy;
       }
 

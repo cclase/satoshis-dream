@@ -229,7 +229,7 @@
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
   var BUILDING_MODEL_ROOT = 'models/';
-  var BUILDING_MODEL_FILES = {
+  var BUILDING_MODELS = {
     mine: 'mine_hq.glb',
     hardware: 'hardware_shop.glb',
     exchange: 'exchange.glb',
@@ -301,7 +301,7 @@
       sun.position = new BABYLON.Vector3(1400,950,-320);
       this._shadowGen = new BABYLON.ShadowGenerator(2048, sun);
       this._shadowGen.useBlurExponentialShadowMap = true;
-      this._shadowGen.blurKernel = 24;
+      this._shadowGen.blurKernel = 32;
       this._shadowGen.depthScale = 50;
       this._shadowGen.darkness = 0.42;
       this._shadowGen.bias = 0.0002;
@@ -402,18 +402,18 @@
       var pipeline = new BABYLON.DefaultRenderingPipeline('defaultPipeline', true, s, [cam]);
       pipeline.fxaaEnabled = true;
       pipeline.bloomEnabled = true;
-      pipeline.bloomThreshold = 0.88;
-      pipeline.bloomWeight = 0.12;
-      pipeline.bloomKernel = 48;
-      pipeline.bloomScale = 0.7;
+      pipeline.bloomThreshold = 0.7;
+      pipeline.bloomWeight = 0.3;
+      pipeline.bloomKernel = 32;
+      pipeline.bloomScale = 0.5;
       pipeline.imageProcessingEnabled = true;
       pipeline.imageProcessing.toneMappingEnabled = true;
       pipeline.imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-      pipeline.imageProcessing.contrast = 1.15;
-      pipeline.imageProcessing.exposure = 1.0;
+      pipeline.imageProcessing.contrast = 1.1;
+      pipeline.imageProcessing.exposure = 1.05;
       pipeline.imageProcessing.vignetteEnabled = true;
-      pipeline.imageProcessing.vignetteWeight = 0.22;
-      pipeline.imageProcessing.vignetteStretch = 0.12;
+      pipeline.imageProcessing.vignetteWeight = 0.5;
+      pipeline.imageProcessing.vignetteStretch = 0.3;
       this._pipeline = pipeline;
     },
 
@@ -474,7 +474,13 @@
         var x=Math.random()*512, y=Math.random()*512, r=4+Math.random()*14;
         var a=0.03+Math.random()*0.07;
         gctx.fillStyle='rgba('+(58+Math.floor(Math.random()*35))+','+(84+Math.floor(Math.random()*45))+','+(45+Math.floor(Math.random()*25))+','+a+')';
-        gctx.beginPath(); gctx.arc(x,y,r,0,Math.PI*2); gctx.fill();
+        if (typeof gctx.arc === 'function') {
+          gctx.beginPath();
+          gctx.arc(x, y, r, 0, Math.PI * 2);
+          gctx.fill();
+        } else {
+          gctx.fillRect(x - r, y - r, r * 2, r * 2);
+        }
       }
       var gid=gctx.getImageData(0,0,512,512);
       for(var p=0;p<gid.data.length;p+=4){
@@ -587,7 +593,7 @@
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var bestPackFile = BUILDING_MODEL_FILES[b.panelType];
+          var bestPackFile = BUILDING_MODELS[b.panelType];
           var legacyFile = LEGACY_MODEL_FILES[idx % LEGACY_MODEL_FILES.length];
 
           // Ground each building on a lot pad so it doesn't look like it floats on grass.
@@ -654,9 +660,10 @@
             if (modelD < 0.01) modelD = 1;
 
             // Fill most of the lot while preserving true model proportions.
+            var uniformScale = Math.min(b.w / modelW, b.h / modelD);
+            uniformScale *= 0.72;
             var targetW = b.w * 0.72;
             var targetD = b.h * 0.72;
-            var uniformScale = Math.min(targetW / modelW, targetD / modelD);
             var targetH = (BLDG_HEIGHTS[b.panelType] || 40) * 1.15;
             if (modelH * uniformScale < targetH * 0.7) {
               uniformScale = targetH / modelH;
@@ -677,9 +684,10 @@
             shadowPatch.material = shadowPatchMat;
 
             // Reposition labels based on actual scaled model height
-            var actualHeight = bounds.max.y - bounds.min.y;
-            if (self._labelMeshes[idx]) self._labelMeshes[idx].position.y = root.position.y + actualHeight + 18;
-            if (self._emojiMeshes[idx]) self._emojiMeshes[idx].position.y = root.position.y + actualHeight + 38;
+            var actualHeight = modelH * uniformScale;
+            actualHeight += root.position.y;
+            if (self._labelMeshes[idx]) self._labelMeshes[idx].position.y = actualHeight + 18;
+            if (self._emojiMeshes[idx]) self._emojiMeshes[idx].position.y = actualHeight + 38;
 
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
@@ -723,7 +731,7 @@
                 placeModel(meshes[0], meshes);
                 _updateLoadingBar();
               }, function(legacyErr) {
-                console.warn('Building load failed for ' + b.id + ': ' + bestErr + ' | fallback: ' + legacyErr);
+                console.warn('Failed to load ' + b.id + ': ' + bestErr + ' | fallback: ' + legacyErr);
                 createFallbackBox();
                 _updateLoadingBar();
               });
@@ -733,7 +741,7 @@
               placeModel(meshes[0], meshes);
               _updateLoadingBar();
             }, function(legacyErr) {
-              console.warn('Building load failed for ' + b.id + ': ' + legacyErr);
+              console.warn('Failed to load ' + b.id + ': ' + legacyErr);
               createFallbackBox();
               _updateLoadingBar();
             });
@@ -1294,7 +1302,7 @@
       this._updateBuildingEmissives(t);
       // Adjust pipeline exposure for night
       if (this._pipeline && this._pipeline.imageProcessing) {
-        this._pipeline.imageProcessing.exposure = t >= 0.7 && t < 0.85 ? 0.82 : 0.98;
+        this._pipeline.imageProcessing.exposure = t >= 0.7 && t < 0.85 ? 0.85 : 1.05;
       }
       // Adjust light intensity
       var hemi = s.getLightByName('hemi');

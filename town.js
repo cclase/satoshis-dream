@@ -845,9 +845,10 @@
       if (keys.down)  dy += 1;
 
       // Rotate input from screen space to world space for isometric camera (alpha = -PI/4)
+      // Derived empirically: screen-up = game(-x,+y), screen-right = game(+x,+y)
       if (dx !== 0 || dy !== 0) {
         var rdx = (dx + dy) * 0.707;
-        var rdy = (-dx + dy) * 0.707;
+        var rdy = (dx - dy) * 0.707;
         dx = rdx; dy = rdy;
       }
 

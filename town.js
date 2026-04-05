@@ -259,7 +259,7 @@
       this._buildPostProcess();
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
+      this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon();
 
       var self = this;
       window.addEventListener('resize', function() { self.resize(); });
@@ -721,6 +721,22 @@
       this._promptMesh.setEnabled(false);
     },
 
+    _buildBeacon: function() {
+      var s = this._scene;
+      // Pulsing column of light over Mining HQ during tutorial
+      this._beaconMesh = BABYLON.MeshBuilder.CreateCylinder('beacon', {height: 200, diameter: 20, tessellation: 12}, s);
+      var bmat = new BABYLON.StandardMaterial('beaconMat', s);
+      bmat.diffuseColor = new BABYLON.Color3(1, 0.58, 0.1);
+      bmat.emissiveColor = new BABYLON.Color3(1, 0.58, 0.1);
+      bmat.alpha = 0.3;
+      this._beaconMesh.material = bmat;
+      // Position over Mining HQ center (x:128, y:128, w:256, h:192)
+      this._beaconMesh.position.x = 128 + 256 / 2;
+      this._beaconMesh.position.z = 128 + 192 / 2;
+      this._beaconMesh.position.y = 100;
+      this._beaconMesh.setEnabled(false);
+    },
+
     // ── Resize ──
 
     resize: function() {
@@ -962,6 +978,16 @@
         this._moveTargetMesh.position.y = 0.5;
       } else if (this._moveTargetMesh) {
         this._moveTargetMesh.setEnabled(false);
+      }
+
+      // Sync beacon (pulse over Mining HQ during tutorial steps 1-2)
+      if (this._beaconMesh) {
+        var showBeacon = Game.state.tutorialStep >= 1 && Game.state.tutorialStep <= 2;
+        this._beaconMesh.setEnabled(showBeacon);
+        if (showBeacon) {
+          var pulse = 0.3 + 0.2 * Math.sin(Date.now() * 0.003);
+          this._beaconMesh.material.alpha = pulse;
+        }
       }
 
       // Sync prompt

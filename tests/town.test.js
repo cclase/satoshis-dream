@@ -448,3 +448,32 @@ describe('building model assignment', () => {
     assert.ok(src.includes('BUILDING_MODELS[b.panelType]'));
   });
 });
+
+// ─────────────────────────────────────────────
+// 9. New Player Experience - Visual Aids
+// ─────────────────────────────────────────────
+describe('new player visual aids', () => {
+  it('town.js has beacon builder for Mining HQ', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_buildBeacon'));
+    assert.ok(src.includes('beaconMesh'));
+  });
+  it('beacon shows during tutorial steps 1-2', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('tutorialStep >= 1 && Game.state.tutorialStep <= 2'));
+  });
+  it('ui.js has control hints overlay', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+    assert.ok(src.includes('_showControlHints'));
+    assert.ok(src.includes('control-hints'));
+  });
+  it('control hints show different content for mobile vs desktop', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+    assert.ok(src.includes('Tap the ground to walk'));
+    assert.ok(src.includes('WASD / Arrow keys to move'));
+  });
+  it('tutorial step 5 message mentions free Laptop', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+    assert.ok(src.includes('Free Laptop'));
+  });
+});

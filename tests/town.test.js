@@ -521,3 +521,52 @@ describe('new player visual aids', () => {
     assert.ok(src.includes('Free Laptop'));
   });
 });
+
+// ─────────────────────────────────────────────
+// 11. Arrow Key Movement Direction
+// ─────────────────────────────────────────────
+describe('arrow key movement direction', () => {
+  // Extract the rotation transform from town.js and test it directly.
+  // The transform converts screen-space input (dx,dy) to game-world (dx,dy)
+  // for the isometric camera at alpha=-PI/4 (left-handed BabylonJS).
+  //
+  // Expected screen-to-game mapping:
+  //   Screen up    → game (-x, +y)
+  //   Screen right → game (+x, +y)
+  //   Screen down  → game (+x, -y)
+  //   Screen left  → game (-x, -y)
+  function applyRotation(dx, dy) {
+    return { dx: (dx + dy) * 0.707, dy: (dx - dy) * 0.707 };
+  }
+
+  it('up arrow moves character toward top of screen: game(-x, +y)', () => {
+    const r = applyRotation(0, -1); // up: dy=-1
+    assert.ok(r.dx < 0, 'game dx should be negative (left in world)');
+    assert.ok(r.dy > 0, 'game dy should be positive (up in world)');
+  });
+  it('down arrow moves character toward bottom of screen: game(+x, -y)', () => {
+    const r = applyRotation(0, 1); // down: dy=+1
+    assert.ok(r.dx > 0, 'game dx should be positive');
+    assert.ok(r.dy < 0, 'game dy should be negative');
+  });
+  it('right arrow moves character toward right of screen: game(+x, +y)', () => {
+    const r = applyRotation(1, 0); // right: dx=+1
+    assert.ok(r.dx > 0, 'game dx should be positive');
+    assert.ok(r.dy > 0, 'game dy should be positive');
+  });
+  it('left arrow moves character toward left of screen: game(-x, -y)', () => {
+    const r = applyRotation(-1, 0); // left: dx=-1
+    assert.ok(r.dx < 0, 'game dx should be negative');
+    assert.ok(r.dy < 0, 'game dy should be negative');
+  });
+  it('diagonal up-right moves in pure +y direction', () => {
+    const r = applyRotation(1, -1); // up+right
+    assert.ok(Math.abs(r.dx) < 0.01, 'dx should be ~0 for diagonal');
+    assert.ok(r.dy > 0, 'dy should be positive');
+  });
+  it('town.js uses the correct rotation formula', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('var rdx = (dx + dy) * 0.707'));
+    assert.ok(src.includes('var rdy = (dx - dy) * 0.707'));
+  });
+});

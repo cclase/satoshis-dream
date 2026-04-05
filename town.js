@@ -228,28 +228,28 @@
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
-  var BUILDING_MODEL_ROOT = 'models/satoshis_dream_best_pack/models/';
+  var BUILDING_MODEL_ROOT = 'models/';
   var BUILDING_MODEL_FILES = {
-    mine: 'building-mining-hq.glb',
-    hardware: 'building-hardware-shop.glb',
-    exchange: 'building-exchange.glb',
-    bank: 'building-bank.glb',
-    diner: 'building-diner.glb',
-    coffee: 'building-coffee-shop.glb',
-    university: 'building-university.glb',
-    hospital: 'building-hospital.glb',
-    internet_cafe: 'building-internet-cafe.glb',
-    casino: 'building-casino.glb',
-    post_office: 'building-post-office.glb',
-    gym: 'building-gym.glb',
-    real_estate: 'building-real-estate.glb',
-    car_dealer: 'building-car-dealership.glb',
-    pet_shop: 'building-pet-shop.glb',
-    pawn_shop: 'building-pawn-shop.glb',
-    utility: 'building-utility-company.glb',
-    clothing: 'building-clothing-store.glb',
-    apartment: 'building-home.glb',
-    homegoods: 'building-home-goods-store.glb'
+    mine: 'mine_hq.glb',
+    hardware: 'hardware_shop.glb',
+    exchange: 'exchange.glb',
+    bank: 'bank.glb',
+    diner: 'diner.glb',
+    coffee: 'coffee_shop.glb',
+    university: 'university.glb',
+    hospital: 'hospital.glb',
+    internet_cafe: 'internet_cafe.glb',
+    casino: 'casino.glb',
+    post_office: 'post_office.glb',
+    gym: 'gym.glb',
+    real_estate: 'real_estate_office.glb',
+    car_dealer: 'hardware_shop.glb',
+    pet_shop: 'pet_shop.glb',
+    pawn_shop: 'pawn_shop.glb',
+    utility: 'bitcoin_atm.glb',
+    clothing: 'clothing_store.glb',
+    apartment: 'apartment_building.glb',
+    homegoods: 'furniture_store.glb'
   };
   var LEGACY_MODEL_FILES = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
 
@@ -274,8 +274,8 @@
       this._scene.clearColor = new BABYLON.Color4(0.55, 0.75, 0.95, 1);
       this._scene.ambientColor = new BABYLON.Color3(0.5, 0.5, 0.5);
       this._scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-      this._scene.fogDensity = 0.0001;
-      this._scene.fogColor = new BABYLON.Color3(0.6, 0.78, 0.95);
+      this._scene.fogDensity = 0.000055;
+      this._scene.fogColor = new BABYLON.Color3(0.68, 0.78, 0.88);
 
       // Camera: steeper angle, distance adapts to screen width
       var camRadius = canvasEl.clientWidth < 600 ? 1000 : 700; // farther on mobile
@@ -289,21 +289,21 @@
       // Lock alpha (horizontal rotation) so arrow keys stay consistent
       this._camera3.lowerAlphaLimit = -Math.PI / 4;
       this._camera3.upperAlphaLimit = -Math.PI / 4;
-      this._camera3.lowerBetaLimit = 0.5;  // ~29° from vertical (steepest)
-      this._camera3.upperBetaLimit = 0.8;  // ~46° from vertical (lowest)
+      this._camera3.lowerBetaLimit = 0.62;
+      this._camera3.upperBetaLimit = 1.0;
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
-      hemi.intensity = 0.7; hemi.diffuse = new BABYLON.Color3(1,1,0.95);
-      hemi.groundColor = new BABYLON.Color3(0.4,0.45,0.5);
+      hemi.intensity = 0.58; hemi.diffuse = new BABYLON.Color3(0.98,0.97,0.95);
+      hemi.groundColor = new BABYLON.Color3(0.22,0.25,0.28);
 
-      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.5,-3,-1), this._scene);
-      sun.intensity = 1.0; sun.diffuse = new BABYLON.Color3(1,0.95,0.85);
-      sun.position = new BABYLON.Vector3(2000,800,-200);
+      var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.35,-1,-0.42), this._scene);
+      sun.intensity = 1.15; sun.diffuse = new BABYLON.Color3(1,0.95,0.86);
+      sun.position = new BABYLON.Vector3(1400,950,-320);
       this._shadowGen = new BABYLON.ShadowGenerator(2048, sun);
       this._shadowGen.useBlurExponentialShadowMap = true;
-      this._shadowGen.blurKernel = 32;
+      this._shadowGen.blurKernel = 24;
       this._shadowGen.depthScale = 50;
-      this._shadowGen.darkness = 0.35;
+      this._shadowGen.darkness = 0.42;
       this._shadowGen.bias = 0.0002;
       this._shadowGen.normalBias = 0.03;
 
@@ -398,32 +398,22 @@
     _buildPostProcess: function() {
       var s = this._scene;
       var cam = this._camera3;
-      // Default rendering pipeline: FXAA + bloom + image processing
-      if (!BABYLON.DefaultRenderingPipeline) return; // guard for older builds
+      if (!BABYLON.DefaultRenderingPipeline) return;
       var pipeline = new BABYLON.DefaultRenderingPipeline('defaultPipeline', true, s, [cam]);
-
-      // FXAA antialiasing
       pipeline.fxaaEnabled = true;
-
-      // Bloom for emissive materials (gold orbs, neon signs, night windows)
       pipeline.bloomEnabled = true;
-      pipeline.bloomThreshold = 0.7;
-      pipeline.bloomWeight = 0.3;
-      pipeline.bloomKernel = 32;
-      pipeline.bloomScale = 0.5;
-
-      // Image processing (subtle color grading)
+      pipeline.bloomThreshold = 0.88;
+      pipeline.bloomWeight = 0.12;
+      pipeline.bloomKernel = 48;
+      pipeline.bloomScale = 0.7;
       pipeline.imageProcessingEnabled = true;
       pipeline.imageProcessing.toneMappingEnabled = true;
       pipeline.imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-      pipeline.imageProcessing.contrast = 1.1;
-      pipeline.imageProcessing.exposure = 1.05;
-
-      // Vignette for cinematic feel
+      pipeline.imageProcessing.contrast = 1.15;
+      pipeline.imageProcessing.exposure = 1.0;
       pipeline.imageProcessing.vignetteEnabled = true;
-      pipeline.imageProcessing.vignetteWeight = 0.5;
-      pipeline.imageProcessing.vignetteStretch = 0.3;
-
+      pipeline.imageProcessing.vignetteWeight = 0.22;
+      pipeline.imageProcessing.vignetteStretch = 0.12;
       this._pipeline = pipeline;
     },
 
@@ -473,44 +463,115 @@
       var s = this._scene;
       var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
       ground.position.x=WORLD_W/2; ground.position.z=WORLD_H/2; ground.receiveShadows=true;
-      var gc=document.createElement('canvas'); gc.width=256; gc.height=256;
-      var gctx=gc.getContext('2d'); gctx.fillStyle='#5a8a4a'; gctx.fillRect(0,0,256,256);
-      var gid=gctx.getImageData(0,0,256,256);
-      for(var i=0;i<gid.data.length;i+=4){var n=(Math.random()-0.5)*15;gid.data[i]=Math.min(255,Math.max(0,gid.data[i]+n));gid.data[i+1]=Math.min(255,Math.max(0,gid.data[i+1]+n));gid.data[i+2]=Math.min(255,Math.max(0,gid.data[i+2]+n));}
+      var gc=document.createElement('canvas'); gc.width=512; gc.height=512;
+      var gctx=gc.getContext('2d');
+      var grad=gctx.createLinearGradient(0,0,512,512);
+      grad.addColorStop(0,'#486f3f');
+      grad.addColorStop(0.5,'#547a46');
+      grad.addColorStop(1,'#3e6438');
+      gctx.fillStyle=grad; gctx.fillRect(0,0,512,512);
+      for(var i=0;i<2200;i++){
+        var x=Math.random()*512, y=Math.random()*512, r=4+Math.random()*14;
+        var a=0.03+Math.random()*0.07;
+        gctx.fillStyle='rgba('+(58+Math.floor(Math.random()*35))+','+(84+Math.floor(Math.random()*45))+','+(45+Math.floor(Math.random()*25))+','+a+')';
+        gctx.beginPath(); gctx.arc(x,y,r,0,Math.PI*2); gctx.fill();
+      }
+      var gid=gctx.getImageData(0,0,512,512);
+      for(var p=0;p<gid.data.length;p+=4){
+        var n=(Math.random()-0.5)*20;
+        gid.data[p]=Math.min(255,Math.max(0,gid.data[p]+n));
+        gid.data[p+1]=Math.min(255,Math.max(0,gid.data[p+1]+n));
+        gid.data[p+2]=Math.min(255,Math.max(0,gid.data[p+2]+n));
+      }
       gctx.putImageData(gid,0,0);
-      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=40; gtex.vScale=40;
-      var gmat=new BABYLON.StandardMaterial('gmat',s); gmat.diffuseTexture=gtex;
+      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=22; gtex.vScale=17;
+      var gmat=new BABYLON.StandardMaterial('gmat',s);
+      gmat.diffuseTexture=gtex;
+      gmat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);
       ground.material=gmat; this._groundMesh=ground;
     },
 
     _buildRoads: function() {
       var s=this._scene;
-      var rmat=new BABYLON.StandardMaterial('rmat',s); rmat.diffuseColor=new BABYLON.Color3(0.42,0.42,0.4);
-      var swmat=new BABYLON.StandardMaterial('swmat',s); swmat.diffuseColor=new BABYLON.Color3(0.78,0.75,0.7);
-      var lmat=new BABYLON.StandardMaterial('lmat',s); lmat.diffuseColor=new BABYLON.Color3(0.8,0.8,0.4); lmat.emissiveColor=new BABYLON.Color3(0.2,0.2,0.1);
+      var rc=document.createElement('canvas'); rc.width=256; rc.height=256;
+      var rctx=rc.getContext('2d'); rctx.fillStyle='#3f4348'; rctx.fillRect(0,0,256,256);
+      for(var i=0;i<1200;i++){
+        var v=52+Math.floor(Math.random()*32), a=0.03+Math.random()*0.08;
+        rctx.fillStyle='rgba('+v+','+v+','+(v+4)+','+a+')';
+        rctx.fillRect(Math.random()*256,Math.random()*256,2+Math.random()*6,2+Math.random()*6);
+      }
+      var rtex=new BABYLON.Texture(rc.toDataURL(),s); rtex.uScale=32; rtex.vScale=14;
+      var rmat=new BABYLON.StandardMaterial('rmat',s);
+      rmat.diffuseTexture=rtex;
+      rmat.specularColor=new BABYLON.Color3(0.08,0.08,0.08);
+
+      var swc=document.createElement('canvas'); swc.width=128; swc.height=128;
+      var swctx=swc.getContext('2d'); swctx.fillStyle='#a8a69c'; swctx.fillRect(0,0,128,128);
+      for(var j=0;j<420;j++){
+        var sv=145+Math.floor(Math.random()*35), sa=0.03+Math.random()*0.07;
+        swctx.fillStyle='rgba('+sv+','+sv+','+(sv-5)+','+sa+')';
+        swctx.fillRect(Math.random()*128,Math.random()*128,2+Math.random()*4,2+Math.random()*4);
+      }
+      var swtex=new BABYLON.Texture(swc.toDataURL(),s); swtex.uScale=50; swtex.vScale=50;
+      var swmat=new BABYLON.StandardMaterial('swmat',s);
+      swmat.diffuseTexture=swtex;
+      swmat.specularColor=new BABYLON.Color3(0.06,0.06,0.06);
+
+      var lmat=new BABYLON.StandardMaterial('lmat',s);
+      lmat.diffuseColor=new BABYLON.Color3(0.92,0.9,0.74);
+      lmat.emissiveColor=new BABYLON.Color3(0.05,0.05,0.03);
+
+      var curbMat=new BABYLON.StandardMaterial('curbMat',s);
+      curbMat.diffuseColor=new BABYLON.Color3(0.74,0.74,0.71);
+
       for(var ri=0;ri<H_ROADS.length;ri++){
         var hr=H_ROADS[ri]; var cz=hr.y+hr.h/2;
         var rd=BABYLON.MeshBuilder.CreateGround('hr'+ri,{width:2400,height:hr.h},s);
         rd.position.x=1200;rd.position.y=0.15;rd.position.z=cz;rd.material=rmat;rd.receiveShadows=true;
-        var sw1=BABYLON.MeshBuilder.CreateGround('hsw1'+ri,{width:2400,height:12},s);
-        sw1.position.set(1200,0.3,hr.y-6);sw1.material=swmat;sw1.receiveShadows=true;
-        var sw2=BABYLON.MeshBuilder.CreateGround('hsw2'+ri,{width:2400,height:12},s);
-        sw2.position.set(1200,0.3,hr.y+hr.h+6);sw2.material=swmat;sw2.receiveShadows=true;
+        var sw1=BABYLON.MeshBuilder.CreateGround('hsw1'+ri,{width:2400,height:10},s);
+        sw1.position.set(1200,0.28,hr.y-5);sw1.material=swmat;sw1.receiveShadows=true;
+        var sw2=BABYLON.MeshBuilder.CreateGround('hsw2'+ri,{width:2400,height:10},s);
+        sw2.position.set(1200,0.28,hr.y+hr.h+5);sw2.material=swmat;sw2.receiveShadows=true;
+        var curb1=BABYLON.MeshBuilder.CreateGround('hcurb1'+ri,{width:2400,height:2},s);
+        curb1.position.set(1200,0.36,hr.y+0.5);curb1.material=curbMat;
+        var curb2=BABYLON.MeshBuilder.CreateGround('hcurb2'+ri,{width:2400,height:2},s);
+        curb2.position.set(1200,0.36,hr.y+hr.h-0.5);curb2.material=curbMat;
         for(var d=0;d<30;d++){var dx=d*80+20;if(dx>2400)break;
-          var dash=BABYLON.MeshBuilder.CreateGround('hd'+ri+'_'+d,{width:40,height:3},s);
+          var dash=BABYLON.MeshBuilder.CreateGround('hd'+ri+'_'+d,{width:30,height:2.1},s);
           dash.position.set(dx,0.2,cz);dash.material=lmat;}
       }
       for(var vi=0;vi<V_ROADS.length;vi++){
         var vr=V_ROADS[vi]; var cx=vr.x+vr.w/2;
         var vrd=BABYLON.MeshBuilder.CreateGround('vr'+vi,{width:vr.w,height:1700},s);
         vrd.position.x=cx;vrd.position.y=0.15;vrd.position.z=850;vrd.material=rmat;vrd.receiveShadows=true;
-        var vsw1=BABYLON.MeshBuilder.CreateGround('vsw1'+vi,{width:12,height:1700},s);
-        vsw1.position.set(vr.x-6,0.3,850);vsw1.material=swmat;vsw1.receiveShadows=true;
-        var vsw2=BABYLON.MeshBuilder.CreateGround('vsw2'+vi,{width:12,height:1700},s);
-        vsw2.position.set(vr.x+vr.w+6,0.3,850);vsw2.material=swmat;vsw2.receiveShadows=true;
+        var vsw1=BABYLON.MeshBuilder.CreateGround('vsw1'+vi,{width:10,height:1700},s);
+        vsw1.position.set(vr.x-5,0.28,850);vsw1.material=swmat;vsw1.receiveShadows=true;
+        var vsw2=BABYLON.MeshBuilder.CreateGround('vsw2'+vi,{width:10,height:1700},s);
+        vsw2.position.set(vr.x+vr.w+5,0.28,850);vsw2.material=swmat;vsw2.receiveShadows=true;
+        var vcurb1=BABYLON.MeshBuilder.CreateGround('vcurb1'+vi,{width:2,height:1700},s);
+        vcurb1.position.set(vr.x+0.5,0.36,850);vcurb1.material=curbMat;
+        var vcurb2=BABYLON.MeshBuilder.CreateGround('vcurb2'+vi,{width:2,height:1700},s);
+        vcurb2.position.set(vr.x+vr.w-0.5,0.36,850);vcurb2.material=curbMat;
         for(var vd=0;vd<22;vd++){var dz=vd*80+20;if(dz>1700)break;
-          var vdash=BABYLON.MeshBuilder.CreateGround('vd'+vi+'_'+vd,{width:3,height:40},s);
+          var vdash=BABYLON.MeshBuilder.CreateGround('vd'+vi+'_'+vd,{width:2.1,height:30},s);
           vdash.position.set(cx,0.2,dz);vdash.material=lmat;}
+      }
+
+      // Crosswalk bars at all road intersections to break the flat grid look.
+      for (var hi = 0; hi < H_ROADS.length; hi++) {
+        var h = H_ROADS[hi];
+        for (var vi2 = 0; vi2 < V_ROADS.length; vi2++) {
+          var v = V_ROADS[vi2];
+          var ix = v.x + v.w / 2, iz = h.y + h.h / 2;
+          for (var cw = -2; cw <= 2; cw++) {
+            var barH = BABYLON.MeshBuilder.CreateGround('cwH'+hi+'_'+vi2+'_'+cw,{width:22,height:1.4},s);
+            barH.position.set(ix,0.22,iz + cw * 3.1);
+            barH.material = lmat;
+            var barV = BABYLON.MeshBuilder.CreateGround('cwV'+hi+'_'+vi2+'_'+cw,{width:1.4,height:22},s);
+            barV.position.set(ix + cw * 3.1,0.22,iz);
+            barV.material = lmat;
+          }
+        }
       }
     },
 
@@ -528,6 +589,18 @@
           var b = BUILDINGS[idx];
           var bestPackFile = BUILDING_MODEL_FILES[b.panelType];
           var legacyFile = LEGACY_MODEL_FILES[idx % LEGACY_MODEL_FILES.length];
+
+          // Ground each building on a lot pad so it doesn't look like it floats on grass.
+          var lot = BABYLON.MeshBuilder.CreateGround('lot_'+b.id,{width:b.w*0.92,height:b.h*0.92},s);
+          lot.position.set(b.x + b.w / 2, 0.12, b.y + b.h / 2);
+          var lotMat = new BABYLON.StandardMaterial('lotMat_'+b.id,s);
+          var c = b.color || '#888888';
+          var r = parseInt(c.slice(1,3), 16) / 255;
+          var g = parseInt(c.slice(3,5), 16) / 255;
+          var bl = parseInt(c.slice(5,7), 16) / 255;
+          lotMat.diffuseColor = new BABYLON.Color3(r * 0.26 + 0.16, g * 0.26 + 0.16, bl * 0.26 + 0.16);
+          lotMat.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+          lot.material = lotMat;
 
           // Floating label (always visible, doesn't need model to load)
           var bh = BLDG_HEIGHTS[b.panelType] || 40;
@@ -595,6 +668,13 @@
             root.position.x = b.x + b.w / 2;
             root.position.z = b.y + b.h / 2;
             root.position.y = -bounds.min.y + 0.1;
+
+            var shadowPatch = BABYLON.MeshBuilder.CreateGround('bshadow_'+b.id,{width:targetW*1.1,height:targetD*1.1},s);
+            shadowPatch.position.set(root.position.x,0.13,root.position.z);
+            var shadowPatchMat = new BABYLON.StandardMaterial('bshadowM_'+b.id,s);
+            shadowPatchMat.diffuseColor = new BABYLON.Color3(0.06,0.06,0.06);
+            shadowPatchMat.alpha = 0.28;
+            shadowPatch.material = shadowPatchMat;
 
             // Reposition labels based on actual scaled model height
             var actualHeight = bounds.max.y - bounds.min.y;
@@ -1144,15 +1224,15 @@
       // Interpolate sky color
       var r, g, b;
       if (t < 0.6) { // Day
-        r = 0.55; g = 0.75; b = 0.95;
+        r = 0.62; g = 0.73; b = 0.85;
       } else if (t < 0.7) { // Sunset transition
         var p = (t - 0.6) / 0.1;
-        r = 0.55 + p * 0.35; g = 0.75 - p * 0.45; b = 0.95 - p * 0.55;
+        r = 0.62 + p * 0.24; g = 0.73 - p * 0.38; b = 0.85 - p * 0.5;
       } else if (t < 0.85) { // Night
-        r = 0.05; g = 0.08; b = 0.15;
+        r = 0.06; g = 0.09; b = 0.16;
       } else { // Dawn transition
         var p2 = (t - 0.85) / 0.15;
-        r = 0.05 + p2 * 0.5; g = 0.08 + p2 * 0.67; b = 0.15 + p2 * 0.8;
+        r = 0.06 + p2 * 0.56; g = 0.09 + p2 * 0.64; b = 0.16 + p2 * 0.69;
       }
       s.clearColor = new BABYLON.Color4(r, g, b, 1);
       s.fogColor = new BABYLON.Color3(r, g, b);
@@ -1162,13 +1242,13 @@
       this._updateBuildingEmissives(t);
       // Adjust pipeline exposure for night
       if (this._pipeline && this._pipeline.imageProcessing) {
-        this._pipeline.imageProcessing.exposure = t >= 0.7 && t < 0.85 ? 0.85 : 1.05;
+        this._pipeline.imageProcessing.exposure = t >= 0.7 && t < 0.85 ? 0.82 : 0.98;
       }
       // Adjust light intensity
       var hemi = s.getLightByName('hemi');
       var sun = s.getLightByName('sun');
-      if (hemi) hemi.intensity = t < 0.7 ? 0.7 : (t < 0.85 ? 0.2 : 0.2 + ((t - 0.85) / 0.15) * 0.5);
-      if (sun) sun.intensity = t < 0.7 ? 1.0 : (t < 0.85 ? 0.15 : 0.15 + ((t - 0.85) / 0.15) * 0.85);
+      if (hemi) hemi.intensity = t < 0.7 ? 0.58 : (t < 0.85 ? 0.18 : 0.18 + ((t - 0.85) / 0.15) * 0.4);
+      if (sun) sun.intensity = t < 0.7 ? 1.15 : (t < 0.85 ? 0.18 : 0.18 + ((t - 0.85) / 0.15) * 0.97);
     },
 
     // Day/night cycle

@@ -933,13 +933,40 @@
         ghost.setEnabled(false);
         this._ghostMeshes.push(ghost);
       }
-      // Craig mesh (distinct color)
-      var craigMat = new BABYLON.StandardMaterial('craigMat', s);
-      craigMat.diffuseColor = new BABYLON.Color3(0.8, 0.3, 0.3);
-      craigMat.alpha = 0.5;
-      this._craigMesh = BABYLON.MeshBuilder.CreateCylinder('craig', {diameterTop: 12, diameterBottom: 16, height: 24, tessellation: 6}, s);
-      this._craigMesh.material = craigMat;
+      this._craigMesh = new BABYLON.TransformNode('craig', s);
       this._craigMesh.position.y = 12;
+      var self = this;
+      function loadCraigModel() {
+        BABYLON.SceneLoader.ImportMesh('', 'models/', 'npc_craig.glb', s, function(meshes) {
+          if (!meshes.length) return;
+          var host = new BABYLON.TransformNode('craigHost', s);
+          for (var i = 0; i < meshes.length; i++) {
+            if (!meshes[i].parent) meshes[i].parent = host;
+            meshes[i].receiveShadows = true;
+            if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[i]);
+          }
+          host.parent = self._craigMesh;
+          host.computeWorldMatrix(true);
+          var bounds = host.getHierarchyBoundingVectors(true);
+          var h = Math.max(0.01, bounds.max.y - bounds.min.y);
+          var targetH = 24;
+          var sc = targetH / h;
+          host.scaling = new BABYLON.Vector3(sc, sc, sc);
+          host.computeWorldMatrix(true);
+          bounds = host.getHierarchyBoundingVectors(true);
+          host.position.y = -bounds.min.y;
+        }, null, function() {
+          var craigMat = new BABYLON.StandardMaterial('craigMat', s);
+          craigMat.diffuseColor = new BABYLON.Color3(0.8, 0.3, 0.3);
+          craigMat.alpha = 0.5;
+          var fallback = BABYLON.MeshBuilder.CreateCylinder('craigFallback', {diameterTop: 12, diameterBottom: 16, height: 24, tessellation: 6}, s);
+          fallback.material = craigMat;
+          fallback.position.y = 12;
+          fallback.parent = self._craigMesh;
+        });
+      }
+      loadCraigModel();
+
       // Craig label
       var cLabel = BABYLON.MeshBuilder.CreatePlane('craigLabel', {width: 30, height: 8}, s);
       cLabel.position.y = 34; cLabel.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; cLabel.parent = this._craigMesh;
@@ -973,14 +1000,39 @@
     },
 
     _buildAvatar: function() {
-      var s=this._scene;
-      this._avatarRoot=new BABYLON.TransformNode('avRoot',s);
-      this._avatarBody=BABYLON.MeshBuilder.CreateCylinder('avBody',{diameterTop:14,diameterBottom:18,height:26,tessellation:8},s);
-      var bmat=new BABYLON.StandardMaterial('avBM',s); bmat.diffuseColor=new BABYLON.Color3(0.97,0.58,0.1);
-      this._avatarBody.material=bmat; this._avatarBody.position.y=13; this._avatarBody.parent=this._avatarRoot;
-      this._avatarHead=BABYLON.MeshBuilder.CreateSphere('avHead',{diameter:16,segments:8},s);
-      var hmat=new BABYLON.StandardMaterial('avHM',s); hmat.diffuseColor=new BABYLON.Color3(0.95,0.82,0.68);
-      this._avatarHead.material=hmat; this._avatarHead.position.y=32; this._avatarHead.parent=this._avatarRoot;
+      var s = this._scene;
+      this._avatarRoot = new BABYLON.TransformNode('avRoot', s);
+      var self = this;
+      function loadAvatarModel() {
+        BABYLON.SceneLoader.ImportMesh('', 'models/', 'avatar_player.glb', s, function(meshes) {
+          if (!meshes.length) return;
+          var host = new BABYLON.TransformNode('avModelHost', s);
+          for (var i = 0; i < meshes.length; i++) {
+            if (!meshes[i].parent) meshes[i].parent = host;
+            meshes[i].receiveShadows = true;
+            if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[i]);
+          }
+          host.parent = self._avatarRoot;
+          host.computeWorldMatrix(true);
+          var bounds = host.getHierarchyBoundingVectors(true);
+          var h = Math.max(0.01, bounds.max.y - bounds.min.y);
+          var targetH = 26;
+          var sc = targetH / h;
+          host.scaling = new BABYLON.Vector3(sc, sc, sc);
+          host.computeWorldMatrix(true);
+          bounds = host.getHierarchyBoundingVectors(true);
+          host.position.y = -bounds.min.y;
+        }, null, function() {
+          self._avatarBody = BABYLON.MeshBuilder.CreateCylinder('avBody', {diameterTop:14,diameterBottom:18,height:26,tessellation:8}, s);
+          var bmat = new BABYLON.StandardMaterial('avBM', s); bmat.diffuseColor = new BABYLON.Color3(0.97,0.58,0.1);
+          self._avatarBody.material = bmat; self._avatarBody.position.y = 13; self._avatarBody.parent = self._avatarRoot;
+          self._avatarHead = BABYLON.MeshBuilder.CreateSphere('avHead', {diameter:16,segments:8}, s);
+          var hmat = new BABYLON.StandardMaterial('avHM', s); hmat.diffuseColor = new BABYLON.Color3(0.95,0.82,0.68);
+          self._avatarHead.material = hmat; self._avatarHead.position.y = 32; self._avatarHead.parent = self._avatarRoot;
+        });
+      }
+      loadAvatarModel();
+
       var shadow=BABYLON.MeshBuilder.CreateDisc('avSh',{radius:10,tessellation:16},s);
       var smat=new BABYLON.StandardMaterial('avSM',s); smat.diffuseColor=new BABYLON.Color3(0,0,0); smat.alpha=0.3;
       shadow.material=smat; shadow.rotation.x=Math.PI/2; shadow.position.y=0.2; shadow.parent=this._avatarRoot;

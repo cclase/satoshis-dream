@@ -3,225 +3,593 @@ from pathlib import Path
 
 import numpy as np
 import trimesh
+from trimesh import transformations as tf
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS_DIR = ROOT / "models"
+MODELS = ROOT / "models"
+MODELS.mkdir(parents=True, exist_ok=True)
 
 
-def hex_rgba(color_hex: str, alpha: int = 255):
-    h = color_hex.strip().lstrip("#")
-    return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha]
+def rgba(hex_color: str, alpha: int = 255) -> np.ndarray:
+    h = hex_color.strip().lstrip("#")
+    return np.array([int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha], dtype=np.uint8)
 
 
-def box(extents, center, color_hex):
-    mesh = trimesh.creation.box(extents=extents)
-    mesh.apply_translation(center)
-    mesh.visual.face_colors = np.tile(np.array(hex_rgba(color_hex), dtype=np.uint8), (len(mesh.faces), 1))
+def tint(hex_color: str, delta: int) -> str:
+    h = hex_color.strip().lstrip("#")
+    r = max(0, min(255, int(h[0:2], 16) + delta))
+    g = max(0, min(255, int(h[2:4], 16) + delta))
+    b = max(0, min(255, int(h[4:6], 16) + delta))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def paint(mesh: trimesh.Trimesh, color_hex: str) -> trimesh.Trimesh:
+    mesh.visual.face_colors = np.tile(rgba(color_hex), (len(mesh.faces), 1))
     return mesh
 
 
-def add_window_grid(parts, *, width, height, depth, floors, cols, y0, color="#89b8d8", frame="#2a3440"):
-    pane_w = width / (cols + 2.5)
-    pane_h = height / (floors + 2.0)
-    z = depth / 2 + 0.03
-    for r in range(floors):
-        for c in range(cols):
-            x = -width / 2 + (c + 1.2) * (width / (cols + 1.5))
-            y = y0 + (r + 0.7) * (height / (floors + 1.2))
-            parts.append(box([pane_w * 1.02, pane_h * 1.02, 0.05], [x, y, z], frame))
-            parts.append(box([pane_w * 0.84, pane_h * 0.84, 0.06], [x, y, z + 0.01], color))
+def box(extents, center, color_hex: str) -> trimesh.Trimesh:
+    m = trimesh.creation.box(extents=extents)
+    m.apply_translation(center)
+    return paint(m, color_hex)
 
 
-def add_roof_units(parts, *, width, depth, y, color="#7d7f86"):
-    offsets = [
-        (-width * 0.2, -depth * 0.15),
-        (width * 0.18, -depth * 0.1),
-        (0.0, depth * 0.2),
-    ]
-    for ox, oz in offsets:
-        parts.append(box([width * 0.16, 0.16, depth * 0.14], [ox, y + 0.08, oz], color))
-        parts.append(box([width * 0.08, 0.08, depth * 0.08], [ox, y + 0.18, oz], "#b8bcc4"))
+def cylinder(radius: float, height: float, center, color_hex: str, sections: int = 20) -> trimesh.Trimesh:
+    m = trimesh.creation.cylinder(radius=radius, height=height, sections=sections)
+    m.apply_translation(center)
+    return paint(m, color_hex)
 
 
-def add_column_portico(parts, *, width, depth, y, count=4, color="#d8d5c8", roof="#b5ae98"):
-    spacing = width / (count + 1)
-    z = depth / 2 + 0.12
-    for i in range(count):
-        x = -width / 2 + (i + 1) * spacing
-        parts.append(box([0.12, y * 0.75, 0.12], [x, (y * 0.75) / 2, z], color))
-    parts.append(box([width * 0.82, 0.1, 0.32], [0, y * 0.76 + 0.05, z], roof))
+def cone(radius: float, height: float, center, color_hex: str, sections: int = 20) -> trimesh.Trimesh:
+    m = trimesh.creation.cone(radius=radius, height=height, sections=sections)
+    m.apply_translation(center)
+    return paint(m, color_hex)
 
 
-def build_model(cfg):
-    w = cfg["w"]
-    h = cfg["h"]
-    d = cfg["d"]
-    wall = cfg["wall"]
-    roof = cfg["roof"]
-    accent = cfg["accent"]
-    parts = []
+def sphere(radius: float, center, color_hex: str, subdivisions: int = 2) -> trimesh.Trimesh:
+    m = trimesh.creation.icosphere(subdivisions=subdivisions, radius=radius)
+    m.apply_translation(center)
+    return paint(m, color_hex)
 
-    # Main shell + roof cap
-    parts.append(box([w, h, d], [0, h / 2, 0], wall))
-    parts.append(box([w * 1.04, 0.08, d * 1.04], [0, h + 0.04, 0], roof))
 
-    # Front door + trim
-    door_h = h * 0.34
-    parts.append(box([w * 0.16, door_h, 0.06], [0, door_h / 2, d / 2 + 0.04], "#3a2f2a"))
-    parts.append(box([w * 0.22, 0.06, 0.08], [0, door_h + 0.03, d / 2 + 0.05], accent))
+def limb(radius: float, length: float, center, color_hex: str) -> trimesh.Trimesh:
+    shaft = cylinder(radius, length, center, color_hex, sections=16)
+    cap_a = sphere(radius, [center[0], center[1] + length / 2, center[2]], color_hex, subdivisions=1)
+    cap_b = sphere(radius, [center[0], center[1] - length / 2, center[2]], color_hex, subdivisions=1)
+    return trimesh.util.concatenate([shaft, cap_a, cap_b])
 
-    # Generic windows
-    add_window_grid(
-        parts,
-        width=w * 0.9,
-        height=h * 0.68,
-        depth=d,
-        floors=cfg.get("floors", 2),
-        cols=cfg.get("cols", 4),
-        y0=h * 0.18,
-        color=cfg.get("glass", "#86b8d6"),
-        frame=cfg.get("frame", "#2b323c"),
+
+def rotate(mesh: trimesh.Trimesh, axis, radians: float) -> trimesh.Trimesh:
+    mesh.apply_transform(tf.rotation_matrix(radians, axis))
+    return mesh
+
+
+def gable_roof(width: float, depth: float, rise: float, center, color_hex: str) -> trimesh.Trimesh:
+    w = width / 2
+    d = depth / 2
+    r = rise
+    vertices = np.array(
+        [
+            [-w, 0, -d],
+            [w, 0, -d],
+            [0, r, -d],
+            [-w, 0, d],
+            [w, 0, d],
+            [0, r, d],
+        ],
+        dtype=float,
     )
-
-    # Side wings
-    if cfg.get("wings"):
-        wing_h = h * 0.72
-        wing_w = w * 0.28
-        wing_d = d * 0.88
-        parts.append(box([wing_w, wing_h, wing_d], [-w * 0.42, wing_h / 2, 0], wall))
-        parts.append(box([wing_w, wing_h, wing_d], [w * 0.42, wing_h / 2, 0], wall))
-        parts.append(box([wing_w * 1.03, 0.08, wing_d * 1.03], [-w * 0.42, wing_h + 0.04, 0], roof))
-        parts.append(box([wing_w * 1.03, 0.08, wing_d * 1.03], [w * 0.42, wing_h + 0.04, 0], roof))
-
-    # Tower feature
-    if cfg.get("tower"):
-        tw = w * 0.28
-        th = h * 0.85
-        td = d * 0.28
-        parts.append(box([tw, th, td], [0, h + th / 2, -d * 0.18], accent))
-        parts.append(box([tw * 1.06, 0.1, td * 1.06], [0, h + th + 0.05, -d * 0.18], roof))
-        parts.append(box([tw * 0.42, th * 0.5, td * 0.2], [0, h + th * 0.45, -d * 0.02], "#2b3442"))
-
-    # Portico columns
-    if cfg.get("portico"):
-        add_column_portico(parts, width=w * 0.7, depth=d, y=h * 0.6, count=cfg.get("columns", 4), color=cfg.get("portico_color", "#dad8ce"), roof=roof)
-
-    # Canopy / awning
-    if cfg.get("awning"):
-        parts.append(box([w * 0.64, 0.06, 0.34], [0, h * 0.42, d / 2 + 0.16], accent))
-        parts.append(box([w * 0.58, 0.03, 0.28], [0, h * 0.39, d / 2 + 0.17], cfg.get("awning2", "#f3dcb0")))
-
-    # Neon band / sign mass
-    if cfg.get("band"):
-        parts.append(box([w * 0.92, 0.09, 0.08], [0, h * 0.78, d / 2 + 0.05], accent))
-
-    # Roof machinery
-    if cfg.get("roof_units", True):
-        add_roof_units(parts, width=w, depth=d, y=h + 0.08, color=cfg.get("roof_unit_color", "#7f838b"))
-
-    # Distinctive objects by type
-    if cfg.get("dish"):
-        parts.append(box([0.32, 0.04, 0.32], [w * 0.2, h + 0.28, -d * 0.1], "#c9cbd0"))
-        parts.append(box([0.04, 0.26, 0.04], [w * 0.2, h + 0.16, -d * 0.1], "#7f848d"))
-    if cfg.get("cross"):
-        parts.append(box([0.12, 0.5, 0.07], [0, h + 0.34, d * 0.03], "#cf3f46"))
-        parts.append(box([0.36, 0.12, 0.07], [0, h + 0.34, d * 0.03], "#cf3f46"))
-    if cfg.get("slots"):
-        for i in range(4):
-            x = -w * 0.28 + i * w * 0.19
-            parts.append(box([w * 0.12, 0.22, 0.08], [x, h * 0.22, d / 2 + 0.06], "#2a2f39"))
-
-    mesh = trimesh.util.concatenate(parts)
-    return mesh
+    faces = np.array(
+        [
+            [0, 1, 2],
+            [3, 5, 4],
+            [0, 2, 5],
+            [0, 5, 3],
+            [1, 4, 5],
+            [1, 5, 2],
+            [0, 3, 4],
+            [0, 4, 1],
+        ],
+        dtype=int,
+    )
+    m = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    m.apply_translation(center)
+    return paint(m, color_hex)
 
 
-def export_model(filename, cfg):
-    mesh = build_model(cfg)
-    out_path = MODELS_DIR / filename
-    out_path.write_bytes(trimesh.exchange.gltf.export_glb(mesh))
+def steps(parts: list, width: float, depth: float, step_h: float, count: int, front_z: float, color_hex: str):
+    for i in range(count):
+        w = width * (1 - i * 0.08)
+        d = depth * (1 - i * 0.08)
+        y = step_h * (i + 0.5)
+        z = front_z + i * (depth * 0.12)
+        parts.append(box([w, step_h, d], [0, y, z], color_hex))
 
 
-def build_character(*, shirt, pants, skin, hair, accent, taller=False):
-    parts = []
-    scale = 1.12 if taller else 1.0
-
-    # Legs
-    parts.append(box([0.14, 0.52 * scale, 0.14], [-0.1, 0.26 * scale, 0], pants))
-    parts.append(box([0.14, 0.52 * scale, 0.14], [0.1, 0.26 * scale, 0], pants))
-    # Torso + hips
-    parts.append(box([0.4, 0.18 * scale, 0.22], [0, 0.62 * scale, 0], pants))
-    parts.append(box([0.46, 0.5 * scale, 0.24], [0, 0.96 * scale, 0], shirt))
-    # Arms
-    parts.append(box([0.12, 0.42 * scale, 0.12], [-0.3, 0.98 * scale, 0], skin))
-    parts.append(box([0.12, 0.42 * scale, 0.12], [0.3, 0.98 * scale, 0], skin))
-    # Head + hair
-    parts.append(box([0.3, 0.32 * scale, 0.28], [0, 1.42 * scale, 0], skin))
-    parts.append(box([0.32, 0.1 * scale, 0.3], [0, 1.58 * scale, -0.01], hair))
-    parts.append(box([0.12, 0.08 * scale, 0.08], [0, 1.42 * scale, 0.15], accent))
-    # Shoes
-    parts.append(box([0.17, 0.08 * scale, 0.22], [-0.1, 0.04 * scale, 0.03], "#1f2124"))
-    parts.append(box([0.17, 0.08 * scale, 0.22], [0.1, 0.04 * scale, 0.03], "#1f2124"))
-
-    mesh = trimesh.util.concatenate(parts)
-    bounds = mesh.bounds
-    mesh.apply_translation([0, -bounds[0][1], 0])
-    return mesh
+def add_window_grid(parts: list, width: float, height: float, depth: float, y0: float, rows: int, cols: int, glass: str):
+    frame = "#1e2730"
+    zw = depth / 2 + 0.03
+    pane_w = width / (cols + 2.0)
+    pane_h = height / (rows + 2.2)
+    for r in range(rows):
+        for c in range(cols):
+            x = -width / 2 + (c + 1.1) * (width / (cols + 1.2))
+            y = y0 + (r + 0.8) * (height / (rows + 1.3))
+            parts.append(box([pane_w * 1.03, pane_h * 1.03, 0.05], [x, y, zw], frame))
+            parts.append(box([pane_w * 0.82, pane_h * 0.82, 0.06], [x, y, zw + 0.01], glass))
 
 
-def export_character(filename, **kwargs):
-    mesh = build_character(**kwargs)
-    out_path = MODELS_DIR / filename
-    out_path.write_bytes(trimesh.exchange.gltf.export_glb(mesh))
+def add_parapet(parts: list, width: float, depth: float, y: float, color_hex: str):
+    t = 0.06
+    parts.append(box([width, t, t], [0, y, depth / 2], color_hex))
+    parts.append(box([width, t, t], [0, y, -depth / 2], color_hex))
+    parts.append(box([t, t, depth], [width / 2, y, 0], color_hex))
+    parts.append(box([t, t, depth], [-width / 2, y, 0], color_hex))
+
+
+def add_roof_units(parts: list, width: float, depth: float, y: float):
+    pads = [(-0.22, -0.18), (0.24, -0.1), (0.0, 0.22)]
+    for ox, oz in pads:
+        x = ox * width
+        z = oz * depth
+        parts.append(box([width * 0.18, 0.14, depth * 0.14], [x, y + 0.07, z], "#6f7680"))
+        parts.append(box([width * 0.08, 0.08, depth * 0.08], [x, y + 0.17, z], "#b9c0c9"))
+
+
+def export_mesh(name: str, meshes: list):
+    merged = trimesh.util.concatenate(meshes)
+    bounds = merged.bounds
+    merged.apply_translation([0, -bounds[0][1], 0])
+    (MODELS / name).write_bytes(trimesh.exchange.gltf.export_glb(merged))
+
+
+def build_mine_hq() -> list:
+    p = []
+    p.append(box([1.7, 0.22, 1.35], [0.05, 0.11, 0.02], "#51453a"))
+    p.append(box([1.3, 0.72, 1.0], [-0.08, 0.58, 0.0], "#4f5f70"))
+    p.append(box([0.92, 0.52, 0.7], [0.2, 1.08, -0.08], "#40515f"))
+    p.append(box([0.56, 0.34, 0.44], [0.25, 1.46, -0.15], "#344552"))
+    p.append(cylinder(0.14, 1.2, [-0.58, 0.6, 0.35], "#788692"))
+    p.append(cylinder(0.14, 1.2, [-0.32, 0.6, 0.35], "#788692"))
+    conveyor = box([0.92, 0.08, 0.16], [0.05, 0.9, 0.35], "#9e6d35")
+    rotate(conveyor, [0, 0, 1], math.radians(-18))
+    p.append(conveyor)
+    add_window_grid(p, 1.2, 0.55, 1.0, 0.28, 2, 5, "#7fa6c2")
+    add_roof_units(p, 1.3, 1.0, 1.7)
+    return p
+
+
+def build_hardware_shop() -> list:
+    p = []
+    p.append(box([1.42, 0.18, 1.1], [0, 0.09, 0], "#666b72"))
+    p.append(box([1.15, 0.62, 0.88], [0, 0.49, 0.02], "#607287"))
+    p.append(box([0.48, 0.52, 0.54], [0.58, 0.44, -0.08], "#536377"))
+    p.append(gable_roof(1.22, 0.92, 0.28, [0, 0.84, 0.02], "#354352"))
+    p.append(gable_roof(0.54, 0.58, 0.2, [0.58, 0.71, -0.08], "#354352"))
+    add_window_grid(p, 1.04, 0.42, 0.88, 0.24, 1, 5, "#82add3")
+    p.append(box([0.26, 0.34, 0.08], [-0.42, 0.17, 0.49], "#2f2a25"))
+    p.append(box([0.72, 0.06, 0.3], [0.05, 0.44, 0.61], "#4f9de6"))
+    return p
+
+
+def build_exchange() -> list:
+    p = []
+    p.append(box([1.2, 0.14, 0.96], [0, 0.07, 0], "#657078"))
+    p.append(box([0.92, 0.9, 0.78], [0, 0.52, 0], "#71808a"))
+    p.append(box([0.56, 0.74, 0.46], [0.08, 1.28, -0.04], "#61717c"))
+    p.append(cylinder(0.16, 0.88, [-0.32, 1.08, -0.12], "#54646f"))
+    p.append(cylinder(0.1, 0.62, [0.34, 1.45, 0.05], "#4b5965"))
+    add_window_grid(p, 0.86, 0.8, 0.78, 0.2, 4, 5, "#89bfdc")
+    p.append(box([0.68, 0.06, 0.24], [0.0, 0.55, 0.5], "#2fbf84"))
+    add_roof_units(p, 0.92, 0.78, 1.85)
+    return p
+
+
+def build_bank() -> list:
+    p = []
+    p.append(box([1.62, 0.2, 1.28], [0, 0.1, 0], "#9b917f"))
+    steps(p, width=1.05, depth=0.5, step_h=0.05, count=4, front_z=0.5, color_hex="#b5ab97")
+    p.append(box([1.22, 0.7, 0.9], [0, 0.55, -0.05], "#cdbfa6"))
+    for i in range(5):
+        x = -0.46 + i * 0.23
+        p.append(cylinder(0.05, 0.52, [x, 0.36, 0.44], "#ddd6c5"))
+    p.append(box([0.88, 0.08, 0.28], [0, 0.67, 0.45], "#b9ad95"))
+    p.append(gable_roof(0.95, 0.28, 0.22, [0, 0.71, 0.45], "#a3957a"))
+    p.append(box([0.44, 0.88, 0.32], [0, 1.14, -0.28], "#d3c5ad"))
+    p.append(gable_roof(0.5, 0.36, 0.2, [0, 1.58, -0.28], "#a3957a"))
+    add_window_grid(p, 1.0, 0.52, 0.9, 0.26, 2, 5, "#93b3c8")
+    return p
+
+
+def build_diner() -> list:
+    p = []
+    p.append(box([1.28, 0.14, 1.0], [0, 0.07, 0], "#7f5149"))
+    p.append(box([1.08, 0.56, 0.82], [0, 0.4, 0], "#8d473f"))
+    p.append(cylinder(0.16, 0.56, [-0.54, 0.4, 0.0], "#8d473f"))
+    p.append(cylinder(0.16, 0.56, [0.54, 0.4, 0.0], "#8d473f"))
+    p.append(box([1.08, 0.08, 0.88], [0, 0.72, 0], "#5a2b2b"))
+    p.append(box([0.92, 0.06, 0.34], [0, 0.46, 0.56], "#e26155"))
+    add_window_grid(p, 0.96, 0.32, 0.82, 0.2, 1, 6, "#a0d4eb")
+    p.append(box([0.2, 0.3, 0.07], [0, 0.16, 0.5], "#2b2725"))
+    return p
+
+
+def build_coffee_shop() -> list:
+    p = []
+    p.append(box([1.12, 0.14, 0.94], [0, 0.07, 0], "#6b5646"))
+    p.append(box([0.96, 0.48, 0.78], [0, 0.34, 0], "#846d5a"))
+    p.append(gable_roof(1.02, 0.82, 0.3, [0, 0.58, 0], "#43362d"))
+    p.append(box([0.58, 0.06, 0.26], [0, 0.34, 0.52], "#c59a66"))
+    add_window_grid(p, 0.9, 0.3, 0.78, 0.16, 1, 4, "#95c5dd")
+    p.append(box([0.18, 0.28, 0.07], [-0.24, 0.15, 0.46], "#2e2823"))
+    p.append(box([0.08, 0.38, 0.08], [0.3, 0.75, -0.2], "#6b6055"))
+    return p
+
+
+def build_university() -> list:
+    p = []
+    p.append(box([1.68, 0.18, 1.36], [0, 0.09, 0], "#827b8a"))
+    p.append(box([1.18, 0.72, 0.92], [0, 0.54, 0], "#93879a"))
+    p.append(box([0.44, 0.62, 0.82], [-0.6, 0.47, 0.02], "#8b7f94"))
+    p.append(box([0.44, 0.62, 0.82], [0.6, 0.47, 0.02], "#8b7f94"))
+    p.append(box([0.34, 1.04, 0.34], [0, 1.03, -0.24], "#7f7387"))
+    p.append(gable_roof(0.42, 0.4, 0.22, [0, 1.56, -0.24], "#5c4d68"))
+    add_window_grid(p, 1.06, 0.58, 0.92, 0.24, 3, 5, "#8fb0cf")
+    add_window_grid(p, 0.38, 0.86, 0.34, 0.36, 4, 2, "#9bc2dd")
+    p.append(box([0.72, 0.08, 0.26], [0, 0.49, 0.58], "#d5d0c9"))
+    return p
+
+
+def build_hospital() -> list:
+    p = []
+    p.append(box([1.5, 0.16, 1.2], [0, 0.08, 0], "#a6adb8"))
+    p.append(box([1.04, 0.7, 0.78], [0, 0.51, 0], "#d2d8df"))
+    p.append(box([0.34, 0.66, 1.02], [-0.38, 0.49, 0.0], "#c7ced7"))
+    p.append(box([0.34, 0.66, 1.02], [0.38, 0.49, 0.0], "#c7ced7"))
+    p.append(box([0.22, 0.58, 0.22], [0, 0.95, -0.16], "#d9dee5"))
+    p.append(box([0.12, 0.44, 0.08], [0, 1.28, -0.16], "#d4474e"))
+    p.append(box([0.36, 0.12, 0.08], [0, 1.28, -0.16], "#d4474e"))
+    pad = cylinder(0.2, 0.04, [0, 0.9, 0.22], "#adb4be", sections=28)
+    p.append(pad)
+    p.append(box([0.3, 0.02, 0.02], [0, 0.93, 0.22], "#f2f4f6"))
+    p.append(box([0.02, 0.02, 0.3], [0, 0.93, 0.22], "#f2f4f6"))
+    add_window_grid(p, 1.0, 0.52, 0.78, 0.24, 3, 6, "#9cc6dd")
+    return p
+
+
+def build_internet_cafe() -> list:
+    p = []
+    p.append(box([1.2, 0.14, 0.96], [0, 0.07, 0], "#3f5b64"))
+    p.append(box([1.0, 0.58, 0.78], [0, 0.41, 0], "#32505a"))
+    roof = box([1.02, 0.12, 0.82], [0.02, 0.78, -0.04], "#1f3139")
+    rotate(roof, [1, 0, 0], math.radians(-10))
+    p.append(roof)
+    p.append(box([0.72, 0.32, 0.08], [0, 0.27, 0.44], "#89c7e1"))
+    p.append(box([0.76, 0.06, 0.24], [0, 0.54, 0.5], "#2fd8d4"))
+    add_window_grid(p, 0.92, 0.36, 0.78, 0.18, 2, 5, "#7fc2e2")
+    p.append(cylinder(0.06, 0.4, [-0.34, 0.78, -0.18], "#768791"))
+    p.append(sphere(0.08, [-0.34, 1.02, -0.18], "#3ad0d1", subdivisions=2))
+    return p
+
+
+def build_casino() -> list:
+    p = []
+    p.append(box([1.64, 0.18, 1.3], [0, 0.09, 0], "#58263a"))
+    p.append(box([1.22, 0.68, 1.0], [0, 0.5, 0], "#6e2f44"))
+    p.append(cylinder(0.24, 0.88, [-0.46, 0.62, 0.0], "#522338"))
+    p.append(cylinder(0.24, 0.88, [0.46, 0.62, 0.0], "#522338"))
+    p.append(box([0.82, 0.08, 0.34], [0, 0.46, 0.64], "#e0a73f"))
+    p.append(box([1.04, 0.08, 0.2], [0, 0.74, 0.52], "#8e2bb0"))
+    add_window_grid(p, 1.1, 0.46, 1.0, 0.22, 2, 6, "#8eb8d4")
+    add_roof_units(p, 1.22, 1.0, 1.02)
+    return p
+
+
+def build_post_office() -> list:
+    p = []
+    p.append(box([1.36, 0.16, 1.04], [0, 0.08, 0], "#7f8794"))
+    steps(p, width=0.82, depth=0.36, step_h=0.04, count=3, front_z=0.44, color_hex="#9ea6b3")
+    p.append(box([1.02, 0.56, 0.82], [0, 0.4, -0.03], "#939cab"))
+    for i in range(4):
+        x = -0.32 + i * 0.21
+        p.append(cylinder(0.045, 0.42, [x, 0.25, 0.39], "#d4d8df"))
+    p.append(box([0.7, 0.08, 0.24], [0, 0.49, 0.39], "#4b6cb2"))
+    p.append(gable_roof(0.74, 0.24, 0.16, [0, 0.53, 0.39], "#606a79"))
+    add_window_grid(p, 0.9, 0.4, 0.82, 0.2, 2, 4, "#8ab5d8")
+    return p
+
+
+def build_gym() -> list:
+    p = []
+    p.append(box([1.24, 0.14, 0.98], [0, 0.07, 0], "#565f69"))
+    p.append(box([1.08, 0.6, 0.82], [0, 0.37, 0], "#5f6873"))
+    for i in range(3):
+        x = -0.32 + i * 0.32
+        tooth = gable_roof(0.28, 0.82, 0.14, [x, 0.66, 0], "#3f4751")
+        rotate(tooth, [0, 0, 1], math.radians(-90))
+        p.append(tooth)
+    p.append(box([0.76, 0.06, 0.24], [0, 0.46, 0.52], "#e8843f"))
+    add_window_grid(p, 0.98, 0.34, 0.82, 0.18, 1, 6, "#8eb8d6")
+    return p
+
+
+def build_real_estate() -> list:
+    p = []
+    p.append(box([1.2, 0.14, 0.94], [0, 0.07, 0], "#7f8f80"))
+    p.append(box([0.98, 0.5, 0.78], [0, 0.35, 0], "#95a494"))
+    p.append(gable_roof(1.04, 0.82, 0.24, [0, 0.62, 0], "#4e5e4f"))
+    p.append(box([0.58, 0.05, 0.24], [0, 0.34, 0.5], "#4aa865"))
+    p.append(box([0.22, 0.3, 0.07], [0.22, 0.15, 0.44], "#322a25"))
+    add_window_grid(p, 0.9, 0.3, 0.78, 0.18, 1, 4, "#98c1db")
+    return p
+
+
+def build_pet_shop() -> list:
+    p = []
+    p.append(box([1.1, 0.14, 0.9], [0, 0.07, 0], "#9e7f79"))
+    p.append(box([0.9, 0.46, 0.7], [0, 0.32, 0], "#b48b84"))
+    p.append(gable_roof(0.96, 0.74, 0.24, [0, 0.56, 0], "#6a4d48"))
+    p.append(box([0.62, 0.05, 0.22], [0, 0.32, 0.46], "#ff8ba7"))
+    p.append(cylinder(0.11, 0.26, [-0.28, 0.2, 0.34], "#c69991"))
+    p.append(cylinder(0.11, 0.26, [0.28, 0.2, 0.34], "#c69991"))
+    add_window_grid(p, 0.82, 0.28, 0.7, 0.16, 1, 3, "#9ac8e2")
+    return p
+
+
+def build_pawn_shop() -> list:
+    p = []
+    p.append(box([1.08, 0.14, 0.9], [0, 0.07, 0], "#675944"))
+    p.append(box([0.9, 0.54, 0.72], [0, 0.38, 0], "#75654d"))
+    add_parapet(p, 0.92, 0.74, 0.68, "#433a2d")
+    p.append(box([0.54, 0.05, 0.2], [0, 0.36, 0.45], "#d7ab3c"))
+    add_window_grid(p, 0.76, 0.28, 0.72, 0.16, 1, 3, "#8ab4cf")
+    p.append(box([0.2, 0.3, 0.07], [0, 0.15, 0.41], "#2d2824"))
+    return p
+
+
+def build_bitcoin_atm() -> list:
+    p = []
+    p.append(box([0.92, 0.14, 0.78], [0, 0.07, 0], "#5f6975"))
+    p.append(box([0.68, 0.5, 0.52], [0, 0.32, 0], "#6d7885"))
+    roof = box([0.74, 0.1, 0.56], [0, 0.62, 0.0], "#333c47")
+    rotate(roof, [1, 0, 0], math.radians(-7))
+    p.append(roof)
+    p.append(box([0.22, 0.34, 0.18], [0, 0.24, 0.2], "#f6a623"))
+    p.append(box([0.16, 0.14, 0.06], [0, 0.29, 0.31], "#1f2630"))
+    p.append(cylinder(0.05, 0.24, [0.26, 0.64, -0.16], "#6f7d89"))
+    p.append(sphere(0.07, [0.26, 0.78, -0.16], "#f6a623", subdivisions=2))
+    return p
+
+
+def build_clothing_store() -> list:
+    p = []
+    p.append(box([1.28, 0.14, 0.98], [0, 0.07, 0], "#7f6571"))
+    p.append(box([1.06, 0.52, 0.8], [0, 0.36, 0], "#936f7d"))
+    p.append(gable_roof(1.12, 0.84, 0.24, [0, 0.62, 0], "#5b4652"))
+    p.append(box([0.7, 0.06, 0.26], [0, 0.4, 0.54], "#e89cb6"))
+    for i in range(5):
+        x = -0.42 + i * 0.21
+        p.append(box([0.03, 0.34, 0.08], [x, 0.31, 0.42], "#d7b6c0"))
+    add_window_grid(p, 0.94, 0.3, 0.8, 0.18, 1, 5, "#9fc8dd")
+    return p
+
+
+def build_apartment() -> list:
+    p = []
+    p.append(box([1.2, 0.16, 1.0], [0, 0.08, 0], "#75695f"))
+    p.append(box([0.94, 1.26, 0.72], [0, 0.79, -0.06], "#8b7d70"))
+    p.append(box([0.52, 0.92, 0.4], [0.22, 1.17, 0.2], "#7c6f62"))
+    add_window_grid(p, 0.86, 1.0, 0.72, 0.24, 5, 4, "#9cbfd5")
+    for level in range(4):
+        y = 0.36 + level * 0.24
+        p.append(box([0.86, 0.03, 0.08], [0, y, 0.34], "#5c534b"))
+    p.append(box([0.22, 0.36, 0.07], [-0.22, 0.18, 0.34], "#2d2824"))
+    p.append(additional_tank())
+    return p
+
+
+def additional_tank() -> trimesh.Trimesh:
+    tank = cylinder(0.1, 0.22, [0.28, 1.54, -0.2], "#b5b0a7")
+    return tank
+
+
+def build_furniture_store() -> list:
+    p = []
+    p.append(box([1.34, 0.16, 1.04], [0, 0.08, 0], "#6e765f"))
+    p.append(box([1.1, 0.62, 0.86], [0, 0.47, 0], "#7f8a6e"))
+    p.append(box([0.6, 0.46, 0.42], [-0.34, 0.4, 0.26], "#737d63"))
+    p.append(box([0.64, 0.06, 0.26], [0, 0.46, 0.56], "#a1bf68"))
+    for i in range(3):
+        x = -0.3 + i * 0.3
+        p.append(gable_roof(0.24, 0.86, 0.14, [x, 0.79, 0], "#4d5642"))
+    add_window_grid(p, 0.98, 0.34, 0.86, 0.2, 1, 5, "#94bdd8")
+    return p
+
+
+def build_garage() -> list:
+    p = []
+    p.append(box([1.08, 0.14, 0.88], [0, 0.07, 0], "#6f747a"))
+    p.append(box([0.9, 0.44, 0.7], [0, 0.29, 0], "#7b828b"))
+    p.append(gable_roof(0.94, 0.74, 0.18, [0, 0.52, 0], "#4b5057"))
+    p.append(box([0.46, 0.28, 0.07], [0, 0.16, 0.36], "#353a42"))
+    p.append(box([0.52, 0.04, 0.08], [0, 0.34, 0.37], "#a3afbf"))
+    return p
+
+
+def build_small_a() -> list:
+    p = build_garage()
+    p.append(box([0.24, 0.18, 0.2], [0.26, 0.78, -0.1], "#8e7b69"))
+    return p
+
+
+def build_small_b() -> list:
+    p = []
+    p.append(box([1.0, 0.12, 0.82], [0, 0.06, 0], "#70657b"))
+    p.append(box([0.82, 0.5, 0.66], [0, 0.31, 0], "#7c7088"))
+    p.append(gable_roof(0.86, 0.7, 0.2, [0, 0.56, 0], "#4d4453"))
+    add_window_grid(p, 0.74, 0.3, 0.66, 0.17, 1, 3, "#9dbddb")
+    return p
+
+
+def build_small_c() -> list:
+    p = []
+    p.append(box([1.06, 0.13, 0.84], [0, 0.065, 0], "#637682"))
+    p.append(box([0.88, 0.52, 0.68], [0, 0.33, 0], "#6a7f8b"))
+    p.append(box([0.48, 0.28, 0.32], [0.2, 0.73, -0.06], "#5e7380"))
+    p.append(additional_tank())
+    add_window_grid(p, 0.8, 0.32, 0.68, 0.18, 1, 4, "#9ec4de")
+    return p
+
+
+def build_small_d() -> list:
+    p = []
+    p.append(box([1.0, 0.12, 0.82], [0, 0.06, 0], "#7f6f62"))
+    p.append(box([0.84, 0.48, 0.66], [0, 0.3, 0], "#8b7a6c"))
+    p.append(gable_roof(0.88, 0.7, 0.2, [0, 0.54, 0], "#5f4f43"))
+    add_window_grid(p, 0.76, 0.3, 0.66, 0.17, 1, 3, "#9fc0d8")
+    return p
+
+
+def build_tree_round() -> list:
+    p = [cylinder(0.08, 0.62, [0, 0.31, 0], "#6b4e34")]
+    p.append(sphere(0.26, [0, 0.66, 0], "#2f7f45", subdivisions=2))
+    p.append(sphere(0.2, [-0.12, 0.72, 0.06], "#348a4a", subdivisions=1))
+    p.append(sphere(0.2, [0.12, 0.74, -0.04], "#358d4d", subdivisions=1))
+    return p
+
+
+def build_tree_tall() -> list:
+    p = [cylinder(0.07, 0.7, [0, 0.35, 0], "#6b4e34")]
+    p.append(cone(0.26, 0.48, [0, 0.72, 0], "#2d7740", sections=16))
+    p.append(cone(0.2, 0.38, [0, 0.98, 0], "#348649", sections=16))
+    return p
+
+
+def build_street_lamp() -> list:
+    p = []
+    pole = cylinder(0.03, 1.46, [0, 0.73, 0], "#505862", sections=14)
+    p.append(pole)
+    arm = box([0.28, 0.03, 0.03], [0.13, 1.35, 0], "#464d56")
+    p.append(arm)
+    p.append(box([0.1, 0.12, 0.1], [0.27, 1.28, 0], "#f4e7b6"))
+    p.append(box([0.18, 0.04, 0.18], [0, 0.02, 0], "#3f454d"))
+    return p
+
+
+def build_bench() -> list:
+    p = []
+    p.append(box([0.72, 0.06, 0.22], [0, 0.34, 0], "#8a623f"))
+    p.append(box([0.72, 0.06, 0.07], [0, 0.56, -0.07], "#8a623f"))
+    for x in (-0.28, 0.28):
+        p.append(box([0.05, 0.34, 0.05], [x, 0.17, 0.08], "#4d5158"))
+        p.append(box([0.05, 0.34, 0.05], [x, 0.17, -0.08], "#4d5158"))
+    return p
+
+
+def build_mailbox() -> list:
+    return [box([0.2, 0.42, 0.18], [0, 0.21, 0], "#2f76c2"), box([0.24, 0.06, 0.2], [0, 0.45, 0], "#d4dde8")]
+
+
+def build_prop(color_a: str, color_b: str) -> list:
+    return [box([0.34, 0.22, 0.34], [0, 0.11, 0], color_a), box([0.2, 0.16, 0.2], [0, 0.3, 0], color_b)]
+
+
+def build_character(shirt: str, pants: str, skin: str, hair: str, accent: str, tall: bool) -> list:
+    s = 1.14 if tall else 1.0
+    p = []
+    p.append(limb(0.055, 0.52 * s, [-0.11, 0.34 * s, 0], pants))
+    p.append(limb(0.055, 0.52 * s, [0.11, 0.34 * s, 0], pants))
+    p.append(box([0.32, 0.16 * s, 0.2], [0, 0.62 * s, 0], tint(pants, 8)))
+    p.append(cylinder(0.18, 0.52 * s, [0, 0.95 * s, 0], shirt, sections=20))
+    p.append(sphere(0.2, [0, 1.22 * s, 0], shirt, subdivisions=2))
+    p.append(limb(0.045, 0.46 * s, [-0.25, 0.95 * s, 0], skin))
+    p.append(limb(0.045, 0.46 * s, [0.25, 0.95 * s, 0], skin))
+    p.append(cylinder(0.06, 0.06 * s, [0, 1.37 * s, 0], skin, sections=18))
+    p.append(sphere(0.16, [0, 1.53 * s, 0], skin, subdivisions=3))
+    p.append(sphere(0.17, [0, 1.58 * s, -0.02], hair, subdivisions=2))
+    p.append(box([0.12, 0.03, 0.06], [0, 1.5 * s, 0.14], accent))
+    p.append(box([0.18, 0.07, 0.26], [-0.11, 0.04 * s, 0.03], "#1f2124"))
+    p.append(box([0.18, 0.07, 0.26], [0.11, 0.04 * s, 0.03], "#1f2124"))
+    return p
 
 
 def main():
-    configs = {
-        "mine_hq.glb": dict(w=1.55, h=0.95, d=1.25, wall="#55667a", roof="#2f3a46", accent="#f19a33", floors=3, cols=5, wings=True, band=True, dish=True),
-        "hardware_shop.glb": dict(w=1.35, h=0.82, d=1.05, wall="#586f86", roof="#2f3a46", accent="#4f9de6", floors=2, cols=5, awning=True, band=True),
-        "exchange.glb": dict(w=1.3, h=0.86, d=1.0, wall="#6f7e89", roof="#2d3946", accent="#2fbe84", floors=3, cols=6, band=True),
-        "bank.glb": dict(w=1.55, h=1.05, d=1.2, wall="#c7bda7", roof="#9b927d", accent="#c9a545", floors=3, cols=5, portico=True, columns=5, tower=True, roof_units=False),
-        "diner.glb": dict(w=1.28, h=0.68, d=0.95, wall="#9a4c43", roof="#5a2727", accent="#e56155", floors=1, cols=5, awning=True, band=True),
-        "coffee_shop.glb": dict(w=1.12, h=0.68, d=0.9, wall="#8e7a63", roof="#4d4034", accent="#cc9a62", floors=1, cols=4, awning=True, awning2="#e6d3b0"),
-        "university.glb": dict(w=1.58, h=0.96, d=1.28, wall="#8d7c93", roof="#5c4b66", accent="#d7d2cc", floors=3, cols=5, tower=True, wings=True, roof_units=False),
-        "hospital.glb": dict(w=1.42, h=0.92, d=1.1, wall="#d4d8df", roof="#6f7a88", accent="#cf3f46", floors=3, cols=6, cross=True, band=True),
-        "internet_cafe.glb": dict(w=1.25, h=0.74, d=0.96, wall="#365561", roof="#1b2e37", accent="#2fd9d4", floors=2, cols=5, band=True),
-        "casino.glb": dict(w=1.6, h=0.9, d=1.22, wall="#7a3447", roof="#4a1f2f", accent="#f2b53f", floors=2, cols=6, band=True, slots=True),
-        "post_office.glb": dict(w=1.35, h=0.8, d=1.0, wall="#8e97a6", roof="#505865", accent="#3f6cb3", floors=2, cols=4, portico=True, columns=4),
-        "gym.glb": dict(w=1.26, h=0.74, d=0.96, wall="#626a74", roof="#3f464f", accent="#e7843e", floors=2, cols=6, band=True),
-        "real_estate_office.glb": dict(w=1.28, h=0.72, d=0.95, wall="#7d8c7b", roof="#4e5b4d", accent="#4aa865", floors=2, cols=4, awning=True),
-        "pet_shop.glb": dict(w=1.18, h=0.7, d=0.9, wall="#b48b84", roof="#6a4d48", accent="#ff8aa6", floors=2, cols=4, awning=True),
-        "pawn_shop.glb": dict(w=1.15, h=0.72, d=0.9, wall="#6d5f4a", roof="#43392c", accent="#d6aa3d", floors=1, cols=3, band=True),
-        "bitcoin_atm.glb": dict(w=1.05, h=0.78, d=0.84, wall="#5e6874", roof="#333b46", accent="#f6a623", floors=2, cols=3, roof_units=False),
-        "clothing_store.glb": dict(w=1.3, h=0.75, d=0.95, wall="#8f6f7a", roof="#5a4550", accent="#e89bb4", floors=2, cols=5, awning=True),
-        "apartment_building.glb": dict(w=1.18, h=1.15, d=0.98, wall="#83786e", roof="#58504b", accent="#c9a783", floors=5, cols=4, band=True),
-        "furniture_store.glb": dict(w=1.35, h=0.8, d=1.02, wall="#788267", roof="#4d5642", accent="#a0bf68", floors=2, cols=5, awning=True),
-        "building-garage.glb": dict(w=1.2, h=0.62, d=0.95, wall="#6f7278", roof="#43474d", accent="#9098a3", floors=1, cols=2, roof_units=False),
+    builders = {
+        "mine_hq.glb": build_mine_hq,
+        "hardware_shop.glb": build_hardware_shop,
+        "exchange.glb": build_exchange,
+        "bank.glb": build_bank,
+        "diner.glb": build_diner,
+        "coffee_shop.glb": build_coffee_shop,
+        "university.glb": build_university,
+        "hospital.glb": build_hospital,
+        "internet_cafe.glb": build_internet_cafe,
+        "casino.glb": build_casino,
+        "post_office.glb": build_post_office,
+        "gym.glb": build_gym,
+        "real_estate_office.glb": build_real_estate,
+        "pet_shop.glb": build_pet_shop,
+        "pawn_shop.glb": build_pawn_shop,
+        "bitcoin_atm.glb": build_bitcoin_atm,
+        "clothing_store.glb": build_clothing_store,
+        "apartment_building.glb": build_apartment,
+        "furniture_store.glb": build_furniture_store,
+        "building-garage.glb": build_garage,
+        "building-small-a.glb": build_small_a,
+        "building-small-b.glb": build_small_b,
+        "building-small-c.glb": build_small_c,
+        "building-small-d.glb": build_small_d,
     }
 
-    for name, cfg in configs.items():
-        export_model(name, cfg)
+    for name, fn in builders.items():
+        export_mesh(name, fn())
         print(f"generated: {name}")
 
-    export_character(
+    export_mesh("grass-trees.glb", build_tree_round())
+    print("generated: grass-trees.glb")
+    export_mesh("grass-trees-tall.glb", build_tree_tall())
+    print("generated: grass-trees-tall.glb")
+    export_mesh("street_lamp.glb", build_street_lamp())
+    print("generated: street_lamp.glb")
+    export_mesh("park_bench.glb", build_bench())
+    print("generated: park_bench.glb")
+    export_mesh("mailbox.glb", build_mailbox())
+    print("generated: mailbox.glb")
+    export_mesh("fire_hydrant.glb", build_prop("#c73833", "#b42420"))
+    print("generated: fire_hydrant.glb")
+    export_mesh("trash_can.glb", build_prop("#4f5a63", "#6c7b86"))
+    print("generated: trash_can.glb")
+    export_mesh("bus_stop.glb", build_prop("#4d6a86", "#adc6dd"))
+    print("generated: bus_stop.glb")
+    export_mesh("flower_planter.glb", build_prop("#8b5e3f", "#58a35f"))
+    print("generated: flower_planter.glb")
+    export_mesh("garden_center.glb", build_prop("#6f7442", "#8ca45a"))
+    print("generated: garden_center.glb")
+
+    export_mesh(
         "avatar_player.glb",
-        shirt="#f1a33d",
-        pants="#2e3b48",
-        skin="#d6ac84",
-        hair="#4a3a2d",
-        accent="#ffcf57",
-        taller=False,
+        build_character(
+            shirt="#f2a742",
+            pants="#334252",
+            skin="#d7ad86",
+            hair="#4a3a2d",
+            accent="#ffd45c",
+            tall=False,
+        ),
     )
     print("generated: avatar_player.glb")
 
-    export_character(
+    export_mesh(
         "npc_craig.glb",
-        shirt="#7a2e37",
-        pants="#2c2f38",
-        skin="#c89d79",
-        hair="#2f2520",
-        accent="#d84c54",
-        taller=True,
+        build_character(
+            shirt="#7a2f39",
+            pants="#2c313a",
+            skin="#cb9f7b",
+            hair="#2f2520",
+            accent="#d84c54",
+            tall=True,
+        ),
     )
     print("generated: npc_craig.glb")
 

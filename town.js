@@ -740,14 +740,11 @@
       if (keys.up)    dy -= 1;
       if (keys.down)  dy += 1;
 
-      // Rotate input direction by FIXED camera angle so arrow keys always map to consistent world directions
-      // Using initial camera alpha (-PI/4) rather than live alpha to prevent circular movement
-      if ((dx !== 0 || dy !== 0) && this._camera3) {
-        var a = -Math.PI / 4; // Fixed initial camera angle
-        var rightX = -Math.sin(a), rightY = Math.cos(a);
-        var fwdX =  Math.cos(a), fwdY =  Math.sin(a);
-        var rdx = dx * rightX + dy * fwdX;
-        var rdy = dx * rightY + dy * fwdY;
+      // Rotate input from screen space to world space for isometric camera (alpha = -PI/4)
+      // Screen-right in game coords: (+0.707, +0.707), screen-down: (-0.707, +0.707)
+      if (dx !== 0 || dy !== 0) {
+        var rdx = (dx - dy) * 0.707;
+        var rdy = (dx + dy) * 0.707;
         dx = rdx; dy = rdy;
       }
 

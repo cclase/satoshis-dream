@@ -417,3 +417,34 @@ describe('pipeline exposure day/night', () => {
     assert.equal(calls.pipeline.imageProcessing.exposure, 1.05);
   });
 });
+
+// ─────────────────────────────────────────────
+// 8. Building Model Assignment
+// ─────────────────────────────────────────────
+describe('building model assignment', () => {
+  it('bank.glb exists', () => {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'bank.glb')));
+  });
+  it('pet_shop.glb exists', () => {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'pet_shop.glb')));
+  });
+  it('hospital.glb exists', () => {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'hospital.glb')));
+  });
+  it('generic fallback models exist', () => {
+    const generics = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
+    for (const f of generics) {
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', f)), `Missing ${f}`);
+    }
+  });
+  it('BUILDING_MODELS mapping is present in town.js source', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("bank: 'bank.glb'"));
+    assert.ok(src.includes("pet_shop: 'pet_shop.glb'"));
+    assert.ok(src.includes("hospital: 'hospital.glb'"));
+  });
+  it('model selection uses panelType lookup before generic fallback', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('BUILDING_MODELS[b.panelType]'));
+  });
+});

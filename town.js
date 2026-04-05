@@ -459,14 +459,19 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Map each building to a Kenney model (cycle through 5 models)
-      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      // Unique models for specific buildings, fallback to generic Kenney models
+      var BUILDING_MODELS = {
+        bank: 'bank.glb',
+        pet_shop: 'pet_shop.glb',
+        hospital: 'hospital.glb',
+      };
+      var GENERIC_MODELS = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
+          var modelFile = BUILDING_MODELS[b.panelType] || GENERIC_MODELS[idx % GENERIC_MODELS.length];
 
           // Load glb model
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {

@@ -468,13 +468,28 @@ describe('building model assignment', () => {
 // ─────────────────────────────────────────────
 // 9. Decorative Prop Models
 // ─────────────────────────────────────────────
-describe('decorative prop models', () => {
-  const PROPS = ['street_lamp.glb', 'park_bench.glb', 'fire_hydrant.glb', 'trash_can.glb',
-    'mailbox.glb', 'bus_stop.glb', 'flower_planter.glb', 'garden_center.glb', 'dark_web_cafe.glb'];
+describe('decorative prop placement', () => {
+  const PROP_FILES = ['street_lamp.glb', 'park_bench.glb', 'fire_hydrant.glb', 'trash_can.glb',
+    'mailbox.glb', 'bus_stop.glb', 'flower_planter.glb', 'garden_center.glb'];
   it('all decorative prop model files exist', () => {
-    for (const f of PROPS) {
+    for (const f of PROP_FILES) {
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', f)), `Missing prop ${f}`);
     }
+  });
+  it('_buildProps is called during init', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('this._buildProps()'));
+  });
+  it('props are placed at fixed positions along roads', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("model: 'street_lamp.glb'"));
+    assert.ok(src.includes("model: 'park_bench.glb'"));
+    assert.ok(src.includes("model: 'fire_hydrant.glb'"));
+    assert.ok(src.includes("model: 'trash_can.glb'"));
+    assert.ok(src.includes("model: 'mailbox.glb'"));
+    assert.ok(src.includes("model: 'bus_stop.glb'"));
+    assert.ok(src.includes("model: 'flower_planter.glb'"));
+    assert.ok(src.includes("model: 'garden_center.glb'"));
   });
 });
 

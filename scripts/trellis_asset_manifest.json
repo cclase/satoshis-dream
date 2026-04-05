@@ -1,0 +1,107 @@
+[
+  {
+    "file": "mine_hq.glb",
+    "prompt": "photorealistic industrial mining headquarters building exterior, concrete and steel, loading bay, rooftop machinery, neutral daylight background",
+    "seed": 101
+  },
+  {
+    "file": "hardware_shop.glb",
+    "prompt": "photorealistic neighborhood hardware store exterior, signage canopy, storefront windows, weathered materials, neutral daylight background",
+    "seed": 102
+  },
+  {
+    "file": "exchange.glb",
+    "prompt": "photorealistic modern financial exchange office exterior, glass facade, clean architectural lines, neutral daylight background",
+    "seed": 103
+  },
+  {
+    "file": "bank.glb",
+    "prompt": "photorealistic urban bank building exterior, stone facade, grand entry, realistic windows, neutral daylight background",
+    "seed": 104
+  },
+  {
+    "file": "diner.glb",
+    "prompt": "photorealistic retro diner building exterior, chrome trim, red accents, large front windows, neutral daylight background",
+    "seed": 105
+  },
+  {
+    "file": "coffee_shop.glb",
+    "prompt": "photorealistic modern coffee shop exterior, warm materials, awning, sidewalk seating area, neutral daylight background",
+    "seed": 106
+  },
+  {
+    "file": "university.glb",
+    "prompt": "photorealistic university campus hall exterior, brick and stone facade, columns, realistic windows, neutral daylight background",
+    "seed": 107
+  },
+  {
+    "file": "hospital.glb",
+    "prompt": "photorealistic hospital building exterior, modern healthcare architecture, ambulance bay entrance, neutral daylight background",
+    "seed": 108
+  },
+  {
+    "file": "internet_cafe.glb",
+    "prompt": "photorealistic internet cafe storefront exterior, compact urban building, neon sign, glass front, neutral daylight background",
+    "seed": 109
+  },
+  {
+    "file": "casino.glb",
+    "prompt": "photorealistic city casino exterior, dramatic facade, marquee lights, upscale architecture, neutral daylight background",
+    "seed": 110
+  },
+  {
+    "file": "post_office.glb",
+    "prompt": "photorealistic post office exterior, civic architecture, postal drop box entry, realistic details, neutral daylight background",
+    "seed": 111
+  },
+  {
+    "file": "gym.glb",
+    "prompt": "photorealistic urban fitness gym exterior, large glass panels, modern signage area, neutral daylight background",
+    "seed": 112
+  },
+  {
+    "file": "real_estate_office.glb",
+    "prompt": "photorealistic real estate office exterior, modern storefront, display windows, urban context isolated, neutral daylight background",
+    "seed": 113
+  },
+  {
+    "file": "pet_shop.glb",
+    "prompt": "photorealistic pet shop building exterior, colorful storefront, grooming entrance, realistic windows, neutral daylight background",
+    "seed": 114
+  },
+  {
+    "file": "pawn_shop.glb",
+    "prompt": "photorealistic pawn shop exterior, compact commercial building, secure front windows, neutral daylight background",
+    "seed": 115
+  },
+  {
+    "file": "bitcoin_atm.glb",
+    "prompt": "photorealistic small bitcoin ATM kiosk structure exterior, contemporary urban kiosk, realistic materials, neutral daylight background",
+    "seed": 116
+  },
+  {
+    "file": "clothing_store.glb",
+    "prompt": "photorealistic fashion clothing store exterior, contemporary facade, display windows, neutral daylight background",
+    "seed": 117
+  },
+  {
+    "file": "apartment_building.glb",
+    "prompt": "photorealistic mid-rise apartment building exterior, balconies, realistic residential windows, neutral daylight background",
+    "seed": 118
+  },
+  {
+    "file": "furniture_store.glb",
+    "prompt": "photorealistic furniture showroom exterior, wide storefront glazing, modern signage zone, neutral daylight background",
+    "seed": 119
+  },
+  {
+    "file": "avatar_player.glb",
+    "prompt": "photorealistic adult human character full body, neutral A-pose, casual clothing, game-ready, isolated on plain background",
+    "seed": 120
+  },
+  {
+    "file": "npc_craig.glb",
+    "prompt": "photorealistic adult male character full body, neutral A-pose, business-casual outfit, game-ready, isolated on plain background",
+    "seed": 121
+  }
+]

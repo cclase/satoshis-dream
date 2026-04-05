@@ -1392,7 +1392,7 @@
           Town.updateAvatar(dt, UI.keys);
           Town.updateCamera(dt);
         }
-        Town.render();
+        Town.render(dt);
         if (Game.state.avatar) {
           UI.updateHUD();
           UI.updateOpenPanel();

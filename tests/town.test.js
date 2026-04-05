@@ -720,3 +720,94 @@ describe('dynamic label heights', () => {
     assert.ok(src.includes('_emojiMeshes[idx].position.y = actualHeight + 38'), 'emoji should be at actualHeight + 38');
   });
 });
+
+// ─────────────────────────────────────────────
+// 17. Review Fix: Loading screen double-call guard
+// ─────────────────────────────────────────────
+describe('loading screen double-call guard', () => {
+  it('_hideLoadingScreen has _loadingHidden guard', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_loadingHidden'), 'should have guard flag');
+    assert.ok(src.includes('if (_loadingHidden) return'), 'should early-return if already hidden');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 18. Review Fix: Trees and props tracked in loading bar
+// ─────────────────────────────────────────────
+describe('tree and prop loading tracking', () => {
+  it('trees increment _loadingTotal and call _updateLoadingBar', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    // _buildTrees function should have _loadingTotal++ and _updateLoadingBar
+    const treeSection = src.slice(src.indexOf('_buildTrees: function'), src.indexOf('_buildProps: function'));
+    assert.ok(treeSection.includes('_loadingTotal++'), 'trees should increment loading total');
+    assert.ok(treeSection.includes('_updateLoadingBar()'), 'trees should call _updateLoadingBar');
+  });
+  it('props increment _loadingTotal and call _updateLoadingBar', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const propSection = src.slice(src.indexOf('_buildProps: function'), src.indexOf('_buildCollectibles: function'));
+    assert.ok(propSection.includes('_loadingTotal += PROPS.length'), 'props should add to loading total');
+    assert.ok(propSection.includes('_updateLoadingBar()'), 'props should call _updateLoadingBar');
+  });
+  it('tree and prop error callbacks exist', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("console.warn('Failed to load tree:"), 'trees should have error callback');
+    assert.ok(src.includes("console.warn('Failed to load prop"), 'props should have error callback');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 19. Review Fix: Proximity ring built at init, not in render
+// ─────────────────────────────────────────────
+describe('proximity ring initialization', () => {
+  it('_buildProximityRing is called during init', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('this._buildProximityRing()'), 'should call _buildProximityRing during init');
+  });
+  it('_buildProximityRing creates ring mesh', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("_buildProximityRing: function()"), 'should have build method');
+  });
+  it('render loop does not create proximity ring lazily', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const renderSection = src.slice(src.indexOf('render: function'));
+    assert.ok(!renderSection.includes("CreateTorus('proxRing'"), 'render should not create torus');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 20. Review Fix: Render uses real dt, not hardcoded 0.016
+// ─────────────────────────────────────────────
+describe('render uses real dt', () => {
+  it('render function accepts dt parameter', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('render: function(dt)'), 'render should accept dt parameter');
+  });
+  it('game loop passes dt to Town.render', () => {
+    const gameSrc = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
+    assert.ok(gameSrc.includes('Town.render(dt)'), 'game loop should pass dt to render');
+  });
+  it('time accumulation uses dt not hardcoded', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    const renderSection = src.slice(src.indexOf('render: function(dt)'));
+    assert.ok(renderSection.includes('this._time += dt'), 'should use dt for time');
+    assert.ok(renderSection.includes('dt / 300'), 'should use dt for day/night cycle');
+    // The only 0.016 should be in the fallback default, not in time calculations
+    assert.ok(!renderSection.includes('this._time += 0.016'), 'should not hardcode 0.016 for time');
+  });
+});
+
+// ─────────────────────────────────────────────
+// 21. Review Fix: Edge flash triggers on rising edge only
+// ─────────────────────────────────────────────
+describe('edge flash rising edge trigger', () => {
+  it('flash only triggers when _atWorldEdge transitions from false to true', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_wasAtWorldEdge'), 'should track previous edge state');
+    assert.ok(src.includes('this._atWorldEdge && !this._wasAtWorldEdge'), 'should check rising edge');
+  });
+  it('edge flash timer decrements with dt', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('this._edgeFlashTimer -= dt'), 'should decrement by dt not hardcoded');
+  });
+});

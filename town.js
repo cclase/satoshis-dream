@@ -214,7 +214,10 @@
     if (status) status.textContent = 'Loading assets... ' + _loadingDone + '/' + _loadingTotal;
     if (_loadingDone >= _loadingTotal) _hideLoadingScreen();
   }
+  var _loadingHidden = false;
   function _hideLoadingScreen() {
+    if (_loadingHidden) return;
+    _loadingHidden = true;
     var screen = document.getElementById('loading-screen');
     if (screen) {
       screen.style.opacity = '0';
@@ -284,7 +287,7 @@
       this._buildPostProcess();
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
-      this._buildTrees(); this._buildProps(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon();
+      this._buildTrees(); this._buildProps(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt(); this._buildBeacon(); this._buildProximityRing();
 
       // Safety: hide loading screen after 15s even if some assets fail silently
       setTimeout(function() { _hideLoadingScreen(); }, 15000);
@@ -626,15 +629,20 @@
         } while (!valid && attempts < 20);
         if (!valid) continue;
 
+        _loadingTotal++;
         (function(x, z, idx) {
           var modelFile = TREE_MODELS[idx % TREE_MODELS.length];
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
-            if (!meshes.length) return;
+            if (!meshes.length) { _updateLoadingBar(); return; }
             var root = meshes[0];
             var sc = 30 + sr() * 20;
             root.scaling = new BABYLON.Vector3(sc, sc, sc);
             root.position.set(x, 0, z);
             root.rotation.y = sr() * Math.PI * 2;
+            _updateLoadingBar();
+          }, null, function(scene, msg, ex) {
+            console.warn('Failed to load tree: ' + (msg || ex));
+            _updateLoadingBar();
           });
         })(tx, tz, ti);
       }
@@ -691,10 +699,11 @@
         { model: 'garden_center.glb', x: 100, z: 1250, scale: 20 },
       ];
 
+      _loadingTotal += PROPS.length;
       for (var i = 0; i < PROPS.length; i++) {
         (function(prop) {
           BABYLON.SceneLoader.ImportMesh('', 'models/', prop.model, s, function(meshes) {
-            if (!meshes.length) return;
+            if (!meshes.length) { _updateLoadingBar(); return; }
             var root = meshes[0];
             var bounds = root.getHierarchyBoundingVectors(true);
             var mW = bounds.max.x - bounds.min.x || 1;
@@ -709,6 +718,10 @@
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
             }
+            _updateLoadingBar();
+          }, null, function(scene, msg, ex) {
+            console.warn('Failed to load prop ' + prop.model + ': ' + (msg || ex));
+            _updateLoadingBar();
           });
         })(PROPS[i]);
       }
@@ -880,6 +893,19 @@
       this._beaconMesh.position.z = 128 + 192 / 2;
       this._beaconMesh.position.y = 100;
       this._beaconMesh.setEnabled(false);
+    },
+
+    _buildProximityRing: function() {
+      var s = this._scene;
+      this._proximityRing = BABYLON.MeshBuilder.CreateTorus('proxRing', {diameter: 60, thickness: 2, tessellation: 24}, s);
+      var prmat = new BABYLON.StandardMaterial('prmat', s);
+      prmat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+      prmat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.2);
+      prmat.alpha = 0;
+      this._proximityRing.material = prmat;
+      this._proximityRing.rotation.x = Math.PI / 2;
+      this._proximityRing.position.y = 0.5;
+      this._proximityRing.setEnabled(false);
     },
 
     // ── Resize ──
@@ -1102,11 +1128,12 @@
       return 'night';
     },
 
-    render: function() {
+    render: function(dt) {
       if (!this._engine) return;
-      this._time += 0.016;
+      dt = dt || 0.016;
+      this._time += dt;
       // Day/night cycle: 300 seconds (5 minutes)
-      this._dayTime = (this._dayTime + 0.016 / 300) % 1.0;
+      this._dayTime = (this._dayTime + dt / 300) % 1.0;
       this._updateDayNight();
       var av = Game.state.avatar;
 
@@ -1174,17 +1201,7 @@
       }
 
       // Building proximity highlight — glow ring under nearest interactable building
-      if (av && !UI.panelOpen) {
-        if (!this._proximityRing) {
-          this._proximityRing = BABYLON.MeshBuilder.CreateTorus('proxRing', {diameter: 60, thickness: 2, tessellation: 24}, this._scene);
-          var prmat = new BABYLON.StandardMaterial('prmat', this._scene);
-          prmat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
-          prmat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.2);
-          prmat.alpha = 0;
-          this._proximityRing.material = prmat;
-          this._proximityRing.rotation.x = Math.PI / 2;
-          this._proximityRing.position.y = 0.5;
-        }
+      if (av && !UI.panelOpen && this._proximityRing) {
         var nb = this.nearbyBuilding;
         if (nb) {
           this._proximityRing.position.x = nb.x + nb.w / 2;
@@ -1196,13 +1213,13 @@
         }
       }
 
-      // World edge vignette overlay
-      if (this._atWorldEdge) {
-        if (!this._edgeFlashTimer) this._edgeFlashTimer = 0;
+      // World edge vignette overlay — trigger on rising edge only
+      if (this._atWorldEdge && !this._wasAtWorldEdge) {
         this._edgeFlashTimer = 0.3; // flash for 0.3 seconds
       }
+      this._wasAtWorldEdge = this._atWorldEdge;
       if (this._edgeFlashTimer > 0) {
-        this._edgeFlashTimer -= 0.016;
+        this._edgeFlashTimer -= dt;
         var edgeAlpha = Math.max(0, this._edgeFlashTimer / 0.3) * 0.15;
         if (this._pipeline && this._pipeline.imageProcessing) {
           this._pipeline.imageProcessing.vignetteWeight = 0.5 + edgeAlpha * 8;

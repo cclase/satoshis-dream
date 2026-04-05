@@ -6,3 +6,6 @@ Original prompt: Drastically improve the in-game building models to look and fee
 - 2026-04-05: Regenerated all building, prop, tree, and character GLB files using the new generator.
 - 2026-04-05: Removed obsolete generator `scripts/generate_recreated_v2.py` and deleted empty `models/recreated_v2` folder.
 - 2026-04-05: Full test suite passed (`349/349`).
+- 2026-04-05 (late): Second overhaul pass added higher-detail facades and silhouette variation across all archetypes (window bands, towers, balconies, canopies, pilasters, roof equipment).
+- 2026-04-05 (late): Town lot pad colors in `town.js` were desaturated to neutral concrete/asphalt tones to reduce toy-like colored square pads.
+- 2026-04-05 (late): Full test suite still passes (`349/349`) after second pass.

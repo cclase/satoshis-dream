@@ -604,7 +604,12 @@
           var r = parseInt(c.slice(1,3), 16) / 255;
           var g = parseInt(c.slice(3,5), 16) / 255;
           var bl = parseInt(c.slice(5,7), 16) / 255;
-          lotMat.diffuseColor = new BABYLON.Color3(r * 0.26 + 0.16, g * 0.26 + 0.16, bl * 0.26 + 0.16);
+          // Keep lot pads close to concrete/asphalt tones so the city doesn't read as toy-like color blocks.
+          lotMat.diffuseColor = new BABYLON.Color3(
+            0.21 + r * 0.05,
+            0.22 + g * 0.05,
+            0.23 + bl * 0.05
+          );
           lotMat.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
           lot.material = lotMat;
 
@@ -661,9 +666,9 @@
 
             // Fill most of the lot while preserving true model proportions.
             var uniformScale = Math.min(b.w / modelW, b.h / modelD);
-            uniformScale *= 0.72;
-            var targetW = b.w * 0.72;
-            var targetD = b.h * 0.72;
+            uniformScale *= 0.78;
+            var targetW = b.w * 0.78;
+            var targetD = b.h * 0.78;
             var targetH = (BLDG_HEIGHTS[b.panelType] || 40) * 1.15;
             if (modelH * uniformScale < targetH * 0.7) {
               uniformScale = targetH / modelH;

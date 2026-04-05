@@ -570,3 +570,55 @@ describe('arrow key movement direction', () => {
     assert.ok(src.includes('this._camera3.alpha'), 'should read live camera alpha');
   });
 });
+
+// ─────────────────────────────────────────────
+// 12. Movement Polish
+// ─────────────────────────────────────────────
+describe('movement polish', () => {
+  it('wall-sliding collision tries full move, then X-only, then Y-only', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('collidesBuilding(av.x + moveX, av.y + moveY)'), 'should try full diagonal move');
+    assert.ok(src.includes('collidesBuilding(av.x + moveX, av.y)'), 'should try X-only slide');
+    assert.ok(src.includes('collidesBuilding(av.x, av.y + moveY)'), 'should try Y-only slide');
+    // Should NOT have old step-down loop
+    assert.ok(!src.includes('step >= 0.25; step *= 0.5'), 'old step-down collision should be removed');
+  });
+  it('avatar rotates to face movement direction', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_facingAngle'), 'should track facing angle');
+    assert.ok(src.includes('this._avatarRoot.rotation.y'), 'should apply rotation to avatar root');
+  });
+  it('camera lerp is 0.15 (not 0.08)', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('* 0.15'), 'camera lerp should be 0.15');
+    assert.ok(!src.includes('* 0.08'), 'old 0.08 lerp should be removed');
+  });
+  it('world edge detection flag exists', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_atWorldEdge'), 'should track world edge collision');
+  });
+  it('world edge triggers vignette flash', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_edgeFlashTimer'), 'should have edge flash timer');
+    assert.ok(src.includes('vignetteWeight'), 'should modify vignette weight at edge');
+  });
+  it('stuck detection timer is 0.6 seconds (not 1.5)', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_stuckTimer > 0.6'), 'stuck timer should be 0.6s');
+    assert.ok(!src.includes('_stuckTimer > 1.5'), 'old 1.5s stuck timer should be removed');
+  });
+  it('building proximity ring provides visual feedback', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('_proximityRing'), 'should have proximity ring mesh');
+    assert.ok(src.includes('proxRing'), 'should create torus ring for building proximity');
+  });
+  it('short-distance click-to-move skips pathfinding', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('directDist < 200'), 'should skip pathfinding for short distances');
+  });
+  it('diagonal normalization uses proper vector length', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes('Math.sqrt(dx * dx + dy * dy)'), 'should normalize diagonal with vector length');
+    assert.ok(!src.includes('dx *= 0.707'), 'old hardcoded 0.707 normalization should be removed');
+  });
+});

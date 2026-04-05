@@ -864,6 +864,17 @@
       }
 
       if (this.moveTarget && dx === 0 && dy === 0) {
+        // Skip pathfinding for short distances — go direct
+        var directDx = this.moveTarget.x - av.x;
+        var directDy = this.moveTarget.y - av.y;
+        var directDist = Math.sqrt(directDx * directDx + directDy * directDy);
+        if (directDist < 200 && !this._pathWaypoints) {
+          // Check if direct path is clear (no building collision at midpoint)
+          var midX = av.x + directDx * 0.5, midY = av.y + directDy * 0.5;
+          if (!this.collidesBuilding(midX, midY)) {
+            this._pathWaypoints = [{ x: this.moveTarget.x, y: this.moveTarget.y }];
+          }
+        }
         if (!this._pathWaypoints) {
           this._pathWaypoints = findPath(av.x, av.y, this.moveTarget.x, this.moveTarget.y);
         }
@@ -891,8 +902,8 @@
       }
 
       if (this.moveTarget === null && dx !== 0 && dy !== 0) {
-        dx *= 0.707;
-        dy *= 0.707;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (len > 0) { dx /= len; dy /= len; }
       }
 
       if (dx === 0 && dy === 0) {
@@ -900,36 +911,40 @@
         return;
       }
 
+      // Track facing direction for avatar rotation
+      this._facingAngle = Math.atan2(dx, dy);
+
       var speed = AVATAR_SPEED * Game.getSpeedMultiplier();
       var moveX = dx * speed * dt;
       var moveY = dy * speed * dt;
 
-      // Try full step, then half, then quarter (prevents overshooting buildings)
-      var movedX = false, movedY = false;
-      for (var step = 1; step >= 0.25; step *= 0.5) {
-        if (!movedX && !this.collidesBuilding(av.x + moveX * step, av.y)) {
-          av.x += moveX * step; movedX = true;
-        }
-        if (!movedY && !this.collidesBuilding(av.x, av.y + moveY * step)) {
-          av.y += moveY * step; movedY = true;
-        }
-        if (movedX && movedY) break;
-      }
-      if (!movedX || !movedY) {
+      // Wall-sliding collision: try full move, then slide along each axis independently
+      if (!this.collidesBuilding(av.x + moveX, av.y + moveY)) {
+        av.x += moveX;
+        av.y += moveY;
+      } else if (!this.collidesBuilding(av.x + moveX, av.y)) {
+        av.x += moveX; // slide along X
+      } else if (!this.collidesBuilding(av.x, av.y + moveY)) {
+        av.y += moveY; // slide along Y
+      } else {
+        // Fully blocked — skip waypoint if pathfinding
         if (this._pathWaypoints && this._pathWaypoints.length > 0) {
           this._pathWaypoints.shift();
         }
       }
 
+      // World boundary clamping with edge flag for visual feedback
+      var prevX = av.x, prevY = av.y;
       av.x = Math.max(AVATAR_SIZE, Math.min(WORLD_W - AVATAR_SIZE, av.x));
       av.y = Math.max(AVATAR_SIZE, Math.min(WORLD_H - AVATAR_SIZE, av.y));
+      this._atWorldEdge = (av.x !== prevX || av.y !== prevY);
 
-      // Stuck detection: if position hasn't changed much in 1.5 seconds, skip waypoint
+      // Stuck detection: 0.6 seconds with visual feedback
       if (this.moveTarget) {
         var movedDist = Math.abs(av.x - this._lastAvatarX) + Math.abs(av.y - this._lastAvatarY);
         if (movedDist < 2) {
           this._stuckTimer += dt;
-          if (this._stuckTimer > 1.5) {
+          if (this._stuckTimer > 0.6) {
             this._stuckTimer = 0;
             if (this._pathWaypoints && this._pathWaypoints.length > 0) {
               this._pathWaypoints.shift();
@@ -984,9 +999,9 @@
       if (!av) return;
       var target = this._camera3.target;
       this._camera3.target = new BABYLON.Vector3(
-        target.x + (av.x - target.x) * 0.08,
+        target.x + (av.x - target.x) * 0.15,
         0,
-        target.z + (av.y - target.z) * 0.08
+        target.z + (av.y - target.z) * 0.15
       );
     },
 
@@ -1047,6 +1062,16 @@
         this._avatarRoot.position.x = av.x;
         this._avatarRoot.position.z = av.y;
         this._avatarRoot.position.y = Math.sin(this._time * 3) * 1.5;
+        // Rotate avatar to face movement direction
+        if (this._facingAngle !== undefined) {
+          var targetAngle = this._facingAngle;
+          var currentAngle = this._avatarRoot.rotation.y || 0;
+          // Smooth rotation (lerp toward target)
+          var diff = targetAngle - currentAngle;
+          while (diff > Math.PI) diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          this._avatarRoot.rotation.y = currentAngle + diff * 0.2;
+        }
         // Update name label
         if (this._avatarLastName !== av.name) {
           this._avatarLastName = av.name;
@@ -1085,7 +1110,7 @@
         }
       }
 
-      // Sync prompt
+      // Sync prompt + building proximity glow
       if (this.nearbyBuilding && av && !UI.panelOpen && this._promptMesh) {
         this._promptMesh.setEnabled(true);
         this._promptMesh.position.x = av.x;
@@ -1093,6 +1118,44 @@
         this._promptMesh.position.z = av.y;
       } else if (this._promptMesh) {
         this._promptMesh.setEnabled(false);
+      }
+
+      // Building proximity highlight — glow ring under nearest interactable building
+      if (av && !UI.panelOpen) {
+        if (!this._proximityRing) {
+          this._proximityRing = BABYLON.MeshBuilder.CreateTorus('proxRing', {diameter: 60, thickness: 2, tessellation: 24}, this._scene);
+          var prmat = new BABYLON.StandardMaterial('prmat', this._scene);
+          prmat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.2);
+          prmat.emissiveColor = new BABYLON.Color3(1, 0.85, 0.2);
+          prmat.alpha = 0;
+          this._proximityRing.material = prmat;
+          this._proximityRing.rotation.x = Math.PI / 2;
+          this._proximityRing.position.y = 0.5;
+        }
+        var nb = this.nearbyBuilding;
+        if (nb) {
+          this._proximityRing.position.x = nb.x + nb.w / 2;
+          this._proximityRing.position.z = nb.y + nb.h / 2;
+          this._proximityRing.material.alpha = 0.4 + 0.2 * Math.sin(this._time * 4);
+          this._proximityRing.setEnabled(true);
+        } else {
+          this._proximityRing.setEnabled(false);
+        }
+      }
+
+      // World edge vignette overlay
+      if (this._atWorldEdge) {
+        if (!this._edgeFlashTimer) this._edgeFlashTimer = 0;
+        this._edgeFlashTimer = 0.3; // flash for 0.3 seconds
+      }
+      if (this._edgeFlashTimer > 0) {
+        this._edgeFlashTimer -= 0.016;
+        var edgeAlpha = Math.max(0, this._edgeFlashTimer / 0.3) * 0.15;
+        if (this._pipeline && this._pipeline.imageProcessing) {
+          this._pipeline.imageProcessing.vignetteWeight = 5 + edgeAlpha * 30;
+        }
+      } else if (this._pipeline && this._pipeline.imageProcessing) {
+        this._pipeline.imageProcessing.vignetteWeight = 5;
       }
 
       this._scene.render();

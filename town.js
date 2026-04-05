@@ -247,8 +247,16 @@
       var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.5,-3,-1), this._scene);
       sun.intensity = 1.0; sun.diffuse = new BABYLON.Color3(1,0.95,0.85);
       sun.position = new BABYLON.Vector3(2000,800,-200);
-      this._shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+      this._shadowGen = new BABYLON.ShadowGenerator(2048, sun);
       this._shadowGen.useBlurExponentialShadowMap = true;
+      this._shadowGen.blurKernel = 32;
+      this._shadowGen.depthScale = 50;
+
+      // ── Skybox ──
+      this._buildSkybox();
+
+      // ── Post-processing pipeline ──
+      this._buildPostProcess();
 
       this._buildGround(); this._buildRoads(); this._buildBuildings();
       this._buildTrees(); this._buildCollectibles(); this._buildGhosts(); this._buildAvatar(); this._buildMoveTarget(); this._buildPrompt();
@@ -302,6 +310,107 @@
       });
     },
 
+    _buildSkybox: function() {
+      var s = this._scene;
+      var skybox = BABYLON.MeshBuilder.CreateBox('skybox', { size: 5000 }, s);
+      var skyMat = new BABYLON.StandardMaterial('skyMat', s);
+      skyMat.backFaceCulling = false;
+      skyMat.disableLighting = true;
+      skyMat.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      skyMat.specularColor = new BABYLON.Color3(0, 0, 0);
+      // Gradient sky via procedural texture
+      var skyCanvas = document.createElement('canvas');
+      skyCanvas.width = 1; skyCanvas.height = 256;
+      var ctx = skyCanvas.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#3a7bd5');   // Zenith blue
+      grad.addColorStop(0.5, '#87ceeb'); // Mid sky
+      grad.addColorStop(0.85, '#d4e9f7');// Horizon haze
+      grad.addColorStop(1, '#e8dcc8');   // Warm horizon
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 1, 256);
+      var skyTex = new BABYLON.Texture(skyCanvas.toDataURL(), s);
+      skyMat.emissiveTexture = skyTex;
+      skybox.material = skyMat;
+      skybox.infiniteDistance = true;
+      skybox.renderingGroupId = 0;
+      this._skybox = skybox;
+      this._skyMat = skyMat;
+    },
+
+    _buildPostProcess: function() {
+      var s = this._scene;
+      var cam = this._camera3;
+      // Default rendering pipeline: FXAA + bloom + image processing
+      if (!BABYLON.DefaultRenderingPipeline) return; // guard for older builds
+      var pipeline = new BABYLON.DefaultRenderingPipeline('defaultPipeline', true, s, [cam]);
+
+      // FXAA antialiasing
+      pipeline.fxaaEnabled = true;
+
+      // Bloom for emissive materials (gold orbs, neon signs, night windows)
+      pipeline.bloomEnabled = true;
+      pipeline.bloomThreshold = 0.7;
+      pipeline.bloomWeight = 0.3;
+      pipeline.bloomKernel = 32;
+      pipeline.bloomScale = 0.5;
+
+      // Image processing (subtle color grading)
+      pipeline.imageProcessingEnabled = true;
+      pipeline.imageProcessing.toneMappingEnabled = true;
+      pipeline.imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+      pipeline.imageProcessing.contrast = 1.1;
+      pipeline.imageProcessing.exposure = 1.05;
+
+      // Vignette for cinematic feel
+      pipeline.imageProcessing.vignetteEnabled = true;
+      pipeline.imageProcessing.vignetteWeight = 1.5;
+      pipeline.imageProcessing.vignetteStretch = 0.5;
+
+      this._pipeline = pipeline;
+    },
+
+    _updateSkybox: function(r, g, b) {
+      if (!this._skybox) return;
+      var skyCanvas = document.createElement('canvas');
+      skyCanvas.width = 1; skyCanvas.height = 256;
+      var ctx = skyCanvas.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, 256);
+      // Zenith is darker version of sky color
+      var zr = Math.max(0, r - 0.15), zg = Math.max(0, g - 0.15), zb = Math.max(0, b - 0.05);
+      // Horizon is lighter/warmer
+      var hr = Math.min(1, r + 0.2), hg = Math.min(1, g + 0.05), hb = Math.min(1, b - 0.1);
+      grad.addColorStop(0, 'rgb(' + Math.floor(zr*255) + ',' + Math.floor(zg*255) + ',' + Math.floor(zb*255) + ')');
+      grad.addColorStop(0.5, 'rgb(' + Math.floor(r*255) + ',' + Math.floor(g*255) + ',' + Math.floor(b*255) + ')');
+      grad.addColorStop(1, 'rgb(' + Math.floor(hr*255) + ',' + Math.floor(hg*255) + ',' + Math.floor(hb*255) + ')');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 1, 256);
+      if (this._skyMat.emissiveTexture) this._skyMat.emissiveTexture.dispose();
+      this._skyMat.emissiveTexture = new BABYLON.Texture(skyCanvas.toDataURL(), this._scene);
+    },
+
+    _updateBuildingEmissives: function(dayTime) {
+      if (!this._buildingMeshes) return;
+      var isNight = dayTime >= 0.7 && dayTime < 0.85;
+      var isDusk = dayTime >= 0.6 && dayTime < 0.7;
+      var glowIntensity = isNight ? 1.0 : (isDusk ? (dayTime - 0.6) / 0.1 : 0);
+      if (dayTime >= 0.85) glowIntensity = Math.max(0, 1.0 - (dayTime - 0.85) / 0.15);
+
+      for (var i = 0; i < this._buildingMeshes.length; i++) {
+        var root = this._buildingMeshes[i];
+        if (!root) continue;
+        var meshes = root.getChildMeshes ? root.getChildMeshes() : [];
+        for (var m = 0; m < meshes.length; m++) {
+          var mat = meshes[m].material;
+          if (!mat) continue;
+          // Warm window glow at night
+          mat.emissiveColor = new BABYLON.Color3(
+            0.9 * glowIntensity,
+            0.7 * glowIntensity,
+            0.3 * glowIntensity
+          );
+        }
+      }
+    },
+
     _buildGround: function() {
       var s = this._scene;
       var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
@@ -350,14 +459,19 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Map each building to a Kenney model (cycle through 5 models)
-      var MODEL_FILES = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      // Unique models for specific buildings, fallback to generic Kenney models
+      var BUILDING_MODELS = {
+        bank: 'bank.glb',
+        pet_shop: 'pet_shop.glb',
+        hospital: 'hospital.glb',
+      };
+      var GENERIC_MODELS = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = MODEL_FILES[idx % MODEL_FILES.length];
+          var modelFile = BUILDING_MODELS[b.panelType] || GENERIC_MODELS[idx % GENERIC_MODELS.length];
 
           // Load glb model
           BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
@@ -788,6 +902,14 @@
       }
       s.clearColor = new BABYLON.Color4(r, g, b, 1);
       s.fogColor = new BABYLON.Color3(r, g, b);
+      // Update skybox gradient to match sky color
+      this._updateSkybox(r, g, b);
+      // Building window glow at night
+      this._updateBuildingEmissives(t);
+      // Adjust pipeline exposure for night
+      if (this._pipeline && this._pipeline.imageProcessing) {
+        this._pipeline.imageProcessing.exposure = t >= 0.7 && t < 0.85 ? 0.85 : 1.05;
+      }
       // Adjust light intensity
       var hemi = s.getLightByName('hemi');
       var sun = s.getLightByName('sun');

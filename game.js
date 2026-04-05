@@ -539,7 +539,7 @@
     sleep: function() {
       var s = this.state;
       var now = Date.now();
-      if (now - s.lastSleepTime < 180000) return { error: 'Too soon! Wait ' + Math.ceil((180000 - (now - s.lastSleepTime)) / 1000) + 's' };
+      if (now - s.lastSleepTime < 90000) return { error: 'Too soon! Wait ' + Math.ceil((90000 - (now - s.lastSleepTime)) / 1000) + 's' };
       s.lastSleepTime = now;
       // Energy restore based on bed
       var restore = 50;
@@ -806,11 +806,6 @@
       s.craig.sats += playerRate * pace * dt;
       // Craig also earns a base amount even when player has no production
       s.craig.sats += 0.5 * dt;
-      // Craig steals from you if he's ahead (reduced from 1% to 0.2%)
-      if (s.craig.sats > s.lifetimeSats * 1.1) {
-        var steal = playerRate * 0.002 * dt; // 0.2% production per second
-        s.sats = Math.max(0, s.sats - steal);
-      }
       s.craig.hardware = Math.floor(s.craig.sats / 5000);
       // Craig taunts
       var now = Date.now();
@@ -842,10 +837,10 @@
     },
     sabotageCraig: function() {
       var s = this.state;
-      if (s.sats < 1000) return false;
-      s.sats -= 1000;
+      if (s.sats < 200) return false;
+      s.sats -= 200;
       if (!s.craig) s.craig = { sats: 0, hardware: 0, lastTaunt: 0 };
-      s.craig._sabotageUntil = Date.now() + 600000; // 10 min
+      s.craig._sabotageUntil = Date.now() + 1800000; // 30 min
       return true;
     },
 
@@ -1042,7 +1037,7 @@
       // Max 1 loan at a time
       if (this.state.loans.length > 0) return false;
       this.state.usd += loan.amount;
-      this.state.loans.push({ id: loan.id, amount: loan.amount, owed: loan.amount * (1 + loan.rate), takenAt: Date.now() });
+      this.state.loans.push({ id: loan.id, amount: loan.amount, owed: loan.amount * (1 + loan.rate), takenAt: Date.now(), missedPayments: 0 });
       return true;
     },
 
@@ -1120,8 +1115,8 @@
       // Energy - drains slowly, regens slowly
       var energyDrain = 0.4; // per second base
       if (this.getProductionRate() > 0) energyDrain = 0.6; // drains in ~170s when producing
-      // Reduced regen while producing (25% of normal), full regen when idle
-      var energyRegen = this.getEnergyRegen() * dt * (this.getProductionRate() > 0 ? 0.25 : 1.0);
+      // Reduced regen while producing (50% of normal), full regen when idle
+      var energyRegen = this.getEnergyRegen() * dt * (this.getProductionRate() > 0 ? 0.5 : 1.0);
       s.energy = Math.max(0, Math.min(this.getEnergyMax(), s.energy - (energyDrain * dt) + energyRegen));
 
       // Electricity bill
@@ -1156,9 +1151,13 @@
           if (s.usd >= minPayment) {
             s.usd -= minPayment;
             loan.owed -= minPayment;
+            loan.missedPayments = 0;
           } else {
-            // Can't pay — add penalty interest
-            loan.owed *= 1.02;
+            // Can't pay — grace period: only penalize after 3 missed payments
+            loan.missedPayments = (loan.missedPayments || 0) + 1;
+            if (loan.missedPayments >= 3) {
+              loan.owed *= 1.02;
+            }
           }
           s.loanTime = now;
           // Fully paid off
@@ -1169,15 +1168,15 @@
           // Warn at 2x original
           if (loan.owed > loan.amount * 2 && !loan._warned) {
             loan._warned = true;
-            if (UI && UI.toast) UI.toast('\u26A0\uFE0F Loan at 2x! Repay soon or default at 5x!');
+            if (UI && UI.toast) UI.toast('\u26A0\uFE0F Loan at 2x! Repay soon or default at 3x!');
           }
-          // Default: if owed > 5x original
-          if (loan.owed > loan.amount * 5) {
+          // Default: if owed > 3x original
+          if (loan.owed > loan.amount * 3) {
             s.loans = [];
             var safeProtect = this._getItemBonus('protect'); // Safe furniture
-            s.sats = Math.floor(s.sats * (0.5 + safeProtect)); // Safe protects some sats
-            s.usd = Math.max(0, s.usd - loan.amount * 0.5);
-            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost ' + Math.round((0.5 - safeProtect) * 100) + '% sats and $' + Game.formatNumber(loan.amount * 0.5) + '!');
+            s.sats = Math.floor(s.sats * (0.75 + safeProtect)); // Safe protects some sats
+            s.usd = Math.max(0, s.usd - loan.amount * 0.25);
+            if (UI && UI.toast) UI.toast('\u{1F6A8} Loan defaulted! Lost ' + Math.round((0.25 - safeProtect) * 100) + '% sats and $' + Game.formatNumber(loan.amount * 0.25) + '!');
           }
         }
       }

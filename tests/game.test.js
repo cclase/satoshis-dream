@@ -793,14 +793,14 @@ describe('craig rival', () => {
   let Game;
   beforeEach(() => { Game = freshGame(); });
 
-  it('sabotageCraig costs 1000 sats', () => {
-    Game.state.sats = 2000;
+  it('sabotageCraig costs 200 sats', () => {
+    Game.state.sats = 500;
     assert.ok(Game.sabotageCraig());
-    assert.equal(Game.state.sats, 1000);
+    assert.equal(Game.state.sats, 300);
     assert.ok(Game.state.craig._sabotageUntil > Date.now());
   });
   it('sabotageCraig fails with insufficient sats', () => {
-    Game.state.sats = 500;
+    Game.state.sats = 100;
     assert.equal(Game.sabotageCraig(), false);
   });
   it('challengeCraig returns result object', () => {
@@ -1553,5 +1553,221 @@ describe('achievement edge cases', () => {
     Game.checkAchievements();
     // Multiple achievements should have granted reward sats
     assert.ok(Game.state.sats > 0);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 38. Energy Rebalance
+// ─────────────────────────────────────────────
+describe('energy rebalance', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('energy regen while producing is 50% of base (not 25%)', () => {
+    Game.state.owned = { u1: 1 };
+    Game.state.energy = 50;
+    // With base regen 0.5/s, producing regen = 0.5 * 0.5 = 0.25/s
+    // Energy drain while producing = 0.6/s
+    // Net drain = 0.6 - 0.25 = 0.35/s over 1 second
+    Game.tick(1.0);
+    const expectedEnergy = 50 - 0.35;
+    assert.ok(Math.abs(Game.state.energy - expectedEnergy) < 0.1,
+      `Expected ~${expectedEnergy}, got ${Game.state.energy}`);
+  });
+  it('energy drains slower than old 25% regen rate', () => {
+    Game.state.owned = { u1: 1 };
+    Game.state.energy = 100;
+    Game.tick(10.0);
+    // Old: 100 - (0.6-0.125)*10 = 100 - 4.75 = 95.25
+    // New: 100 - (0.6-0.25)*10 = 100 - 3.5 = 96.5
+    assert.ok(Game.state.energy > 95.5,
+      `Energy should drain slower with 50% regen, got ${Game.state.energy}`);
+  });
+  it('energy regens fully when idle (no hardware)', () => {
+    Game.state.energy = 50;
+    // No hardware: drain 0.4/s, regen 0.5/s (100%), net +0.1/s
+    Game.tick(1.0);
+    assert.ok(Game.state.energy > 50,
+      `Energy should regen when idle, got ${Game.state.energy}`);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 39. Sleep Cooldown Rebalance
+// ─────────────────────────────────────────────
+describe('sleep cooldown rebalance', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('allows sleep after 90 seconds', () => {
+    Game.state.lastSleepTime = Date.now() - 91000;
+    Game.state.energy = 30;
+    const result = Game.sleep();
+    assert.ok(!result.error);
+    assert.equal(result.energy, 50);
+  });
+  it('rejects sleep before 90 seconds', () => {
+    Game.state.lastSleepTime = Date.now() - 60000; // 60s ago
+    const result = Game.sleep();
+    assert.ok(result.error);
+  });
+  it('allows sleep immediately with lastSleepTime=0', () => {
+    Game.state.lastSleepTime = 0;
+    Game.state.energy = 50;
+    const result = Game.sleep();
+    assert.ok(!result.error);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 40. Loan Grace Period
+// ─────────────────────────────────────────────
+describe('loan grace period', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('new loan has missedPayments counter at 0', () => {
+    Game.takeLoan('small');
+    assert.equal(Game.state.loans[0].missedPayments, 0);
+  });
+  it('no penalty interest on 1st missed payment', () => {
+    Game.takeLoan('small');
+    Game.state.usd = 0; // can't make payment
+    const owedBefore = Game.state.loans[0].owed;
+    // Simulate a tick with enough time elapsed for loan check
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    // After 1 miss: missedPayments=1, no penalty applied
+    assert.equal(Game.state.loans[0].missedPayments, 1);
+    // Owed should only have grown by compound interest (rate*0.01), not the 1.02 penalty
+    const expectedOwed = owedBefore * (1 + 0.05 * 0.01);
+    assert.ok(Math.abs(Game.state.loans[0].owed - expectedOwed) < 0.1,
+      `Expected ~${expectedOwed}, got ${Game.state.loans[0].owed}`);
+  });
+  it('no penalty interest on 2nd missed payment', () => {
+    Game.takeLoan('small');
+    Game.state.usd = 0;
+    Game.state.loans[0].missedPayments = 1;
+    const owedBefore = Game.state.loans[0].owed;
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    assert.equal(Game.state.loans[0].missedPayments, 2);
+    const expectedOwed = owedBefore * (1 + 0.05 * 0.01);
+    assert.ok(Math.abs(Game.state.loans[0].owed - expectedOwed) < 0.1);
+  });
+  it('penalty interest kicks in on 3rd missed payment', () => {
+    Game.takeLoan('small');
+    Game.state.usd = 0;
+    Game.state.loans[0].missedPayments = 2;
+    const owedBefore = Game.state.loans[0].owed;
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    assert.equal(Game.state.loans[0].missedPayments, 3);
+    // Owed grows by compound + 1.02 penalty
+    const expectedOwed = owedBefore * (1 + 0.05 * 0.01) * 1.02;
+    assert.ok(Math.abs(Game.state.loans[0].owed - expectedOwed) < 0.1,
+      `Expected penalty at ~${expectedOwed}, got ${Game.state.loans[0].owed}`);
+  });
+  it('successful payment resets missedPayments to 0', () => {
+    Game.takeLoan('small');
+    Game.state.loans[0].missedPayments = 2;
+    Game.state.usd = 1000; // plenty to cover payment
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    assert.equal(Game.state.loans[0].missedPayments, 0);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 41. Loan Default Rebalance
+// ─────────────────────────────────────────────
+describe('loan default rebalance', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('defaults at 3x original amount (not 5x)', () => {
+    Game.takeLoan('small'); // amount: 100
+    Game.state.loans[0].owed = 301; // just over 3x
+    Game.state.usd = 0;
+    Game.state.loans[0].missedPayments = 5;
+    Game.state.sats = 1000;
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    assert.equal(Game.state.loans.length, 0); // defaulted
+  });
+  it('does not default below 3x', () => {
+    Game.takeLoan('small');
+    Game.state.loans[0].owed = 250; // under 3x (300)
+    Game.state.usd = 0;
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    assert.equal(Game.state.loans.length, 1); // still active
+  });
+  it('default penalty is 25% sats (not 50%)', () => {
+    Game.takeLoan('small');
+    Game.state.loans[0].owed = 400; // over 3x
+    Game.state.usd = 100;
+    Game.state.sats = 1000;
+    Game.state.loans[0].missedPayments = 5;
+    Game.state.loanTime = Date.now() - 31000;
+    Game.tick(0.01);
+    // Player keeps 75% of sats (plus tiny tick production): should be >= 750
+    assert.ok(Game.state.sats >= 750 && Game.state.sats <= 800,
+      `Expected ~750 sats (75% of 1000), got ${Game.state.sats}`);
+  });
+  it('default USD penalty is 25% of loan amount', () => {
+    Game.takeLoan('small'); // amount: 100
+    Game.state.loans[0].owed = 400; // over 3x
+    Game.state.usd = 200;
+    Game.state.sats = 1000;
+    Game.state.loans[0].missedPayments = 5;
+    Game.state.loanTime = Date.now() - 31000;
+    // No hardware = no electricity bill to interfere
+    Game.tick(0.01);
+    // USD penalty: max(0, 200 - 100*0.25) = 175, minus small tick deductions
+    assert.ok(Game.state.usd >= 150 && Game.state.usd <= 180,
+      `Expected ~175 USD (200 - 25 penalty), got ${Game.state.usd}`);
+  });
+});
+
+// ─────────────────────────────────────────────
+// 42. Craig No-Steal Rebalance
+// ─────────────────────────────────────────────
+describe('craig no-steal rebalance', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('craig does not steal sats when ahead', () => {
+    Game.state.owned = { u1: 1 };
+    Game.state.sats = 1000;
+    Game.state.lifetimeSats = 500;
+    Game.state.craig = { sats: 10000, hardware: 2, lastTaunt: Date.now() };
+    // Craig is way ahead (10000 > 500*1.1)
+    Game.updateCraig(1.0);
+    // Player sats should be unchanged (no steal)
+    assert.equal(Game.state.sats, 1000);
+  });
+  it('craig still earns sats normally', () => {
+    Game.state.owned = { u1: 1 };
+    Game.state.craig = { sats: 100, hardware: 0, lastTaunt: Date.now() };
+    Game.updateCraig(1.0);
+    assert.ok(Game.state.craig.sats > 100);
+  });
+  it('sabotage costs 200 sats (not 1000)', () => {
+    Game.state.sats = 300;
+    assert.ok(Game.sabotageCraig());
+    assert.equal(Game.state.sats, 100);
+  });
+  it('sabotage fails with less than 200 sats', () => {
+    Game.state.sats = 199;
+    assert.equal(Game.sabotageCraig(), false);
+  });
+  it('sabotage lasts 30 minutes (not 10)', () => {
+    Game.state.sats = 500;
+    Game.sabotageCraig();
+    const duration = Game.state.craig._sabotageUntil - Date.now();
+    // Should be ~1800000ms (30 min), allow 1s tolerance
+    assert.ok(Math.abs(duration - 1800000) < 1000,
+      `Expected ~1800000ms duration, got ${duration}`);
   });
 });

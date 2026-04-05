@@ -228,6 +228,30 @@
   var ROOF_COLORS = ['#9a5533','#6b4423','#667766','#884444','#7a5533'];
   var BRICK_TYPES = ['diner','gym','pawn_shop','mine'];
   var STONE_TYPES = ['bank','university','post_office','hospital'];
+  var BUILDING_MODEL_ROOT = 'models/satoshis_dream_best_pack/models/';
+  var BUILDING_MODEL_FILES = {
+    mine: 'building-mining-hq.glb',
+    hardware: 'building-hardware-shop.glb',
+    exchange: 'building-exchange.glb',
+    bank: 'building-bank.glb',
+    diner: 'building-diner.glb',
+    coffee: 'building-coffee-shop.glb',
+    university: 'building-university.glb',
+    hospital: 'building-hospital.glb',
+    internet_cafe: 'building-internet-cafe.glb',
+    casino: 'building-casino.glb',
+    post_office: 'building-post-office.glb',
+    gym: 'building-gym.glb',
+    real_estate: 'building-real-estate.glb',
+    car_dealer: 'building-car-dealership.glb',
+    pet_shop: 'building-pet-shop.glb',
+    pawn_shop: 'building-pawn-shop.glb',
+    utility: 'building-utility-company.glb',
+    clothing: 'building-clothing-store.glb',
+    apartment: 'building-home.glb',
+    homegoods: 'building-home-goods-store.glb'
+  };
+  var LEGACY_MODEL_FILES = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
 
   // ── Town Object ──
   var Town = {
@@ -279,6 +303,9 @@
       this._shadowGen.useBlurExponentialShadowMap = true;
       this._shadowGen.blurKernel = 32;
       this._shadowGen.depthScale = 50;
+      this._shadowGen.darkness = 0.35;
+      this._shadowGen.bias = 0.0002;
+      this._shadowGen.normalBias = 0.03;
 
       // ── Skybox ──
       this._buildSkybox();
@@ -490,29 +517,6 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Unique models for each building, with generic fallback
-      var BUILDING_MODELS = {
-        mine: 'mine_hq.glb',
-        hardware: 'hardware_shop.glb',
-        exchange: 'exchange.glb',
-        bank: 'bank.glb',
-        diner: 'diner.glb',
-        coffee: 'coffee_shop.glb',
-        university: 'university.glb',
-        hospital: 'hospital.glb',
-        internet_cafe: 'internet_cafe.glb',
-        casino: 'casino.glb',
-        post_office: 'post_office.glb',
-        gym: 'gym.glb',
-        real_estate: 'real_estate_office.glb',
-        pet_shop: 'pet_shop.glb',
-        pawn_shop: 'pawn_shop.glb',
-        utility: 'bitcoin_atm.glb',
-        clothing: 'clothing_store.glb',
-        apartment: 'apartment_building.glb',
-        homegoods: 'furniture_store.glb',
-      };
-      var GENERIC_MODELS = ['building-garage.glb'];
       var self = this;
       this._labelMeshes = [];
       this._emojiMeshes = [];
@@ -522,7 +526,8 @@
       for (var i = 0; i < BUILDINGS.length; i++) {
         (function(idx) {
           var b = BUILDINGS[idx];
-          var modelFile = BUILDING_MODELS[b.panelType] || GENERIC_MODELS[idx % GENERIC_MODELS.length];
+          var bestPackFile = BUILDING_MODEL_FILES[b.panelType];
+          var legacyFile = LEGACY_MODEL_FILES[idx % LEGACY_MODEL_FILES.length];
 
           // Floating label (always visible, doesn't need model to load)
           var bh = BLDG_HEIGHTS[b.panelType] || 40;
@@ -551,8 +556,22 @@
           ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
           self._emojiMeshes[idx] = ep;
 
+          function polishMaterial(mat) {
+            if (!mat) return;
+            if (mat.specularColor && !mat.metallic) {
+              mat.specularColor = new BABYLON.Color3(0.12, 0.12, 0.12);
+            }
+            if (typeof mat.roughness === 'number' && mat.roughness < 0.75) {
+              mat.roughness = 0.78;
+            }
+            if (typeof mat.environmentIntensity === 'number') {
+              mat.environmentIntensity = Math.max(mat.environmentIntensity, 0.8);
+            }
+          }
+
           // Helper to position model + reposition labels at actual height
           function placeModel(root, meshes) {
+            root.computeWorldMatrix(true);
             var bounds = root.getHierarchyBoundingVectors(true);
             var modelW = bounds.max.x - bounds.min.x;
             var modelH = bounds.max.y - bounds.min.y;
@@ -561,20 +580,31 @@
             if (modelH < 0.01) modelH = 1;
             if (modelD < 0.01) modelD = 1;
 
-            var uniformScale = Math.min(b.w / modelW, b.h / modelD);
+            // Fill most of the lot while preserving true model proportions.
+            var targetW = b.w * 0.72;
+            var targetD = b.h * 0.72;
+            var uniformScale = Math.min(targetW / modelW, targetD / modelD);
+            var targetH = (BLDG_HEIGHTS[b.panelType] || 40) * 1.15;
+            if (modelH * uniformScale < targetH * 0.7) {
+              uniformScale = targetH / modelH;
+            }
+
             root.scaling = new BABYLON.Vector3(uniformScale, uniformScale, uniformScale);
+            root.computeWorldMatrix(true);
+            bounds = root.getHierarchyBoundingVectors(true);
             root.position.x = b.x + b.w / 2;
             root.position.z = b.y + b.h / 2;
-            root.position.y = 0;
+            root.position.y = -bounds.min.y + 0.1;
 
             // Reposition labels based on actual scaled model height
-            var actualHeight = modelH * uniformScale;
-            if (self._labelMeshes[idx]) self._labelMeshes[idx].position.y = actualHeight + 18;
-            if (self._emojiMeshes[idx]) self._emojiMeshes[idx].position.y = actualHeight + 38;
+            var actualHeight = bounds.max.y - bounds.min.y;
+            if (self._labelMeshes[idx]) self._labelMeshes[idx].position.y = root.position.y + actualHeight + 18;
+            if (self._emojiMeshes[idx]) self._emojiMeshes[idx].position.y = root.position.y + actualHeight + 38;
 
             for (var mi = 0; mi < meshes.length; mi++) {
               meshes[mi].receiveShadows = true;
               if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
+              if (meshes[mi].material) polishMaterial(meshes[mi].material);
             }
             self._buildingMeshes.push(root);
           }
@@ -595,16 +625,39 @@
             self._buildingMeshes.push(box);
           }
 
-          // Load glb model with error fallback
-          BABYLON.SceneLoader.ImportMesh('', 'models/', modelFile, s, function(meshes) {
-            if (!meshes.length) { createFallbackBox(); _updateLoadingBar(); return; }
-            placeModel(meshes[0], meshes);
-            _updateLoadingBar();
-          }, null, function(scene, msg, ex) {
-            console.warn('Failed to load ' + modelFile + ': ' + (msg || ex));
-            createFallbackBox();
-            _updateLoadingBar();
-          });
+          function tryLoadModel(rootPath, fileName, onSuccess, onFailure) {
+            BABYLON.SceneLoader.ImportMesh('', rootPath, fileName, s, function(meshes) {
+              if (!meshes.length) { onFailure('No meshes in ' + fileName); return; }
+              onSuccess(meshes);
+            }, null, function(scene, msg, ex) {
+              onFailure(msg || ex || ('Failed to load ' + fileName));
+            });
+          }
+
+          if (bestPackFile) {
+            tryLoadModel(BUILDING_MODEL_ROOT, bestPackFile, function(meshes) {
+              placeModel(meshes[0], meshes);
+              _updateLoadingBar();
+            }, function(bestErr) {
+              tryLoadModel('models/', legacyFile, function(meshes) {
+                placeModel(meshes[0], meshes);
+                _updateLoadingBar();
+              }, function(legacyErr) {
+                console.warn('Building load failed for ' + b.id + ': ' + bestErr + ' | fallback: ' + legacyErr);
+                createFallbackBox();
+                _updateLoadingBar();
+              });
+            });
+          } else {
+            tryLoadModel('models/', legacyFile, function(meshes) {
+              placeModel(meshes[0], meshes);
+              _updateLoadingBar();
+            }, function(legacyErr) {
+              console.warn('Building load failed for ' + b.id + ': ' + legacyErr);
+              createFallbackBox();
+              _updateLoadingBar();
+            });
+          }
         })(i);
       }
     },

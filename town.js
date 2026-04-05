@@ -459,13 +459,29 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
-      // Unique models for specific buildings, fallback to generic Kenney models
+      // Unique models for each building, with generic fallback
       var BUILDING_MODELS = {
+        mine: 'mine_hq.glb',
+        hardware: 'hardware_shop.glb',
+        exchange: 'exchange.glb',
         bank: 'bank.glb',
-        pet_shop: 'pet_shop.glb',
+        diner: 'diner.glb',
+        coffee: 'coffee_shop.glb',
+        university: 'university.glb',
         hospital: 'hospital.glb',
+        internet_cafe: 'internet_cafe.glb',
+        casino: 'casino.glb',
+        post_office: 'post_office.glb',
+        gym: 'gym.glb',
+        real_estate: 'real_estate_office.glb',
+        pet_shop: 'pet_shop.glb',
+        pawn_shop: 'pawn_shop.glb',
+        utility: 'bitcoin_atm.glb',
+        clothing: 'clothing_store.glb',
+        apartment: 'apartment_building.glb',
+        homegoods: 'furniture_store.glb',
       };
-      var GENERIC_MODELS = ['building-small-a.glb','building-small-b.glb','building-small-c.glb','building-small-d.glb','building-garage.glb'];
+      var GENERIC_MODELS = ['building-garage.glb'];
       var self = this;
 
       for (var i = 0; i < BUILDINGS.length; i++) {

@@ -422,26 +422,42 @@ describe('pipeline exposure day/night', () => {
 // 8. Building Model Assignment
 // ─────────────────────────────────────────────
 describe('building model assignment', () => {
-  it('bank.glb exists', () => {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'bank.glb')));
-  });
-  it('pet_shop.glb exists', () => {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'pet_shop.glb')));
-  });
-  it('hospital.glb exists', () => {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'hospital.glb')));
-  });
-  it('generic fallback models exist', () => {
-    const generics = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
-    for (const f of generics) {
-      assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', f)), `Missing ${f}`);
+  const ALL_BUILDING_MODELS = {
+    mine: 'mine_hq.glb',
+    hardware: 'hardware_shop.glb',
+    exchange: 'exchange.glb',
+    bank: 'bank.glb',
+    diner: 'diner.glb',
+    coffee: 'coffee_shop.glb',
+    university: 'university.glb',
+    hospital: 'hospital.glb',
+    internet_cafe: 'internet_cafe.glb',
+    casino: 'casino.glb',
+    post_office: 'post_office.glb',
+    gym: 'gym.glb',
+    real_estate: 'real_estate_office.glb',
+    pet_shop: 'pet_shop.glb',
+    pawn_shop: 'pawn_shop.glb',
+    utility: 'bitcoin_atm.glb',
+    clothing: 'clothing_store.glb',
+    apartment: 'apartment_building.glb',
+    homegoods: 'furniture_store.glb',
+  };
+  it('all 19 unique building model files exist', () => {
+    for (const [type, file] of Object.entries(ALL_BUILDING_MODELS)) {
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', file)),
+        `Missing model ${file} for building type ${type}`);
     }
   });
-  it('BUILDING_MODELS mapping is present in town.js source', () => {
+  it('generic fallback model exists for unmapped buildings', () => {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'building-garage.glb')));
+  });
+  it('all building types have model mappings in town.js', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
-    assert.ok(src.includes("bank: 'bank.glb'"));
-    assert.ok(src.includes("pet_shop: 'pet_shop.glb'"));
-    assert.ok(src.includes("hospital: 'hospital.glb'"));
+    for (const [type, file] of Object.entries(ALL_BUILDING_MODELS)) {
+      assert.ok(src.includes(`${type}: '${file}'`),
+        `Missing mapping for ${type} → ${file} in town.js`);
+    }
   });
   it('model selection uses panelType lookup before generic fallback', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
@@ -450,7 +466,20 @@ describe('building model assignment', () => {
 });
 
 // ─────────────────────────────────────────────
-// 9. New Player Experience - Visual Aids
+// 9. Decorative Prop Models
+// ─────────────────────────────────────────────
+describe('decorative prop models', () => {
+  const PROPS = ['street_lamp.glb', 'park_bench.glb', 'fire_hydrant.glb', 'trash_can.glb',
+    'mailbox.glb', 'bus_stop.glb', 'flower_planter.glb', 'garden_center.glb', 'dark_web_cafe.glb'];
+  it('all decorative prop model files exist', () => {
+    for (const f of PROPS) {
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', f)), `Missing prop ${f}`);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────
+// 10. New Player Experience - Visual Aids
 // ─────────────────────────────────────────────
 describe('new player visual aids', () => {
   it('town.js has beacon builder for Mining HQ', () => {

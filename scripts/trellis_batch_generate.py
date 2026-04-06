@@ -9,6 +9,7 @@ an output directory, one file per manifest entry.
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import shutil
@@ -77,7 +78,20 @@ def _run_generation(
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
     import torch  # noqa: PLC0415
-    from trellis2.pipelines import Trellis2ImageTo3DPipeline  # noqa: PLC0415
+    try:
+        from trellis2.pipelines import Trellis2ImageTo3DPipeline  # noqa: PLC0415
+    except ModuleNotFoundError:
+        trellis_root = Path(os.environ.get("TRELLIS2_ROOT", "/content/TRELLIS.2")).resolve()
+        if trellis_root.exists() and str(trellis_root) not in sys.path:
+            sys.path.insert(0, str(trellis_root))
+        try:
+            Trellis2ImageTo3DPipeline = importlib.import_module("trellis2.pipelines").Trellis2ImageTo3DPipeline
+        except ModuleNotFoundError as ex:
+            raise RuntimeError(
+                "Cannot import trellis2. Set TRELLIS2_ROOT to your TRELLIS.2 clone path "
+                "or install TRELLIS.2 dependencies in this runtime."
+            ) from ex
+
     import o_voxel  # noqa: PLC0415
 
     if not torch.cuda.is_available():

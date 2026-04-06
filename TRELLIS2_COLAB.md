@@ -22,7 +22,6 @@ set -e
 cd TRELLIS.2
 pip install -U pip
 . ./setup.sh --basic --o-voxel
-pip install -e .
 ```
 
 Note: TRELLIS.2 does not use a root `requirements.txt` in the current main branch.

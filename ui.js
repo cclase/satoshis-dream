@@ -1493,7 +1493,7 @@
         {id:'coolrunner',name:'Cool Runner',desc:'-20% heat generation'},
         {id:'trustfund',name:'Trust Fund',desc:'Start with extra $100 USD'}
       ];
-      var html = '<div class="modal-card"><div class="modal-title">Satoshi\'s Dream</div>' +
+      var html = '<div class="modal-card avatar-modal"><div class="modal-title">Satoshi\'s Dream</div>' +
         '<div class="modal-subtitle">Choose your identity</div>' +
         '<div class="name-row"><input type="text" class="modal-input" id="avatarName" placeholder="Satoshi" maxlength="12" autocomplete="off">' +
         '<button class="random-btn" id="randomNameBtn" title="Random name">\u{1F3B2}</button></div>' +

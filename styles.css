@@ -724,6 +724,71 @@ body {
 /* ═══════════════════════════════════════ */
 /* D-Pad                                   */
 /* ═══════════════════════════════════════ */
+/* Large, readable layout specifically for the character creation flow */
+.avatar-modal {
+  max-width: min(760px, 96vw);
+  padding: clamp(24px, 2.8vw, 34px);
+  border-width: 3px;
+}
+
+.avatar-modal .modal-title {
+  font-size: clamp(30px, 3vw, 44px);
+  margin-bottom: 14px;
+}
+
+.avatar-modal .modal-subtitle {
+  font-size: clamp(13px, 1.25vw, 16px);
+  margin-bottom: 14px;
+}
+
+.avatar-modal .modal-input {
+  font-size: clamp(18px, 1.55vw, 24px);
+  padding: 14px 16px;
+}
+
+.avatar-modal .random-btn {
+  width: 56px;
+  font-size: 26px;
+}
+
+.avatar-modal .sprite-row {
+  gap: 16px;
+}
+
+.avatar-modal .sprite-option {
+  width: 92px;
+  height: 92px;
+}
+
+.avatar-modal .sprite-emoji {
+  font-size: 42px;
+}
+
+.avatar-modal .sprite-label {
+  font-size: 12px;
+}
+
+.avatar-modal .bonus-grid {
+  gap: 12px;
+}
+
+.avatar-modal .bonus-card {
+  padding: 14px;
+}
+
+.avatar-modal .bonus-name {
+  font-size: 16px;
+}
+
+.avatar-modal .bonus-desc {
+  font-size: 14px;
+}
+
+.avatar-modal .modal-btn {
+  font-size: 20px;
+  padding: 16px;
+}
+
 #dpad {
   position: fixed;
   bottom: 20px;
@@ -946,6 +1011,19 @@ body {
   .bonus-card { padding: 10px; }
   .bonus-name { font-size: 13px; }
   .bonus-desc { font-size: 12px; }
+  .avatar-modal {
+    max-width: 96vw;
+    padding: 18px;
+  }
+  .avatar-modal .modal-title { font-size: 28px; }
+  .avatar-modal .modal-subtitle { font-size: 13px; }
+  .avatar-modal .modal-input { font-size: 17px; }
+  .avatar-modal .sprite-option { width: 66px; height: 66px; }
+  .avatar-modal .sprite-emoji { font-size: 28px; }
+  .avatar-modal .sprite-label { font-size: 10px; }
+  .avatar-modal .bonus-name { font-size: 13px; }
+  .avatar-modal .bonus-desc { font-size: 12px; }
+  .avatar-modal .modal-btn { font-size: 16px; padding: 13px; }
   .mine-btn { width: 80px; height: 80px; font-size: 36px; }
   .exchange-btns { grid-template-columns: 1fr 1fr; }
   .exchange-stats { flex-direction: column; }

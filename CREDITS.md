@@ -13,6 +13,7 @@ As of April 6, 2026, the checked-in `.glb` files in `models/` were generated in-
 Latest regeneration in this commit:
 
 - `scripts/generate_building_overhaul.py` was updated and re-run to replace all major building and character models with higher-detail procedural meshes (facade bands, recessed entries, rounded corner masses, expanded roof details, and richer character anatomy).
+- A follow-up pass further overhauled prop/tree assets (street furniture, hydrants, planters, bus stops, lamps, and trees) and corrected local mesh rotation behavior in the generator for consistent placement.
 
 Primary generation scripts:
 

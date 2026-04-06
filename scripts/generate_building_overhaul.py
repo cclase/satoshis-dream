@@ -54,7 +54,10 @@ def sphere(radius: float, center, color_hex: str, subdivisions: int = 2):
 
 
 def rotate(mesh: trimesh.Trimesh, axis, radians: float):
+    center = mesh.centroid.copy()
+    mesh.apply_translation(-center)
     mesh.apply_transform(tf.rotation_matrix(radians, axis))
+    mesh.apply_translation(center)
     return mesh
 
 
@@ -596,54 +599,116 @@ def small_d():
 
 
 def tree_round():
-    return [
-        cyl(0.08, 0.64, [0, 0.32, 0], "#6b4e34"),
-        sphere(0.26, [0, 0.66, 0], "#2f7f45", subdivisions=2),
-        sphere(0.2, [-0.12, 0.72, 0.06], "#348a4a", subdivisions=1),
-        sphere(0.2, [0.12, 0.74, -0.04], "#358d4d", subdivisions=1),
+    p = [
+        cyl(0.085, 0.7, [0, 0.35, 0], "#6b4e34"),
+        cyl(0.06, 0.18, [0.0, 0.07, 0.16], "#64482f"),
+        cyl(0.06, 0.18, [0.14, 0.07, -0.08], "#64482f"),
+        cyl(0.06, 0.18, [-0.12, 0.07, -0.1], "#64482f"),
+        sphere(0.28, [0, 0.74, 0], "#2f7f45", subdivisions=2),
+        sphere(0.22, [-0.14, 0.84, 0.09], "#348a4a", subdivisions=1),
+        sphere(0.22, [0.16, 0.86, -0.05], "#2f8448", subdivisions=1),
+        sphere(0.2, [0.02, 0.94, 0.13], "#3a9452", subdivisions=1),
+        sphere(0.18, [0.02, 0.66, -0.16], "#2b7740", subdivisions=1),
     ]
+    return p
 
 
 def tree_tall():
-    return [
-        cyl(0.07, 0.72, [0, 0.36, 0], "#6b4e34"),
-        cone(0.26, 0.5, [0, 0.74, 0], "#2d7740"),
-        cone(0.2, 0.4, [0, 1.02, 0], "#348649"),
+    p = [
+        cyl(0.075, 0.8, [0, 0.4, 0], "#6b4e34"),
+        cone(0.3, 0.52, [0, 0.84, 0], "#2d7740"),
+        cone(0.24, 0.46, [0, 1.12, 0], "#348649"),
+        cone(0.18, 0.38, [0, 1.34, 0], "#3a9150"),
+        box([0.12, 0.04, 0.12], [0, 0.62, 0], "#58683a"),
     ]
+    return p
 
 
 def street_lamp():
     p = [
-        cyl(0.03, 1.46, [0, 0.73, 0], "#505862", sections=14),
-        box([0.28, 0.03, 0.03], [0.13, 1.35, 0], "#464d56"),
-        box([0.1, 0.12, 0.1], [0.27, 1.28, 0], "#f4e7b6"),
-        box([0.18, 0.04, 0.18], [0, 0.02, 0], "#3f454d"),
+        cyl(0.035, 1.52, [0, 0.76, 0], "#505862", sections=16),
+        box([0.34, 0.035, 0.035], [0.16, 1.42, 0], "#464d56"),
+        box([0.18, 0.025, 0.025], [0.31, 1.42, 0], "#3d434a"),
+        box([0.12, 0.14, 0.1], [0.38, 1.34, 0], "#f4e7b6"),
+        box([0.08, 0.025, 0.08], [0.38, 1.43, 0], "#a9a08a"),
+        box([0.2, 0.05, 0.2], [0, 0.025, 0], "#3f454d"),
+        box([0.28, 0.02, 0.28], [0, 0.01, 0], "#2e333a"),
     ]
+    for ox, oz in ((0.07, 0.07), (-0.07, 0.07), (0.07, -0.07), (-0.07, -0.07)):
+        p.append(cyl(0.01, 0.015, [ox, 0.058, oz], "#8e949c", sections=10))
     return p
 
 
 def bench():
-    p = [
-        box([0.72, 0.06, 0.22], [0, 0.34, 0], "#8a623f"),
-        box([0.72, 0.06, 0.07], [0, 0.56, -0.07], "#8a623f"),
-    ]
+    p = []
+    for i in range(4):
+        p.append(box([0.72, 0.022, 0.05], [0, 0.28 + i * 0.028, 0.07 - i * 0.047], "#8a623f"))
+    p.append(box([0.72, 0.03, 0.22], [0, 0.34, 0], "#7f5a39"))
     for x in (-0.28, 0.28):
         p.append(box([0.05, 0.34, 0.05], [x, 0.17, 0.08], "#4d5158"))
         p.append(box([0.05, 0.34, 0.05], [x, 0.17, -0.08], "#4d5158"))
+        p.append(box([0.08, 0.025, 0.22], [x, 0.05, 0], "#3f4349"))
     return p
 
 
 def mailbox():
+    p = [
+        box([0.12, 0.55, 0.12], [0, 0.275, 0], "#d6dce4"),
+        box([0.24, 0.28, 0.2], [0, 0.62, 0], "#2f76c2"),
+        box([0.24, 0.07, 0.2], [0, 0.795, 0], "#d4dde8"),
+        box([0.05, 0.1, 0.02], [0.15, 0.69, 0.05], "#e54f4f"),
+    ]
+    return p
+
+
+def fire_hydrant_prop():
     return [
-        box([0.2, 0.42, 0.18], [0, 0.21, 0], "#2f76c2"),
-        box([0.24, 0.06, 0.2], [0, 0.45, 0], "#d4dde8"),
+        cyl(0.095, 0.35, [0, 0.175, 0], "#c73833", sections=18),
+        cyl(0.06, 0.2, [0, 0.45, 0], "#c73833", sections=16),
+        cyl(0.13, 0.07, [0, 0.54, 0], "#b42420", sections=18),
+        cyl(0.045, 0.15, [0.14, 0.32, 0], "#c73833", sections=14),
+        cyl(0.045, 0.15, [-0.14, 0.32, 0], "#c73833", sections=14),
+        box([0.2, 0.03, 0.2], [0, 0.015, 0], "#89201c"),
     ]
 
 
-def generic_prop(a: str, b: str):
+def trash_can_prop():
     return [
-        box([0.34, 0.22, 0.34], [0, 0.11, 0], a),
-        box([0.2, 0.16, 0.2], [0, 0.3, 0], b),
+        cyl(0.12, 0.32, [0, 0.16, 0], "#4f5a63", sections=20),
+        cyl(0.13, 0.03, [0, 0.335, 0], "#6c7b86", sections=20),
+        box([0.03, 0.14, 0.03], [0.12, 0.23, 0], "#6c7b86"),
+        box([0.03, 0.14, 0.03], [-0.12, 0.23, 0], "#6c7b86"),
+    ]
+
+
+def bus_stop_prop():
+    return [
+        box([0.36, 0.03, 0.18], [0, 0.53, 0], "#adc6dd"),
+        box([0.03, 0.52, 0.03], [-0.15, 0.26, 0], "#4d6a86"),
+        box([0.03, 0.52, 0.03], [0.15, 0.26, 0], "#4d6a86"),
+        box([0.34, 0.2, 0.02], [0, 0.39, -0.08], "#7f9eb9"),
+        box([0.24, 0.06, 0.12], [0, 0.18, 0.02], "#697e91"),
+        box([0.24, 0.02, 0.02], [0, 0.22, 0.08], "#adb8c2"),
+    ]
+
+
+def flower_planter_prop():
+    return [
+        box([0.3, 0.16, 0.3], [0, 0.08, 0], "#8b5e3f"),
+        box([0.24, 0.12, 0.24], [0, 0.16, 0], "#5b3d2b"),
+        sphere(0.09, [-0.06, 0.22, 0.0], "#58a35f", subdivisions=1),
+        sphere(0.09, [0.06, 0.24, -0.03], "#5fb968", subdivisions=1),
+        sphere(0.08, [0.0, 0.25, 0.06], "#6ac074", subdivisions=1),
+    ]
+
+
+def garden_center_prop():
+    return [
+        box([0.28, 0.14, 0.28], [0, 0.07, 0], "#6f7442"),
+        box([0.24, 0.1, 0.24], [0, 0.17, 0], "#8ca45a"),
+        cone(0.09, 0.16, [-0.06, 0.28, 0.0], "#3d7c42"),
+        cone(0.08, 0.14, [0.06, 0.26, -0.03], "#4a8f4f"),
+        cone(0.07, 0.12, [0.0, 0.27, 0.06], "#4d9553"),
     ]
 
 
@@ -737,11 +802,11 @@ def main():
     finalize("street_lamp.glb", street_lamp()); print("generated: street_lamp.glb")
     finalize("park_bench.glb", bench()); print("generated: park_bench.glb")
     finalize("mailbox.glb", mailbox()); print("generated: mailbox.glb")
-    finalize("fire_hydrant.glb", generic_prop("#c73833", "#b42420")); print("generated: fire_hydrant.glb")
-    finalize("trash_can.glb", generic_prop("#4f5a63", "#6c7b86")); print("generated: trash_can.glb")
-    finalize("bus_stop.glb", generic_prop("#4d6a86", "#adc6dd")); print("generated: bus_stop.glb")
-    finalize("flower_planter.glb", generic_prop("#8b5e3f", "#58a35f")); print("generated: flower_planter.glb")
-    finalize("garden_center.glb", generic_prop("#6f7442", "#8ca45a")); print("generated: garden_center.glb")
+    finalize("fire_hydrant.glb", fire_hydrant_prop()); print("generated: fire_hydrant.glb")
+    finalize("trash_can.glb", trash_can_prop()); print("generated: trash_can.glb")
+    finalize("bus_stop.glb", bus_stop_prop()); print("generated: bus_stop.glb")
+    finalize("flower_planter.glb", flower_planter_prop()); print("generated: flower_planter.glb")
+    finalize("garden_center.glb", garden_center_prop()); print("generated: garden_center.glb")
 
     finalize("avatar_player.glb", character("#f2a742", "#334252", "#d7ad86", "#4a3a2d", "#ffd45c", False))
     print("generated: avatar_player.glb")

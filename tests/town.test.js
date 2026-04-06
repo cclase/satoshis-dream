@@ -811,3 +811,18 @@ describe('edge flash rising edge trigger', () => {
     assert.ok(src.includes('this._edgeFlashTimer -= dt'), 'should decrement by dt not hardcoded');
   });
 });
+
+// ─────────────────────────────────────────────
+// 22. Avatar Modal Readability Regression Guard
+// ─────────────────────────────────────────────
+describe('avatar modal readability styles', () => {
+  it('keeps minimum readable text sizes on mobile', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+    assert.ok(css.includes('.modal-title { font-size: 24px; }'), 'mobile modal title should stay at least 24px');
+    assert.ok(css.includes('.modal-input { font-size: 17px; }'), 'mobile name input should stay at least 17px');
+    assert.ok(css.includes('.modal-btn { padding: 13px; font-size: 16px; }'), 'mobile start button should stay readable');
+    assert.ok(css.includes('.bonus-name { font-size: 13px; }'), 'mobile bonus title should stay readable');
+    assert.ok(css.includes('.bonus-desc { font-size: 12px; }'), 'mobile bonus description should stay readable');
+    assert.ok(css.includes('.sprite-option { width: 66px; height: 66px; }'), 'mobile avatar cards should remain tappable');
+  });
+});

@@ -137,6 +137,63 @@ def add_balconies(parts: list, width: float, depth: float, floors: int, y_start:
             parts.append(box([0.02, 0.11, 0.02], [x, y + 0.06, depth / 2 + 0.15], "#7d7a76"))
 
 
+def add_corner_roundovers(parts: list, width: float, depth: float, height: float, color_hex: str, radius: float = 0.06):
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            x = sx * (width / 2 - radius * 0.45)
+            z = sz * (depth / 2 - radius * 0.45)
+            parts.append(cyl(radius, height, [x, height / 2, z], color_hex, sections=18))
+
+
+def add_facade_bands(parts: list, width: float, depth: float, y_levels: list[float], color_hex: str):
+    band_w = max(0.22, width * 0.96)
+    for y in y_levels:
+        parts.append(box([band_w, 0.032, 0.06], [0, y, depth / 2 + 0.02], color_hex))
+        parts.append(box([band_w, 0.03, 0.05], [0, y, -depth / 2 - 0.015], tint(color_hex, -10)))
+
+
+def add_recessed_entry(
+    parts: list,
+    width: float,
+    depth: float,
+    door_width: float,
+    door_height: float,
+    awning_color: str,
+    frame_color: str = "#25282c",
+):
+    door_w = min(door_width, width * 0.42)
+    door_h = door_height
+    z_front = depth / 2
+    parts.append(box([door_w + 0.12, door_h + 0.12, 0.03], [0, door_h * 0.52, z_front - 0.05], frame_color))
+    parts.append(box([door_w, door_h, 0.04], [0, door_h * 0.5, z_front - 0.03], "#13171d"))
+    parts.append(box([door_w * 0.38, door_h * 0.78, 0.05], [0, door_h * 0.58, z_front - 0.02], "#7cb2da"))
+    parts.append(box([door_w + 0.28, 0.05, 0.26], [0, door_h + 0.06, z_front + 0.08], awning_color))
+    for x in (-door_w / 2 - 0.09, door_w / 2 + 0.09):
+        parts.append(box([0.03, 0.24, 0.03], [x, door_h + 0.015, z_front + 0.03], tint(awning_color, -25)))
+
+
+def add_roof_guardrail(parts: list, width: float, depth: float, y: float, color_hex: str):
+    parts.append(box([width * 0.92, 0.03, 0.03], [0, y, depth * 0.47], color_hex))
+    parts.append(box([width * 0.92, 0.03, 0.03], [0, y, -depth * 0.47], color_hex))
+    parts.append(box([0.03, 0.03, depth * 0.92], [width * 0.47, y, 0], color_hex))
+    parts.append(box([0.03, 0.03, depth * 0.92], [-width * 0.47, y, 0], color_hex))
+
+
+def add_window_canopies(parts: list, width: float, depth: float, cols: int, y: float, color_hex: str):
+    z = depth / 2 + 0.065
+    for c in range(cols):
+        x = -width / 2 + (c + 0.8) * (width / (cols + 0.6))
+        canopy = box([width / (cols + 3.5), 0.025, 0.12], [x, y, z], color_hex)
+        rotate(canopy, [1, 0, 0], math.radians(-12))
+        parts.append(canopy)
+
+
+def add_signage_totem(parts: list, x: float, y: float, z: float, pole: str, panel: str):
+    parts.append(cyl(0.05, 0.62, [x, y, z], pole, sections=12))
+    parts.append(box([0.28, 0.16, 0.07], [x, y + 0.34, z], panel))
+    parts.append(box([0.22, 0.11, 0.08], [x, y + 0.34, z + 0.01], tint(panel, 20)))
+
+
 def finalize(name: str, parts: list):
     mesh = trimesh.util.concatenate(parts)
     b = mesh.bounds
@@ -156,7 +213,13 @@ def mine_hq():
     rotate(belt, [0, 0, 1], math.radians(-17))
     p.append(belt)
     add_windows_front(p, 1.2, 1.0, floors=2, cols=5, y_bottom=0.22, floor_h=0.2, glass="#7da8ca")
+    add_window_canopies(p, 1.2, 1.0, cols=5, y=0.66, color_hex="#4f6e8a")
+    add_facade_bands(p, 1.2, 1.0, [0.28, 0.74, 1.18], "#34424f")
+    add_corner_roundovers(p, 1.2, 1.0, 0.72, "#4d5f73")
+    add_recessed_entry(p, 1.2, 1.0, door_width=0.24, door_height=0.35, awning_color="#7f9eb8")
+    add_signage_totem(p, x=-0.68, y=0.46, z=-0.42, pole="#5b6670", panel="#f7931a")
     add_roof_mech(p, 1.28, 1.0, 1.82)
+    add_roof_guardrail(p, 1.18, 0.9, 1.93, "#5f6f7d")
     return p
 
 
@@ -171,6 +234,10 @@ def hardware_shop():
     add_windows_front(p, 1.05, 0.86, floors=1, cols=6, y_bottom=0.2, floor_h=0.28, glass="#8cc5ea")
     add_windows_sides(p, 0.86, floors=1, cols=3, y_bottom=0.2, floor_h=0.28, side_x=0.58, glass="#8cc5ea")
     p.append(box([0.22, 0.34, 0.08], [-0.4, 0.17, 0.5], "#2f2a25"))
+    add_recessed_entry(p, 1.05, 0.86, door_width=0.24, door_height=0.34, awning_color="#5ca4ea")
+    add_facade_bands(p, 1.05, 0.86, [0.32, 0.62], "#3e556c")
+    add_corner_roundovers(p, 1.05, 0.86, 0.58, "#617791", radius=0.05)
+    add_signage_totem(p, x=0.62, y=0.36, z=-0.42, pole="#54606b", panel="#8ca7c5")
     return p
 
 
@@ -183,7 +250,12 @@ def exchange():
     p.append(cyl(0.1, 0.68, [0.35, 1.5, 0.06], "#4a5964"))
     add_windows_front(p, 0.9, 0.8, floors=4, cols=5, y_bottom=0.22, floor_h=0.18, glass="#8ec3de")
     p.append(box([0.7, 0.07, 0.24], [0.0, 0.58, 0.53], "#33c08b"))
+    add_window_canopies(p, 0.9, 0.8, cols=5, y=0.77, color_hex="#2f434f")
+    add_facade_bands(p, 0.9, 0.8, [0.34, 0.7, 1.06, 1.42], "#5f7483")
+    add_recessed_entry(p, 0.9, 0.8, door_width=0.22, door_height=0.34, awning_color="#33c08b")
+    add_corner_roundovers(p, 0.9, 0.8, 0.94, "#6f818d", radius=0.045)
     add_roof_mech(p, 0.96, 0.8, 1.96)
+    add_roof_guardrail(p, 0.92, 0.76, 2.06, "#667885")
     return p
 
 
@@ -201,6 +273,10 @@ def bank():
     p.append(box([0.44, 0.9, 0.32], [0, 1.16, -0.3], "#d4c6af"))
     p.append(gable(0.5, 0.36, 0.22, [0, 1.62, -0.3], "#a09075"))
     add_windows_front(p, 1.0, 0.92, floors=2, cols=5, y_bottom=0.24, floor_h=0.2, glass="#98b9ce")
+    add_window_canopies(p, 1.0, 0.92, cols=5, y=0.66, color_hex="#9f937c")
+    add_facade_bands(p, 1.0, 0.92, [0.33, 0.74], "#baad94")
+    add_corner_roundovers(p, 1.0, 0.92, 0.72, "#cabda5", radius=0.05)
+    add_recessed_entry(p, 1.0, 0.92, door_width=0.2, door_height=0.36, awning_color="#b7aa91")
     return p
 
 
@@ -213,7 +289,11 @@ def diner():
     p.append(box([1.12, 0.08, 0.9], [0, 0.74, 0], "#5b2c2c"))
     p.append(box([0.92, 0.06, 0.34], [0, 0.46, 0.58], "#ea6a5d"))
     add_windows_front(p, 0.98, 0.84, floors=1, cols=6, y_bottom=0.2, floor_h=0.26, glass="#a3d6ec")
+    add_window_canopies(p, 0.98, 0.84, cols=6, y=0.55, color_hex="#a43f39")
+    add_facade_bands(p, 0.98, 0.84, [0.31, 0.62], "#6a2f2d")
+    add_recessed_entry(p, 0.98, 0.84, door_width=0.24, door_height=0.34, awning_color="#ea6a5d")
     p.append(box([0.2, 0.32, 0.08], [0, 0.16, 0.51], "#2b2725"))
+    add_corner_roundovers(p, 0.98, 0.84, 0.58, "#8f463f", radius=0.05)
     return p
 
 
@@ -228,8 +308,13 @@ def coffee_shop():
         x = 0.24 + i * 0.18
         p.append(box([0.03, 0.22, 0.03], [x, 0.2, 0.6], "#4b3f35"))
     add_windows_front(p, 0.9, 0.78, floors=1, cols=4, y_bottom=0.2, floor_h=0.26, glass="#9ccce4")
+    add_window_canopies(p, 0.9, 0.78, cols=4, y=0.53, color_hex="#7b5f4a")
+    add_recessed_entry(p, 0.9, 0.78, door_width=0.2, door_height=0.33, awning_color="#c99966")
+    add_corner_roundovers(p, 0.9, 0.78, 0.5, "#826b58", radius=0.045)
+    add_facade_bands(p, 0.9, 0.78, [0.3], "#6f5947")
     p.append(box([0.18, 0.3, 0.08], [-0.22, 0.16, 0.47], "#2e2823"))
     p.append(cyl(0.05, 0.44, [0.3, 0.84, -0.2], "#6c6258"))
+    add_signage_totem(p, x=-0.48, y=0.32, z=-0.3, pole="#4a3f36", panel="#c8a27c")
     return p
 
 
@@ -247,6 +332,10 @@ def university():
     p.append(box([0.74, 0.08, 0.24], [0, 0.47, 0.47], "#d6d0c6"))
     add_windows_front(p, 1.08, 0.94, floors=3, cols=5, y_bottom=0.24, floor_h=0.2, glass="#93b4d2")
     add_windows_front(p, 0.32, 0.34, floors=4, cols=2, y_bottom=0.5, floor_h=0.2, glass="#a8cae5")
+    add_facade_bands(p, 1.08, 0.94, [0.34, 0.72, 1.1], "#7d728a")
+    add_corner_roundovers(p, 1.08, 0.94, 0.78, "#8d8197", radius=0.04)
+    add_recessed_entry(p, 1.08, 0.94, door_width=0.26, door_height=0.34, awning_color="#b7af9f")
+    add_roof_guardrail(p, 1.02, 0.86, 1.78, "#7f7488")
     return p
 
 
@@ -263,6 +352,10 @@ def hospital():
     p.append(box([0.3, 0.02, 0.02], [0, 0.95, 0.24], "#f3f5f7"))
     p.append(box([0.02, 0.02, 0.3], [0, 0.95, 0.24], "#f3f5f7"))
     add_windows_front(p, 1.0, 0.8, floors=3, cols=6, y_bottom=0.24, floor_h=0.2, glass="#a3cade")
+    add_window_canopies(p, 1.0, 0.8, cols=6, y=0.72, color_hex="#c2c9d3")
+    add_recessed_entry(p, 1.0, 0.8, door_width=0.24, door_height=0.35, awning_color="#d3454d")
+    add_facade_bands(p, 1.0, 0.8, [0.36, 0.74, 1.12], "#b7bec9")
+    add_corner_roundovers(p, 1.0, 0.8, 0.7, "#cdd4dc", radius=0.045)
     return p
 
 
@@ -276,8 +369,13 @@ def internet_cafe():
     p.append(box([0.74, 0.33, 0.08], [0, 0.28, 0.46], "#8ecae7"))
     p.append(box([0.8, 0.06, 0.24], [0, 0.58, 0.52], "#2fd8d4"))
     add_windows_front(p, 0.94, 0.8, floors=2, cols=5, y_bottom=0.2, floor_h=0.2, glass="#8bc8e8")
+    add_window_canopies(p, 0.94, 0.8, cols=5, y=0.62, color_hex="#2f5965")
+    add_recessed_entry(p, 0.94, 0.8, door_width=0.22, door_height=0.34, awning_color="#2fd8d4")
+    add_facade_bands(p, 0.94, 0.8, [0.33, 0.73], "#28424b")
+    add_corner_roundovers(p, 0.94, 0.8, 0.62, "#355560", radius=0.045)
     p.append(cyl(0.06, 0.42, [-0.34, 0.82, -0.18], "#788a94"))
     p.append(sphere(0.08, [-0.34, 1.06, -0.18], "#3dd4d3", subdivisions=2))
+    add_signage_totem(p, x=0.5, y=0.35, z=-0.34, pole="#4f616b", panel="#2fd8d4")
     return p
 
 
@@ -292,7 +390,12 @@ def casino():
     p.append(canopy)
     p.append(box([1.06, 0.09, 0.22], [0, 0.78, 0.53], "#922cb6"))
     add_windows_front(p, 1.08, 1.0, floors=2, cols=6, y_bottom=0.24, floor_h=0.22, glass="#93bbd6")
+    add_window_canopies(p, 1.08, 1.0, cols=6, y=0.72, color_hex="#66273f")
+    add_recessed_entry(p, 1.08, 1.0, door_width=0.26, door_height=0.36, awning_color="#e0a83f")
+    add_facade_bands(p, 1.08, 1.0, [0.38, 0.78], "#4c1f30")
+    add_corner_roundovers(p, 1.08, 1.0, 0.72, "#682a40", radius=0.05)
     add_roof_mech(p, 1.22, 1.0, 1.05)
+    add_roof_guardrail(p, 1.12, 0.94, 1.2, "#4f2033")
     return p
 
 
@@ -308,6 +411,10 @@ def post_office():
     p.append(box([0.72, 0.08, 0.24], [0, 0.49, 0.4], "#4b6cb3"))
     p.append(gable(0.76, 0.24, 0.18, [0, 0.54, 0.4], "#606a78"))
     add_windows_front(p, 0.92, 0.84, floors=2, cols=4, y_bottom=0.22, floor_h=0.2, glass="#8fb8d7")
+    add_window_canopies(p, 0.92, 0.84, cols=4, y=0.63, color_hex="#7f8b9b")
+    add_recessed_entry(p, 0.92, 0.84, door_width=0.22, door_height=0.34, awning_color="#4b6cb3")
+    add_corner_roundovers(p, 0.92, 0.84, 0.6, "#8f98a7", radius=0.045)
+    add_facade_bands(p, 0.92, 0.84, [0.32, 0.65], "#6f7b8d")
     return p
 
 
@@ -322,6 +429,10 @@ def gym():
         p.append(tooth)
     p.append(box([0.78, 0.07, 0.25], [0, 0.46, 0.54], "#e8843f"))
     add_windows_front(p, 1.0, 0.84, floors=1, cols=6, y_bottom=0.2, floor_h=0.28, glass="#92bfe0")
+    add_window_canopies(p, 1.0, 0.84, cols=6, y=0.57, color_hex="#444d56")
+    add_recessed_entry(p, 1.0, 0.84, door_width=0.24, door_height=0.34, awning_color="#e8843f")
+    add_corner_roundovers(p, 1.0, 0.84, 0.62, "#5f6873", radius=0.045)
+    add_facade_bands(p, 1.0, 0.84, [0.32], "#49535e")
     return p
 
 
@@ -333,6 +444,9 @@ def real_estate():
     p.append(box([0.6, 0.06, 0.24], [0, 0.36, 0.52], "#4aa866"))
     p.append(box([0.22, 0.33, 0.08], [0.2, 0.16, 0.45], "#322a25"))
     add_windows_front(p, 0.92, 0.8, floors=1, cols=4, y_bottom=0.2, floor_h=0.26, glass="#9cc4de")
+    add_recessed_entry(p, 0.92, 0.8, door_width=0.22, door_height=0.33, awning_color="#4aa866")
+    add_corner_roundovers(p, 0.92, 0.8, 0.54, "#8ea090", radius=0.045)
+    add_facade_bands(p, 0.92, 0.8, [0.31], "#627560")
     return p
 
 
@@ -345,6 +459,8 @@ def pet_shop():
     p.append(cyl(0.11, 0.26, [-0.28, 0.2, 0.34], "#c99b94"))
     p.append(cyl(0.11, 0.26, [0.28, 0.2, 0.34], "#c99b94"))
     add_windows_front(p, 0.84, 0.72, floors=1, cols=3, y_bottom=0.2, floor_h=0.26, glass="#9fcbe3")
+    add_recessed_entry(p, 0.84, 0.72, door_width=0.18, door_height=0.32, awning_color="#ff8ba7")
+    add_corner_roundovers(p, 0.84, 0.72, 0.5, "#ad857e", radius=0.04)
     return p
 
 
@@ -359,6 +475,9 @@ def pawn_shop():
     p.append(box([0.56, 0.06, 0.2], [0, 0.38, 0.46], "#d8ab3d"))
     add_windows_front(p, 0.78, 0.74, floors=1, cols=3, y_bottom=0.2, floor_h=0.26, glass="#8fb7d1")
     p.append(box([0.22, 0.32, 0.08], [0, 0.16, 0.42], "#2d2824"))
+    add_recessed_entry(p, 0.78, 0.74, door_width=0.2, door_height=0.32, awning_color="#d8ab3d")
+    add_corner_roundovers(p, 0.78, 0.74, 0.56, "#75654e", radius=0.04)
+    add_facade_bands(p, 0.78, 0.74, [0.3], "#5a4d3c")
     return p
 
 
@@ -373,6 +492,8 @@ def bitcoin_atm():
     p.append(box([0.17, 0.15, 0.07], [0, 0.33, 0.33], "#1f2630"))
     p.append(cyl(0.05, 0.26, [0.27, 0.68, -0.17], "#707d89"))
     p.append(sphere(0.07, [0.27, 0.83, -0.17], "#f6a623", subdivisions=2))
+    add_corner_roundovers(p, 0.72, 0.56, 0.54, "#66717e", radius=0.04)
+    add_recessed_entry(p, 0.72, 0.56, door_width=0.15, door_height=0.26, awning_color="#f6a623")
     return p
 
 
@@ -383,6 +504,9 @@ def clothing_store():
     p.append(gable(1.14, 0.88, 0.26, [0, 0.7, 0], "#5b4652"))
     p.append(box([0.74, 0.07, 0.27], [0, 0.43, 0.55], "#e89db6"))
     add_windows_front(p, 0.96, 0.82, floors=1, cols=5, y_bottom=0.2, floor_h=0.28, glass="#a5cae0")
+    add_recessed_entry(p, 0.96, 0.82, door_width=0.2, door_height=0.34, awning_color="#e89db6")
+    add_corner_roundovers(p, 0.96, 0.82, 0.56, "#8f6b79", radius=0.045)
+    add_facade_bands(p, 0.96, 0.82, [0.33], "#745a66")
     return p
 
 
@@ -395,6 +519,10 @@ def apartment():
     add_balconies(p, 0.9, 0.74, floors=5, y_start=0.35, floor_h=0.2)
     p.append(box([0.22, 0.38, 0.08], [-0.22, 0.18, 0.35], "#2d2824"))
     p.append(cyl(0.1, 0.24, [0.28, 1.62, -0.22], "#b6b0a8"))
+    add_facade_bands(p, 0.86, 0.74, [0.42, 0.82, 1.22, 1.62], "#74685d")
+    add_corner_roundovers(p, 0.86, 0.74, 1.34, "#85776b", radius=0.04)
+    add_recessed_entry(p, 0.86, 0.74, door_width=0.2, door_height=0.35, awning_color="#9f9081")
+    add_roof_guardrail(p, 0.84, 0.66, 1.96, "#6d6156")
     return p
 
 
@@ -408,6 +536,9 @@ def furniture_store():
         x = -0.31 + i * 0.31
         p.append(gable(0.24, 0.88, 0.14, [x, 0.82, 0], "#4d5642"))
     add_windows_front(p, 1.0, 0.88, floors=1, cols=5, y_bottom=0.22, floor_h=0.28, glass="#97bfd8")
+    add_recessed_entry(p, 1.0, 0.88, door_width=0.24, door_height=0.34, awning_color="#a1bf68")
+    add_corner_roundovers(p, 1.0, 0.88, 0.64, "#7a8569", radius=0.045)
+    add_facade_bands(p, 1.0, 0.88, [0.34, 0.66], "#5f684f")
     return p
 
 
@@ -418,12 +549,15 @@ def garage():
     p.append(gable(0.96, 0.76, 0.2, [0, 0.56, 0], "#4b5057"))
     p.append(box([0.48, 0.3, 0.08], [0, 0.16, 0.37], "#353a42"))
     p.append(box([0.54, 0.04, 0.08], [0, 0.34, 0.38], "#a3afbf"))
+    add_recessed_entry(p, 0.92, 0.72, door_width=0.22, door_height=0.3, awning_color="#8a939f")
+    add_corner_roundovers(p, 0.92, 0.72, 0.46, "#777f89", radius=0.04)
     return p
 
 
 def small_a():
     p = garage()
     p.append(box([0.26, 0.2, 0.22], [0.26, 0.8, -0.1], "#8e7b69"))
+    add_facade_bands(p, 0.92, 0.72, [0.3], "#7b746c")
     return p
 
 
@@ -433,6 +567,8 @@ def small_b():
     p.append(box([0.84, 0.52, 0.68], [0, 0.33, 0], "#7c7088"))
     p.append(gable(0.88, 0.72, 0.22, [0, 0.58, 0], "#4d4453"))
     add_windows_front(p, 0.76, 0.68, floors=1, cols=3, y_bottom=0.2, floor_h=0.26, glass="#9fbfdb")
+    add_recessed_entry(p, 0.76, 0.68, door_width=0.18, door_height=0.3, awning_color="#87789a")
+    add_corner_roundovers(p, 0.76, 0.68, 0.5, "#766b83", radius=0.038)
     return p
 
 
@@ -443,6 +579,8 @@ def small_c():
     p.append(box([0.5, 0.3, 0.34], [0.2, 0.76, -0.06], "#5e7380"))
     p.append(cyl(0.08, 0.2, [0.22, 0.96, -0.15], "#b4bcc6"))
     add_windows_front(p, 0.82, 0.7, floors=1, cols=4, y_bottom=0.2, floor_h=0.26, glass="#a0c6df")
+    add_recessed_entry(p, 0.82, 0.7, door_width=0.2, door_height=0.3, awning_color="#7da2bc")
+    add_corner_roundovers(p, 0.82, 0.7, 0.54, "#647985", radius=0.04)
     return p
 
 
@@ -452,6 +590,8 @@ def small_d():
     p.append(box([0.84, 0.5, 0.68], [0, 0.32, 0], "#8b7a6c"))
     p.append(gable(0.88, 0.72, 0.22, [0, 0.56, 0], "#5f4f43"))
     add_windows_front(p, 0.76, 0.68, floors=1, cols=3, y_bottom=0.2, floor_h=0.26, glass="#a1c0d8")
+    add_recessed_entry(p, 0.76, 0.68, door_width=0.19, door_height=0.3, awning_color="#af9a86")
+    add_corner_roundovers(p, 0.76, 0.68, 0.5, "#857567", radius=0.038)
     return p
 
 
@@ -508,20 +648,56 @@ def generic_prop(a: str, b: str):
 
 
 def character(shirt: str, pants: str, skin: str, hair: str, accent: str, tall: bool):
-    scale = 1.14 if tall else 1.0
+    scale = 1.15 if tall else 1.0
     p = []
-    p.append(cyl(0.07, 0.54 * scale, [-0.11, 0.33 * scale, 0], pants))
-    p.append(cyl(0.07, 0.54 * scale, [0.11, 0.33 * scale, 0], pants))
-    p.append(box([0.32, 0.16 * scale, 0.2], [0, 0.61 * scale, 0], tint(pants, 8)))
-    p.append(cyl(0.18, 0.52 * scale, [0, 0.95 * scale, 0], shirt))
-    p.append(sphere(0.2, [0, 1.23 * scale, 0], shirt, subdivisions=2))
-    p.append(cyl(0.05, 0.46 * scale, [-0.26, 0.95 * scale, 0], skin))
-    p.append(cyl(0.05, 0.46 * scale, [0.26, 0.95 * scale, 0], skin))
-    p.append(sphere(0.165, [0, 1.53 * scale, 0], skin, subdivisions=3))
-    p.append(sphere(0.17, [0, 1.58 * scale, -0.02], hair, subdivisions=2))
-    p.append(box([0.12, 0.03, 0.06], [0, 1.5 * scale, 0.14], accent))
-    p.append(box([0.18, 0.07, 0.26], [-0.11, 0.04 * scale, 0.03], "#1f2124"))
-    p.append(box([0.18, 0.07, 0.26], [0.11, 0.04 * scale, 0.03], "#1f2124"))
+
+    # Shoes + ankles
+    p.append(box([0.2, 0.08, 0.3], [-0.12, 0.04 * scale, 0.03], "#1f2124"))
+    p.append(box([0.2, 0.08, 0.3], [0.12, 0.04 * scale, 0.03], "#1f2124"))
+    p.append(cyl(0.06, 0.08 * scale, [-0.12, 0.1 * scale, 0], tint(pants, -12)))
+    p.append(cyl(0.06, 0.08 * scale, [0.12, 0.1 * scale, 0], tint(pants, -12)))
+
+    # Legs and hips
+    p.append(cyl(0.085, 0.58 * scale, [-0.12, 0.38 * scale, 0], pants))
+    p.append(cyl(0.085, 0.58 * scale, [0.12, 0.38 * scale, 0], pants))
+    p.append(box([0.38, 0.18 * scale, 0.24], [0, 0.67 * scale, 0], tint(pants, 10)))
+    p.append(box([0.36, 0.05 * scale, 0.22], [0, 0.58 * scale, 0.01], tint(pants, -8)))
+
+    # Torso, chest, shoulders
+    p.append(cyl(0.2, 0.5 * scale, [0, 1.0 * scale, 0], shirt))
+    p.append(sphere(0.215, [0, 1.25 * scale, 0], shirt, subdivisions=2))
+    p.append(box([0.5, 0.16 * scale, 0.24], [0, 1.16 * scale, 0], tint(shirt, 6)))
+    p.append(box([0.46, 0.06 * scale, 0.24], [0, 0.88 * scale, 0], tint(shirt, -8)))
+    p.append(box([0.18, 0.16 * scale, 0.03], [0, 1.11 * scale, 0.12], accent))
+
+    # Arms and hands
+    for side in (-1, 1):
+        x = side * 0.28
+        upper = cyl(0.06, 0.28 * scale, [x, 1.1 * scale, 0], tint(shirt, -4))
+        rotate(upper, [0, 0, 1], math.radians(side * 12))
+        p.append(upper)
+        fore = cyl(0.055, 0.26 * scale, [x + side * 0.035, 0.91 * scale, 0.02], skin)
+        rotate(fore, [0, 0, 1], math.radians(side * 8))
+        p.append(fore)
+        p.append(sphere(0.06, [x + side * 0.05, 0.76 * scale, 0.05], skin, subdivisions=2))
+
+    # Neck + head
+    p.append(cyl(0.07, 0.1 * scale, [0, 1.36 * scale, 0], skin))
+    p.append(sphere(0.19, [0, 1.56 * scale, 0], skin, subdivisions=3))
+
+    # Hair mass + side hair
+    p.append(sphere(0.185, [0, 1.62 * scale, -0.01], hair, subdivisions=2))
+    p.append(sphere(0.08, [-0.12, 1.57 * scale, -0.03], hair, subdivisions=1))
+    p.append(sphere(0.08, [0.12, 1.57 * scale, -0.03], hair, subdivisions=1))
+
+    # Face features
+    p.append(box([0.08, 0.02, 0.02], [-0.06, 1.58 * scale, 0.17], "#1f2228"))
+    p.append(box([0.08, 0.02, 0.02], [0.06, 1.58 * scale, 0.17], "#1f2228"))
+    p.append(box([0.04, 0.03, 0.04], [0, 1.53 * scale, 0.18], tint(skin, -16)))
+    p.append(box([0.1, 0.015, 0.02], [0, 1.46 * scale, 0.17], tint(accent, -20)))
+    p.append(sphere(0.03, [-0.17, 1.53 * scale, 0], skin, subdivisions=1))
+    p.append(sphere(0.03, [0.17, 1.53 * scale, 0], skin, subdivisions=1))
+
     return p
 
 

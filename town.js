@@ -278,11 +278,11 @@
       this._scene.fogColor = new BABYLON.Color3(0.68, 0.78, 0.88);
 
       // Camera: third-person follow behind character at chest height
-      this._camDistance = canvasEl.clientWidth < 600 ? 140 : 100;
-      this._camMinDist = 50;
-      this._camMaxDist = 400;
-      this._camHeight = 40;        // height above ground (chest-level view)
-      this._camHeightOffset = 22;  // look-at height on avatar
+      this._camDistance = canvasEl.clientWidth < 600 ? 90 : 65;
+      this._camMinDist = 30;
+      this._camMaxDist = 250;
+      this._camHeight = 22;        // just above character's head
+      this._camHeightOffset = 18;  // look-at point: character's chest
       this._camOrbitAngle = 0;     // orbit angle around character (left/right arrows rotate this)
       this._camera3 = new BABYLON.FreeCamera('cam',
         new BABYLON.Vector3(WORLD_W/2, this._camHeight, WORLD_H/2 - this._camDistance),

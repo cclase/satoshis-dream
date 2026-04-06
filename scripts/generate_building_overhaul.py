@@ -296,6 +296,10 @@ def diner():
     add_facade_bands(p, 0.98, 0.84, [0.31, 0.62], "#6a2f2d")
     add_recessed_entry(p, 0.98, 0.84, door_width=0.24, door_height=0.34, awning_color="#ea6a5d")
     p.append(box([0.2, 0.32, 0.08], [0, 0.16, 0.51], "#2b2725"))
+    p.append(box([0.34, 0.22, 0.18], [0.42, 0.24, -0.34], "#6b3b35"))
+    p.append(box([0.3, 0.08, 0.2], [0.42, 0.39, -0.34], "#e7d7bd"))
+    for i in range(6):
+        p.append(sphere(0.02, [-0.45 + i * 0.18, 0.55, 0.62], "#f6e0ad", subdivisions=1))
     add_corner_roundovers(p, 0.98, 0.84, 0.58, "#8f463f", radius=0.05)
     return p
 
@@ -310,6 +314,10 @@ def coffee_shop():
     for i in range(3):
         x = 0.24 + i * 0.18
         p.append(box([0.03, 0.22, 0.03], [x, 0.2, 0.6], "#4b3f35"))
+    for i in range(4):
+        p.append(box([0.12, 0.03, 0.22], [-0.42 + i * 0.28, 0.26, 0.62], "#d6b68a"))
+    p.append(box([0.28, 0.08, 0.22], [-0.38, 0.18, -0.26], "#7d6a55"))
+    p.append(box([0.24, 0.03, 0.2], [-0.38, 0.24, -0.26], "#cfb597"))
     add_windows_front(p, 0.9, 0.78, floors=1, cols=4, y_bottom=0.2, floor_h=0.26, glass="#9ccce4")
     add_window_canopies(p, 0.9, 0.78, cols=4, y=0.53, color_hex="#7b5f4a")
     add_recessed_entry(p, 0.9, 0.78, door_width=0.2, door_height=0.33, awning_color="#c99966")
@@ -388,10 +396,16 @@ def casino():
     p.append(box([1.22, 0.72, 1.0], [0, 0.56, 0], "#6f2d43"))
     p.append(cyl(0.25, 0.92, [-0.48, 0.66, 0.0], "#542137"))
     p.append(cyl(0.25, 0.92, [0.48, 0.66, 0.0], "#542137"))
-    canopy = cyl(0.28, 0.9, [0.0, 0.42, 0.66], "#e0a83f", sections=22)
-    rotate(canopy, [1, 0, 0], math.radians(90))
-    p.append(canopy)
+    p.append(box([1.08, 0.12, 0.34], [0.0, 0.43, 0.66], "#e0a83f"))
+    p.append(box([0.98, 0.08, 0.26], [0.0, 0.47, 0.7], "#f0bf62"))
+    for i in range(10):
+        x = -0.46 + i * 0.102
+        p.append(sphere(0.026, [x, 0.4, 0.81], "#f4da9b", subdivisions=1))
+    for x in (-0.52, 0.52):
+        p.append(box([0.06, 0.38, 0.08], [x, 0.22, 0.63], "#4e2032"))
     p.append(box([1.06, 0.09, 0.22], [0, 0.78, 0.53], "#922cb6"))
+    p.append(box([0.72, 0.1, 0.08], [0, 1.02, 0.1], "#2a1f28"))
+    p.append(box([0.62, 0.07, 0.09], [0, 1.03, 0.14], "#c4d1e0"))
     add_windows_front(p, 1.08, 1.0, floors=2, cols=6, y_bottom=0.24, floor_h=0.22, glass="#93bbd6")
     add_window_canopies(p, 1.08, 1.0, cols=6, y=0.72, color_hex="#66273f")
     add_recessed_entry(p, 1.08, 1.0, door_width=0.26, door_height=0.36, awning_color="#e0a83f")
@@ -562,6 +576,10 @@ def clothing_store():
     p.append(box([1.08, 0.56, 0.82], [0, 0.4, 0], "#936f7d"))
     p.append(gable(1.14, 0.88, 0.26, [0, 0.7, 0], "#5b4652"))
     p.append(box([0.74, 0.07, 0.27], [0, 0.43, 0.55], "#e89db6"))
+    for i in range(5):
+        p.append(box([0.11, 0.03, 0.24], [-0.36 + i * 0.18, 0.5, 0.6], "#f0b8c9"))
+    p.append(box([0.32, 0.24, 0.18], [0.4, 0.24, -0.28], "#815f6f"))
+    p.append(box([0.24, 0.08, 0.2], [0.4, 0.38, -0.28], "#e6bfd0"))
     add_windows_front(p, 0.96, 0.82, floors=1, cols=5, y_bottom=0.2, floor_h=0.28, glass="#a5cae0")
     add_recessed_entry(p, 0.96, 0.82, door_width=0.2, door_height=0.34, awning_color="#e89db6")
     add_corner_roundovers(p, 0.96, 0.82, 0.56, "#8f6b79", radius=0.045)
@@ -844,11 +862,6 @@ def main():
         "clothing_store.glb": clothing_store,
         "apartment_building.glb": apartment,
         "homegoods_center.glb": homegoods_center,
-        "building-garage.glb": garage,
-        "building-small-a.glb": small_a,
-        "building-small-b.glb": small_b,
-        "building-small-c.glb": small_c,
-        "building-small-d.glb": small_d,
     }
     for name, fn in buildings.items():
         finalize(name, fn())

@@ -553,7 +553,7 @@ body {
   border: 2px solid var(--gold);
   border-radius: 16px;
   padding: 24px;
-  max-width: min(560px, 94vw);
+  max-width: min(680px, 95vw);
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -726,13 +726,13 @@ body {
 /* ═══════════════════════════════════════ */
 /* Large, readable layout specifically for the character creation flow */
 .avatar-modal {
-  max-width: min(760px, 96vw);
-  padding: clamp(24px, 2.8vw, 34px);
+  max-width: min(920px, 96vw);
+  padding: clamp(26px, 3vw, 36px);
   border-width: 3px;
 }
 
 .avatar-modal .modal-title {
-  font-size: clamp(30px, 3vw, 44px);
+  font-size: clamp(34px, 3.4vw, 50px);
   margin-bottom: 14px;
 }
 
@@ -742,7 +742,7 @@ body {
 }
 
 .avatar-modal .modal-input {
-  font-size: clamp(18px, 1.55vw, 24px);
+  font-size: clamp(20px, 1.75vw, 26px);
   padding: 14px 16px;
 }
 
@@ -756,12 +756,12 @@ body {
 }
 
 .avatar-modal .sprite-option {
-  width: 92px;
-  height: 92px;
+  width: 100px;
+  height: 100px;
 }
 
 .avatar-modal .sprite-emoji {
-  font-size: 42px;
+  font-size: 46px;
 }
 
 .avatar-modal .sprite-label {
@@ -777,21 +777,21 @@ body {
 }
 
 .avatar-modal .bonus-name {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .avatar-modal .bonus-desc {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .avatar-modal .modal-btn {
-  font-size: 20px;
-  padding: 16px;
+  font-size: 22px;
+  padding: 18px;
 }
 
 .offline-report-modal {
-  max-width: min(620px, 94vw);
-  padding: clamp(22px, 2.4vw, 30px);
+  max-width: min(700px, 95vw);
+  padding: clamp(24px, 2.8vw, 32px);
 }
 
 .offline-report-modal .modal-title {
@@ -801,7 +801,7 @@ body {
 .offline-report-time {
   color: var(--dim);
   margin-bottom: 18px;
-  font-size: clamp(16px, 1.4vw, 21px);
+  font-size: clamp(18px, 1.6vw, 23px);
   line-height: 1.35;
 }
 
@@ -821,7 +821,7 @@ body {
 }
 
 .offline-report-amount {
-  font-size: clamp(32px, 2.8vw, 44px);
+  font-size: clamp(36px, 3vw, 48px);
   font-weight: 900;
   color: var(--gold);
 }
@@ -1034,42 +1034,42 @@ body {
   .hw-sub { font-size: 9px; }
   .hw-cost { font-size: 11px; }
   .modal-card {
-    padding: 18px;
+    padding: 20px;
     max-height: 85vh;
   }
-  .modal-title { font-size: 24px; }
-  .modal-subtitle { font-size: 13px; }
-  .modal-input { font-size: 17px; }
-  .modal-btn { padding: 13px; font-size: 16px; }
+  .modal-title { font-size: 28px; }
+  .modal-subtitle { font-size: 14px; }
+  .modal-input { font-size: 18px; }
+  .modal-btn { padding: 14px; font-size: 18px; }
   .sprite-row { gap: 10px; }
-  .sprite-option { width: 66px; height: 66px; }
-  .sprite-emoji { font-size: 28px; }
+  .sprite-option { width: 74px; height: 74px; }
+  .sprite-emoji { font-size: 32px; }
   .bonus-grid { gap: 6px; }
-  .bonus-card { padding: 10px; }
-  .bonus-name { font-size: 13px; }
-  .bonus-desc { font-size: 12px; }
+  .bonus-card { padding: 11px; }
+  .bonus-name { font-size: 14px; }
+  .bonus-desc { font-size: 13px; }
   .avatar-modal {
     max-width: 96vw;
-    padding: 18px;
+    padding: 20px;
   }
-  .avatar-modal .modal-title { font-size: 28px; }
-  .avatar-modal .modal-subtitle { font-size: 13px; }
-  .avatar-modal .modal-input { font-size: 17px; }
-  .avatar-modal .sprite-option { width: 66px; height: 66px; }
-  .avatar-modal .sprite-emoji { font-size: 28px; }
-  .avatar-modal .sprite-label { font-size: 10px; }
-  .avatar-modal .bonus-name { font-size: 13px; }
-  .avatar-modal .bonus-desc { font-size: 12px; }
-  .avatar-modal .modal-btn { font-size: 16px; padding: 13px; }
+  .avatar-modal .modal-title { font-size: 32px; }
+  .avatar-modal .modal-subtitle { font-size: 14px; }
+  .avatar-modal .modal-input { font-size: 19px; }
+  .avatar-modal .sprite-option { width: 78px; height: 78px; }
+  .avatar-modal .sprite-emoji { font-size: 34px; }
+  .avatar-modal .sprite-label { font-size: 11px; }
+  .avatar-modal .bonus-name { font-size: 14px; }
+  .avatar-modal .bonus-desc { font-size: 13px; }
+  .avatar-modal .modal-btn { font-size: 18px; padding: 14px; }
   .offline-report-modal {
     max-width: 96vw;
-    padding: 18px;
+    padding: 20px;
   }
-  .offline-report-modal .modal-title { font-size: 28px; }
-  .offline-report-time { font-size: 15px; margin-bottom: 14px; }
+  .offline-report-modal .modal-title { font-size: 30px; }
+  .offline-report-time { font-size: 17px; margin-bottom: 14px; }
   .offline-report-box { padding: 14px; margin-bottom: 14px; }
-  .offline-report-label { font-size: 12px; }
-  .offline-report-amount { font-size: 30px; }
+  .offline-report-label { font-size: 13px; }
+  .offline-report-amount { font-size: 34px; }
   .mine-btn { width: 80px; height: 80px; font-size: 36px; }
   .exchange-btns { grid-template-columns: 1fr 1fr; }
   .exchange-stats { flex-direction: column; }

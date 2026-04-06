@@ -251,7 +251,7 @@
     apartment: 'apartment_building.glb',
     homegoods: 'homegoods_center.glb'
   };
-  var LEGACY_MODEL_FILES = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
+  var MODEL_ASSET_REV = '20260406-overhaul-1';
 
   // ── Town Object ──
   var Town = {
@@ -293,12 +293,16 @@
       this._camera3.upperBetaLimit = 1.0;
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
-      hemi.intensity = 0.58; hemi.diffuse = new BABYLON.Color3(0.98,0.97,0.95);
-      hemi.groundColor = new BABYLON.Color3(0.22,0.25,0.28);
+      hemi.intensity = 0.6; hemi.diffuse = new BABYLON.Color3(0.98,0.97,0.95);
+      hemi.groundColor = new BABYLON.Color3(0.24,0.28,0.3);
 
       var sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-0.35,-1,-0.42), this._scene);
       sun.intensity = 1.15; sun.diffuse = new BABYLON.Color3(1,0.95,0.86);
       sun.position = new BABYLON.Vector3(1400,950,-320);
+      var fill = new BABYLON.DirectionalLight('fill', new BABYLON.Vector3(0.5,-0.8,0.2), this._scene);
+      fill.intensity = 0.28;
+      fill.diffuse = new BABYLON.Color3(0.6, 0.68, 0.75);
+      fill.position = new BABYLON.Vector3(-220, 600, 1250);
       this._shadowGen = new BABYLON.ShadowGenerator(2048, sun);
       this._shadowGen.useBlurExponentialShadowMap = true;
       this._shadowGen.blurKernel = 32;
@@ -463,16 +467,16 @@
       var s = this._scene;
       var ground = BABYLON.MeshBuilder.CreateGround('ground', {width:2800,height:2100}, s);
       ground.position.x=WORLD_W/2; ground.position.z=WORLD_H/2; ground.receiveShadows=true;
-      var gc=document.createElement('canvas'); gc.width=512; gc.height=512;
+      var gc=document.createElement('canvas'); gc.width=1024; gc.height=1024;
       var gctx=gc.getContext('2d');
-      var grad=gctx.createLinearGradient(0,0,512,512);
-      grad.addColorStop(0,'#486f3f');
-      grad.addColorStop(0.5,'#547a46');
-      grad.addColorStop(1,'#3e6438');
-      gctx.fillStyle=grad; gctx.fillRect(0,0,512,512);
-      for(var i=0;i<2200;i++){
-        var x=Math.random()*512, y=Math.random()*512, r=4+Math.random()*14;
-        var a=0.03+Math.random()*0.07;
+      var grad=gctx.createLinearGradient(0,0,1024,1024);
+      grad.addColorStop(0,'#355f34');
+      grad.addColorStop(0.5,'#487143');
+      grad.addColorStop(1,'#2f552f');
+      gctx.fillStyle=grad; gctx.fillRect(0,0,1024,1024);
+      for(var i=0;i<3600;i++){
+        var x=Math.random()*1024, y=Math.random()*1024, r=8+Math.random()*28;
+        var a=0.02+Math.random()*0.06;
         gctx.fillStyle='rgba('+(58+Math.floor(Math.random()*35))+','+(84+Math.floor(Math.random()*45))+','+(45+Math.floor(Math.random()*25))+','+a+')';
         if (typeof gctx.arc === 'function') {
           gctx.beginPath();
@@ -482,50 +486,81 @@
           gctx.fillRect(x - r, y - r, r * 2, r * 2);
         }
       }
-      var gid=gctx.getImageData(0,0,512,512);
+      // Dirt patches and broad color breakup keep the city from reading as flat green tiles.
+      for (var pch = 0; pch < 220; pch++) {
+        var px = Math.random() * 1024;
+        var py = Math.random() * 1024;
+        var pw = 30 + Math.random() * 140;
+        var ph = 30 + Math.random() * 140;
+        var pa = 0.02 + Math.random() * 0.05;
+        gctx.fillStyle = 'rgba(84,77,54,' + pa + ')';
+        gctx.fillRect(px, py, pw, ph);
+      }
+
+      var gid=gctx.getImageData(0,0,1024,1024);
       for(var p=0;p<gid.data.length;p+=4){
-        var n=(Math.random()-0.5)*20;
+        var n=(Math.random()-0.5)*26;
         gid.data[p]=Math.min(255,Math.max(0,gid.data[p]+n));
         gid.data[p+1]=Math.min(255,Math.max(0,gid.data[p+1]+n));
         gid.data[p+2]=Math.min(255,Math.max(0,gid.data[p+2]+n));
       }
       gctx.putImageData(gid,0,0);
-      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=22; gtex.vScale=17;
+      var gtex=new BABYLON.Texture(gc.toDataURL(),s); gtex.uScale=18; gtex.vScale=14;
       var gmat=new BABYLON.StandardMaterial('gmat',s);
       gmat.diffuseTexture=gtex;
-      gmat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);
+      gmat.specularColor=new BABYLON.Color3(0.02,0.02,0.02);
       ground.material=gmat; this._groundMesh=ground;
     },
 
     _buildRoads: function() {
       var s=this._scene;
-      var rc=document.createElement('canvas'); rc.width=256; rc.height=256;
-      var rctx=rc.getContext('2d'); rctx.fillStyle='#3f4348'; rctx.fillRect(0,0,256,256);
-      for(var i=0;i<1200;i++){
-        var v=52+Math.floor(Math.random()*32), a=0.03+Math.random()*0.08;
+      var rc=document.createElement('canvas'); rc.width=512; rc.height=512;
+      var rctx=rc.getContext('2d');
+      var rgrad = rctx.createLinearGradient(0, 0, 512, 512);
+      rgrad.addColorStop(0, '#2a2f36');
+      rgrad.addColorStop(0.5, '#323840');
+      rgrad.addColorStop(1, '#252a31');
+      rctx.fillStyle=rgrad; rctx.fillRect(0,0,512,512);
+      for(var i=0;i<3600;i++){
+        var v=45+Math.floor(Math.random()*34), a=0.02+Math.random()*0.08;
         rctx.fillStyle='rgba('+v+','+v+','+(v+4)+','+a+')';
-        rctx.fillRect(Math.random()*256,Math.random()*256,2+Math.random()*6,2+Math.random()*6);
+        rctx.fillRect(Math.random()*512,Math.random()*512,2+Math.random()*10,2+Math.random()*10);
       }
-      var rtex=new BABYLON.Texture(rc.toDataURL(),s); rtex.uScale=32; rtex.vScale=14;
+      for (var crack = 0; crack < 80; crack++) {
+        var x0 = Math.random() * 512;
+        var y0 = Math.random() * 512;
+        rctx.strokeStyle = 'rgba(18,18,20,' + (0.08 + Math.random() * 0.12) + ')';
+        rctx.lineWidth = 1 + Math.random() * 1.2;
+        if (typeof rctx.moveTo === 'function' && typeof rctx.lineTo === 'function' && typeof rctx.stroke === 'function') {
+          rctx.beginPath();
+          rctx.moveTo(x0, y0);
+          rctx.lineTo(x0 + (Math.random() * 90 - 45), y0 + (Math.random() * 90 - 45));
+          rctx.stroke();
+        } else {
+          rctx.fillStyle = 'rgba(18,18,20,0.12)';
+          rctx.fillRect(x0, y0, 12, 2);
+        }
+      }
+      var rtex=new BABYLON.Texture(rc.toDataURL(),s); rtex.uScale=20; rtex.vScale=9;
       var rmat=new BABYLON.StandardMaterial('rmat',s);
       rmat.diffuseTexture=rtex;
-      rmat.specularColor=new BABYLON.Color3(0.08,0.08,0.08);
+      rmat.specularColor=new BABYLON.Color3(0.03,0.03,0.03);
 
-      var swc=document.createElement('canvas'); swc.width=128; swc.height=128;
-      var swctx=swc.getContext('2d'); swctx.fillStyle='#a8a69c'; swctx.fillRect(0,0,128,128);
-      for(var j=0;j<420;j++){
-        var sv=145+Math.floor(Math.random()*35), sa=0.03+Math.random()*0.07;
+      var swc=document.createElement('canvas'); swc.width=256; swc.height=256;
+      var swctx=swc.getContext('2d'); swctx.fillStyle='#9a988f'; swctx.fillRect(0,0,256,256);
+      for(var j=0;j<1300;j++){
+        var sv=138+Math.floor(Math.random()*42), sa=0.02+Math.random()*0.08;
         swctx.fillStyle='rgba('+sv+','+sv+','+(sv-5)+','+sa+')';
-        swctx.fillRect(Math.random()*128,Math.random()*128,2+Math.random()*4,2+Math.random()*4);
+        swctx.fillRect(Math.random()*256,Math.random()*256,2+Math.random()*6,2+Math.random()*6);
       }
-      var swtex=new BABYLON.Texture(swc.toDataURL(),s); swtex.uScale=50; swtex.vScale=50;
+      var swtex=new BABYLON.Texture(swc.toDataURL(),s); swtex.uScale=34; swtex.vScale=34;
       var swmat=new BABYLON.StandardMaterial('swmat',s);
       swmat.diffuseTexture=swtex;
-      swmat.specularColor=new BABYLON.Color3(0.06,0.06,0.06);
+      swmat.specularColor=new BABYLON.Color3(0.02,0.02,0.02);
 
       var lmat=new BABYLON.StandardMaterial('lmat',s);
-      lmat.diffuseColor=new BABYLON.Color3(0.92,0.9,0.74);
-      lmat.emissiveColor=new BABYLON.Color3(0.05,0.05,0.03);
+      lmat.diffuseColor=new BABYLON.Color3(0.95,0.94,0.86);
+      lmat.emissiveColor=new BABYLON.Color3(0.02,0.02,0.01);
 
       var curbMat=new BABYLON.StandardMaterial('curbMat',s);
       curbMat.diffuseColor=new BABYLON.Color3(0.74,0.74,0.71);
@@ -594,24 +629,47 @@
         (function(idx) {
           var b = BUILDINGS[idx];
           var bestPackFile = BUILDING_MODELS[b.panelType];
-          var legacyFile = LEGACY_MODEL_FILES[idx % LEGACY_MODEL_FILES.length];
+          var bestPackWithRev = bestPackFile ? (bestPackFile + '?v=' + MODEL_ASSET_REV) : null;
 
           // Ground each building on a lot pad so it doesn't look like it floats on grass.
           var lot = BABYLON.MeshBuilder.CreateGround('lot_'+b.id,{width:b.w*0.92,height:b.h*0.92},s);
           lot.position.set(b.x + b.w / 2, 0.12, b.y + b.h / 2);
           var lotMat = new BABYLON.StandardMaterial('lotMat_'+b.id,s);
-          var c = b.color || '#888888';
-          var r = parseInt(c.slice(1,3), 16) / 255;
-          var g = parseInt(c.slice(3,5), 16) / 255;
-          var bl = parseInt(c.slice(5,7), 16) / 255;
-          // Keep lot pads close to concrete/asphalt tones so the city doesn't read as toy-like color blocks.
-          lotMat.diffuseColor = new BABYLON.Color3(
-            0.21 + r * 0.05,
-            0.22 + g * 0.05,
-            0.23 + bl * 0.05
-          );
-          lotMat.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+          lotMat.diffuseColor = new BABYLON.Color3(0.21, 0.22, 0.23);
+          lotMat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
           lot.material = lotMat;
+
+          // Lot curb ring + basic parking striping reduce the "flat square pasted on grass" look.
+          var curbMat = new BABYLON.StandardMaterial('lotCurbMat_'+b.id,s);
+          curbMat.diffuseColor = new BABYLON.Color3(0.64, 0.64, 0.62);
+          curbMat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+          var stripeMat = new BABYLON.StandardMaterial('lotStripeMat_'+b.id,s);
+          stripeMat.diffuseColor = new BABYLON.Color3(0.83, 0.84, 0.82);
+          stripeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+          stripeMat.specularColor = new BABYLON.Color3(0.01, 0.01, 0.01);
+
+          var lotCenterX = b.x + b.w / 2;
+          var lotCenterZ = b.y + b.h / 2;
+          var curbTop = BABYLON.MeshBuilder.CreateGround('lotCurbTop_'+b.id,{width:b.w*0.95,height:1.5},s);
+          curbTop.position.set(lotCenterX, 0.17, lotCenterZ - b.h * 0.46);
+          curbTop.material = curbMat;
+          var curbBottom = BABYLON.MeshBuilder.CreateGround('lotCurbBottom_'+b.id,{width:b.w*0.95,height:1.5},s);
+          curbBottom.position.set(lotCenterX, 0.17, lotCenterZ + b.h * 0.46);
+          curbBottom.material = curbMat;
+          var curbLeft = BABYLON.MeshBuilder.CreateGround('lotCurbLeft_'+b.id,{width:1.5,height:b.h*0.95},s);
+          curbLeft.position.set(lotCenterX - b.w * 0.46, 0.17, lotCenterZ);
+          curbLeft.material = curbMat;
+          var curbRight = BABYLON.MeshBuilder.CreateGround('lotCurbRight_'+b.id,{width:1.5,height:b.h*0.95},s);
+          curbRight.position.set(lotCenterX + b.w * 0.46, 0.17, lotCenterZ);
+          curbRight.material = curbMat;
+
+          var stripeCount = Math.max(2, Math.floor(b.w / 55));
+          for (var si = 0; si < stripeCount; si++) {
+            var sx = b.x + b.w * 0.14 + (si * (b.w * 0.72 / Math.max(1, stripeCount - 1)));
+            var stripe = BABYLON.MeshBuilder.CreateGround('lotStripe_'+b.id+'_'+si,{width:1.1,height:b.h*0.22},s);
+            stripe.position.set(sx, 0.18, b.y + b.h * 0.37);
+            stripe.material = stripeMat;
+          }
 
           // Floating label (always visible, doesn't need model to load)
           var bh = BLDG_HEIGHTS[b.panelType] || 40;
@@ -728,28 +786,18 @@
           }
 
           if (bestPackFile) {
-            tryLoadModel(BUILDING_MODEL_ROOT, bestPackFile, function(meshes) {
+            tryLoadModel(BUILDING_MODEL_ROOT, bestPackWithRev, function(meshes) {
               placeModel(meshes[0], meshes);
               _updateLoadingBar();
             }, function(bestErr) {
-              tryLoadModel('models/', legacyFile, function(meshes) {
-                placeModel(meshes[0], meshes);
-                _updateLoadingBar();
-              }, function(legacyErr) {
-                console.warn('Failed to load ' + b.id + ': ' + bestErr + ' | fallback: ' + legacyErr);
-                createFallbackBox();
-                _updateLoadingBar();
-              });
-            });
-          } else {
-            tryLoadModel('models/', legacyFile, function(meshes) {
-              placeModel(meshes[0], meshes);
-              _updateLoadingBar();
-            }, function(legacyErr) {
-              console.warn('Failed to load ' + b.id + ': ' + legacyErr);
+              console.warn('Failed to load ' + b.id + ': ' + bestErr);
               createFallbackBox();
               _updateLoadingBar();
             });
+          } else {
+            console.warn('No mapped building model for ' + b.id);
+            createFallbackBox();
+            _updateLoadingBar();
           }
         })(i);
       }
@@ -1312,8 +1360,10 @@
       // Adjust light intensity
       var hemi = s.getLightByName('hemi');
       var sun = s.getLightByName('sun');
+      var fill = s.getLightByName('fill');
       if (hemi) hemi.intensity = t < 0.7 ? 0.58 : (t < 0.85 ? 0.18 : 0.18 + ((t - 0.85) / 0.15) * 0.4);
       if (sun) sun.intensity = t < 0.7 ? 1.15 : (t < 0.85 ? 0.18 : 0.18 + ((t - 0.85) / 0.15) * 0.97);
+      if (fill) fill.intensity = t < 0.7 ? 0.28 : (t < 0.85 ? 0.12 : 0.12 + ((t - 0.85) / 0.15) * 0.16);
     },
 
     // Day/night cycle

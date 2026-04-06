@@ -465,9 +465,6 @@ describe('building model assignment', () => {
         `Missing model ${file} for building type ${type}`);
     }
   });
-  it('generic fallback model exists for unmapped buildings', () => {
-    assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', 'building-garage.glb')));
-  });
   it('all building types have model mappings in town.js', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
     for (const [type, file] of Object.entries(ALL_BUILDING_MODELS)) {
@@ -475,9 +472,13 @@ describe('building model assignment', () => {
         `Missing mapping for ${type} → ${file} in town.js`);
     }
   });
-  it('model selection uses panelType lookup before generic fallback', () => {
+  it('model selection uses panelType lookup', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
     assert.ok(src.includes('BUILDING_MODELS[b.panelType]'));
+  });
+  it('building model loading appends a cache-busting revision query', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+    assert.ok(src.includes("bestPackFile + '?v=' + MODEL_ASSET_REV"));
   });
 });
 
@@ -824,13 +825,13 @@ describe('avatar modal readability styles', () => {
     assert.ok(ui.includes('modal-card offline-report-modal'), 'offline report should use dedicated readable modal class');
     assert.ok(css.includes('.avatar-modal {'), 'avatar modal class should exist');
     assert.ok(css.includes('.offline-report-modal {'), 'offline report modal class should exist');
-    assert.ok(css.includes('max-width: min(760px, 96vw);'), 'desktop avatar modal should not be capped to tiny width');
-    assert.ok(css.includes('max-width: min(620px, 94vw);'), 'offline report modal should be widened for readability');
-    assert.ok(css.includes('.modal-title { font-size: 24px; }'), 'mobile modal title should stay at least 24px');
-    assert.ok(css.includes('.modal-input { font-size: 17px; }'), 'mobile name input should stay at least 17px');
-    assert.ok(css.includes('.modal-btn { padding: 13px; font-size: 16px; }'), 'mobile start button should stay readable');
-    assert.ok(css.includes('.bonus-name { font-size: 13px; }'), 'mobile bonus title should stay readable');
-    assert.ok(css.includes('.bonus-desc { font-size: 12px; }'), 'mobile bonus description should stay readable');
-    assert.ok(css.includes('.sprite-option { width: 66px; height: 66px; }'), 'mobile avatar cards should remain tappable');
+    assert.ok(css.includes('max-width: min(920px, 96vw);'), 'desktop avatar modal should not be capped to tiny width');
+    assert.ok(css.includes('max-width: min(700px, 95vw);'), 'offline report modal should be widened for readability');
+    assert.ok(css.includes('.modal-title { font-size: 28px; }'), 'mobile modal title should stay at least 28px');
+    assert.ok(css.includes('.modal-input { font-size: 18px; }'), 'mobile name input should stay at least 18px');
+    assert.ok(css.includes('.modal-btn { padding: 14px; font-size: 18px; }'), 'mobile start button should stay readable');
+    assert.ok(css.includes('.bonus-name { font-size: 14px; }'), 'mobile bonus title should stay readable');
+    assert.ok(css.includes('.bonus-desc { font-size: 13px; }'), 'mobile bonus description should stay readable');
+    assert.ok(css.includes('.sprite-option { width: 74px; height: 74px; }'), 'mobile avatar cards should remain tappable');
   });
 });

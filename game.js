@@ -486,7 +486,9 @@
       if (this.state.research.solar_int) cost *= 0.5;
       if (this.hasPrestigeUpgrade('pu_efficient')) cost *= 0.75;
       if (this.state.pet === 'lizard') cost *= 0.9;
-      cost -= this.state.electricitySolar * 0.1;
+      var utilityLevel = this.getBuildingLevel('utility');
+      var solarReduction = (this.state.electricitySolar * 0.1) * (1 + utilityLevel * 0.1);
+      cost -= solarReduction;
       return Math.max(0, cost);
     },
 
@@ -503,7 +505,11 @@
       var s = this.state;
       if (s.deliveries.length >= 3) return;
       var allBuildings = (window.Town && window.Town.BUILDINGS) || [];
-      var targets = allBuildings.filter(function(b) { return b.panelType !== 'post_office' && b.panelType !== 'apartment'; });
+      var self = this;
+      var targets = allBuildings.filter(function(b) {
+        if (b.panelType === 'post_office' || b.panelType === 'apartment') return false;
+        return !self.isBuildingUnlocked || self.isBuildingUnlocked(b.panelType);
+      });
       while (s.deliveries.length < 3 && targets.length > 0) {
         var idx = Math.floor(Math.random() * targets.length);
         var t = targets.splice(idx, 1)[0];
@@ -642,6 +648,12 @@
       s.buildingVisits[panelType] = (s.buildingVisits[panelType] || 0) + 1;
       if (!s.stats) s.stats = {};
       s.stats.buildingsVisited = (s.stats.buildingsVisited || 0) + 1;
+      // Building identity perks (small immediate rewards for being in-place)
+      if (panelType === 'coffee') {
+        s.energy = Math.min(this.getEnergyMax(), (s.energy || 0) + 2 + this.getBuildingLevel('coffee'));
+      } else if (panelType === 'diner') {
+        s.health = Math.min(100, (s.health || 100) + 1 + this.getBuildingLevel('diner'));
+      }
     },
     getBuildingDiscount: function(panelType) {
       var visits = (this.state.buildingVisits || {})[panelType] || 0;
@@ -649,6 +661,31 @@
       if (visits >= 15) return 0.10;
       if (visits >= 5) return 0.05;
       return 0;
+    },
+    getBuildingRepMilestone: function(panelType) {
+      var visits = (this.state.buildingVisits || {})[panelType] || 0;
+      if (visits < 5) return { current: visits, next: 5, reward: '5% discount' };
+      if (visits < 15) return { current: visits, next: 15, reward: '10% discount' };
+      if (visits < 30) return { current: visits, next: 30, reward: '15% VIP discount' };
+      return { current: visits, next: null, reward: 'VIP maxed' };
+    },
+    getBuildingDistrict: function(panelType) {
+      var south = { real_estate:1, car_dealer:1, pet_shop:1, pawn_shop:1 };
+      var waterfront = { utility:1, clothing:1, apartment:1, homegoods:1 };
+      if (waterfront[panelType]) return 'waterfront';
+      if (south[panelType]) return 'south';
+      return 'north';
+    },
+    isBuildingUnlocked: function(panelType) {
+      var district = this.getBuildingDistrict(panelType);
+      if (district === 'north') return true;
+      if (!this.state.unlockedAreas) this.state.unlockedAreas = ['north'];
+      return this.state.unlockedAreas.indexOf(district) !== -1;
+    },
+    getDistrictUnlockRequirement: function(district) {
+      if (district === 'south') return 'Reach 50K lifetime sats';
+      if (district === 'waterfront') return 'Reach 500K lifetime sats';
+      return 'Unlocked';
     },
 
     // ── Weather ──
@@ -1039,8 +1076,10 @@
       if (!loan) return false;
       // Max 1 loan at a time
       if (this.state.loans.length > 0) return false;
+      var bankDiscount = this.getBuildingLevel('bank') * 0.05;
+      var effRate = loan.rate * Math.max(0.6, 1 - bankDiscount);
       this.state.usd += loan.amount;
-      this.state.loans.push({ id: loan.id, amount: loan.amount, owed: loan.amount * (1 + loan.rate), takenAt: Date.now(), missedPayments: 0 });
+      this.state.loans.push({ id: loan.id, amount: loan.amount, owed: loan.amount * (1 + effRate), takenAt: Date.now(), missedPayments: 0, rate: effRate });
       return true;
     },
 
@@ -1059,7 +1098,9 @@
       var bal = item.cur === 'sats' ? this.state.sats : this.state.usd;
       if (bal < cost) return false;
       if (item.cur === 'sats') this.state.sats -= cost; else this.state.usd -= cost;
-      this.state.mailOrders.push({ itemId: item.id, arrivesAt: Date.now() + 120000, name: item.name }); // 2 min
+      var postLevel = this.getBuildingLevel('post_office');
+      var deliveryMs = Math.max(60000, 120000 - (postLevel * 15000));
+      this.state.mailOrders.push({ itemId: item.id, arrivesAt: Date.now() + deliveryMs, name: item.name }); // 2 min base
       return true;
     },
 
@@ -1068,6 +1109,8 @@
       if (bet <= 0 || bet > this.state.sats) return null;
       this.state.sats -= bet;
       var threshold = this.hasPrestigeUpgrade('pu_lucky') ? 0.45 : 0.5;
+      threshold -= this.getBuildingLevel('casino') * 0.02;
+      threshold = Math.max(0.3, threshold);
       var win = Math.random() > threshold;
       if (win) { this.state.sats += bet * 2; return bet; }
       return -bet;

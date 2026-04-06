@@ -346,6 +346,13 @@
         }
 
         if (clickedBuilding) {
+          if (Game.isBuildingUnlocked && !Game.isBuildingUnlocked(clickedBuilding.panelType)) {
+            if (UI && UI.toast) {
+              var dist = Game.getBuildingDistrict ? Game.getBuildingDistrict(clickedBuilding.panelType) : 'district';
+              UI.toast('🔒 ' + clickedBuilding.name + ' locked. ' + Game.getDistrictUnlockRequirement(dist));
+            }
+            return;
+          }
           worldX = clickedBuilding.x + clickedBuilding.w / 2;
           worldY = clickedBuilding.y + clickedBuilding.h + 30;
           self._pathWaypoints = null;
@@ -361,6 +368,15 @@
           }
           self._pathWaypoints = null;
           if (tappedBuilding) {
+            if (Game.isBuildingUnlocked && !Game.isBuildingUnlocked(tappedBuilding.panelType)) {
+              if (UI && UI.toast) {
+                var dist2 = Game.getBuildingDistrict ? Game.getBuildingDistrict(tappedBuilding.panelType) : 'district';
+                UI.toast('🔒 ' + tappedBuilding.name + ' locked. ' + Game.getDistrictUnlockRequirement(dist2));
+              }
+              self.moveTarget = null;
+              self.autoEnterBuilding = null;
+              return;
+            }
             self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
             self.autoEnterBuilding = tappedBuilding;
           } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
@@ -445,14 +461,20 @@
       for (var i = 0; i < this._buildingMeshes.length; i++) {
         var root = this._buildingMeshes[i];
         if (!root) continue;
+        var b = BUILDINGS[i];
+        var level = (window.Game && Game.getBuildingLevel && b) ? Game.getBuildingLevel(b.panelType) : 0;
+        var unlocked = (window.Game && Game.isBuildingUnlocked && b) ? Game.isBuildingUnlocked(b.panelType) : true;
+        root.visibility = unlocked ? 1 : 0.5;
+        if (this._labelMeshes && this._labelMeshes[i]) this._labelMeshes[i].visibility = unlocked ? 1 : 0.7;
+        if (this._emojiMeshes && this._emojiMeshes[i]) this._emojiMeshes[i].visibility = unlocked ? 1 : 0.6;
         var meshes = root.getChildMeshes ? root.getChildMeshes() : [];
         for (var m = 0; m < meshes.length; m++) {
           var mat = meshes[m].material;
           if (!mat) continue;
           // Warm window glow at night
           mat.emissiveColor = new BABYLON.Color3(
-            0.9 * glowIntensity,
-            0.7 * glowIntensity,
+            (0.9 + level * (8 / 100)) * glowIntensity,
+            (0.7 + level * 0.04) * glowIntensity,
             0.3 * glowIntensity
           );
         }
@@ -619,8 +641,11 @@
           var lctx = ltex.getContext();
           lctx.fillStyle = 'rgba(0,0,0,0.5)';
           lctx.beginPath(); lctx.roundRect(40, 20, 432, 80, 12); lctx.fill();
-          lctx.font = 'bold 48px sans-serif'; lctx.fillStyle = '#ffffff';
-          lctx.textAlign = 'center'; lctx.fillText(b.name, 256, 72);
+          var lvl = (window.Game && Game.getBuildingLevel) ? Game.getBuildingLevel(b.panelType) : 0;
+          var stars = '';
+          for (var si = 0; si < lvl; si++) stars += '★';
+          lctx.font = 'bold 42px sans-serif'; lctx.fillStyle = '#ffffff';
+          lctx.textAlign = 'center'; lctx.fillText(b.name + (stars ? ' ' + stars : ''), 256, 72);
           ltex.update(); ltex.hasAlpha = true;
           var lmat = new BABYLON.StandardMaterial('lm' + b.id, s);
           lmat.diffuseTexture = ltex; lmat.emissiveColor = new BABYLON.Color3(1, 1, 1); lmat.backFaceCulling = false;
@@ -1264,6 +1289,7 @@
         var cy = Math.max(b.y, Math.min(av.y, b.y + b.h));
         var dist = Math.sqrt((av.x - cx) * (av.x - cx) + (av.y - cy) * (av.y - cy));
         if (dist < INTERACT_DIST) {
+          if (Game.isBuildingUnlocked && !Game.isBuildingUnlocked(b.panelType)) continue;
           return b;
         }
       }

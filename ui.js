@@ -9,6 +9,7 @@
     currentBuilding: null,
     toastTimer: null,
     _hwDirty: true,
+    _lastPanelRefresh: 0,
 
     init: function() {
       this.setupKeyboard();
@@ -192,9 +193,13 @@
         '<div class="nav-grid">';
 
       Town.BUILDINGS.forEach(function(b) {
-        html += '<div class="nav-item" data-nav="' + b.id + '">' +
+        var unlocked = Game.isBuildingUnlocked ? Game.isBuildingUnlocked(b.panelType) : true;
+        var district = Game.getBuildingDistrict ? Game.getBuildingDistrict(b.panelType) : 'north';
+        html += '<div class="nav-item' + (!unlocked ? ' locked' : '') + '" data-nav="' + b.id + '">' +
           '<span class="nav-item-emoji">' + b.emoji + '</span>' +
-          '<span class="nav-item-name">' + b.name + '</span></div>';
+          '<span class="nav-item-name">' + b.name + (!unlocked ? ' 🔒' : '') + '</span>' +
+          (!unlocked ? '<span class="nav-item-name" style="font-size:10px;color:var(--dim);">' + district + '</span>' : '') +
+          '</div>';
       });
       html += '</div>';
       navMenu.innerHTML = html;
@@ -205,6 +210,11 @@
         el.addEventListener('click', function() {
           var b = Town.BUILDINGS.find(function(x) { return x.id === el.dataset.nav; });
           if (!b) return;
+          if (Game.isBuildingUnlocked && !Game.isBuildingUnlocked(b.panelType)) {
+            var dist = Game.getBuildingDistrict ? Game.getBuildingDistrict(b.panelType) : 'district';
+            UI.toast('🔒 ' + dist + ' district locked. ' + Game.getDistrictUnlockRequirement(dist));
+            return;
+          }
           // Instant teleport to building entrance
           if (Game.state.avatar) {
             Game.state.avatar.x = b.x + b.w / 2;
@@ -536,6 +546,11 @@
 
     // ── Panel System ──
     showPanel: function(building) {
+      if (Game.isBuildingUnlocked && !Game.isBuildingUnlocked(building.panelType)) {
+        var dist = Game.getBuildingDistrict ? Game.getBuildingDistrict(building.panelType) : 'district';
+        this.toast('🔒 ' + building.name + ' is locked. ' + Game.getDistrictUnlockRequirement(dist));
+        return;
+      }
       if (window.Sound) Sound.doorOpen();
       var panel = document.getElementById('panel');
       panel.style.display = 'block';
@@ -557,10 +572,13 @@
       for (var si = 0; si < level; si++) stars += '\u2B50';
       var visits = (Game.state.buildingVisits || {})[building.panelType] || 0;
       var discount = Game.getBuildingDiscount(building.panelType);
+      var rep = Game.getBuildingRepMilestone ? Game.getBuildingRepMilestone(building.panelType) : null;
+      var repText = rep ? (rep.next ? ('Rep ' + rep.current + '/' + rep.next + ' • Next: ' + rep.reward) : ('Rep ' + rep.current + ' • ' + rep.reward)) : ('Visits: ' + visits);
 
       var header = '<div class="panel-header">' +
         '<div class="panel-title">' + building.emoji + ' ' + building.name + (stars ? ' ' + stars : '') +
-        (discount > 0 ? ' <span style="font-size:11px;color:var(--green);">-' + Math.round(discount*100) + '%</span>' : '') +
+        (discount > 0 ? ' <span style="font-size:11px;color:var(--green);">-' + Math.round(discount*100) + '%</span>' : '') + '<br>' +
+        '<span style="font-size:11px;color:var(--dim);font-weight:600;">' + repText + '</span>' +
         '</div><button class="panel-close" id="panelCloseBtn">\u2715</button></div>';
 
       var body = this.buildPanel(building.panelType);
@@ -600,6 +618,10 @@
       // Only live-update panels that need it
       if (this.currentPanel === 'mine') this.updateMinePanel();
       else if (this.currentPanel === 'exchange') this.updateExchangePanel();
+      else if (this.currentPanel === 'bank') this.updateBankPanel();
+      else if (this.currentPanel === 'post_office') this.updatePostOfficePanel();
+      else if (this.currentPanel === 'utility') this.updateUtilityPanel();
+      else if (this.currentPanel === 'casino') this.updateCasinoPanel();
       // Hardware only refreshes on buy (via _hwDirty flag)
     },
 
@@ -977,16 +999,20 @@
     // ═══════════════════════════════════════
     buildBankPanel: function() {
       var s = Game.state, html = '<div class="panel-body">';
+      var bankLvl = Game.getBuildingLevel ? Game.getBuildingLevel('bank') : 0;
+      html += '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Bank Perk</span><span>-'+ (bankLvl * 5) + '% loan interest</span></div>';
       if (s.loans.length > 0) {
         var loan = s.loans[0];
-        html += '<div class="ex-stat" style="margin-bottom:12px;"><span class="ex-stat-label">Active Loan</span><span>Owed: $' + Game.formatNumber(loan.owed) + '</span></div>';
+        var ratePct = ((loan.rate !== undefined ? loan.rate : 0) * 100).toFixed(1);
+        html += '<div class="ex-stat" style="margin-bottom:12px;"><span class="ex-stat-label">Active Loan</span><span>Owed: $' + Game.formatNumber(loan.owed) + ' @ ' + ratePct + '%</span></div>';
         html += '<button class="panel-btn btn-green" id="repayBtn"' + (s.usd < loan.owed ? ' disabled style="opacity:0.4"' : '') + '>Repay $' + Game.formatNumber(loan.owed) + '</button>';
       } else {
         html += '<p style="color:var(--dim);font-size:12px;margin-bottom:12px;">Take a loan. Interest compounds over time. Default at 5x = lose 50% sats!</p>';
         Game.LOANS.forEach(function(l) {
+          var effRate = l.rate * Math.max(0.6, 1 - bankLvl * 0.05);
           html += '<div class="hw-card" data-loan="' + l.id + '">' +
             '<div class="hw-icon">\u{1F4B5}</div>' +
-            '<div class="hw-info"><div class="hw-name">' + l.name + '</div><div class="hw-sub">$' + Game.formatNumber(l.amount) + ' at ' + (l.rate * 100) + '% interest</div></div>' +
+            '<div class="hw-info"><div class="hw-name">' + l.name + '</div><div class="hw-sub">$' + Game.formatNumber(l.amount) + ' at ' + (effRate * 100).toFixed(1) + '% interest</div></div>' +
             '<div class="hw-cost">Borrow</div></div>';
         });
       }
@@ -1026,6 +1052,12 @@
           if (Game.payTicket(parseInt(el.dataset.payticket))) { UI.toast('\u{1F4CB} Ticket paid!'); UI.showPanel(UI.currentBuilding); }
         });
       });
+    },
+    updateBankPanel: function() {
+      if (this.currentPanel !== 'bank') return;
+      if (Date.now() - this._lastPanelRefresh < 1000) return;
+      this._lastPanelRefresh = Date.now();
+      this.showPanel(this.currentBuilding);
     },
 
     // ═══════════════════════════════════════
@@ -1091,6 +1123,9 @@
         });
         html += '</div>';
       }
+      var postLvl = Game.getBuildingLevel ? Game.getBuildingLevel('post_office') : 0;
+      var deliverySec = Math.max(60, 120 - (postLvl * 15));
+      html += '<div class="ex-stat" style="margin-bottom:10px;"><span class="ex-stat-label">Post Office Perk</span><span>Delivery time: ' + deliverySec + 's</span></div>';
       Game.HARDWARE.forEach(function(u) {
         var cost = Math.floor(Game.getBulkCost(u, 1) * 0.7);
         html += '<div class="hw-card' + (Game.state.sats < cost ? ' locked' : '') + '" data-order="' + u.id + '">' +
@@ -1115,6 +1150,12 @@
         });
       });
     },
+    updatePostOfficePanel: function() {
+      if (this.currentPanel !== 'post_office') return;
+      if (Date.now() - this._lastPanelRefresh < 1000) return;
+      this._lastPanelRefresh = Date.now();
+      this.showPanel(this.currentBuilding);
+    },
 
     // ═══════════════════════════════════════
     // CASINO
@@ -1123,6 +1164,7 @@
       var s = Game.state;
       return '<div class="panel-body">' +
         '<p style="margin-bottom:8px;">Sats: <strong>' + Game.formatNumber(s.sats) + '</strong></p>' +
+        '<p style="margin-bottom:8px;color:var(--dim);font-size:12px;">House Edge Perk: +' + (Game.getBuildingLevel('casino') * 2) + '% win chance</p>' +
         '<div style="display:flex;gap:8px;margin-bottom:12px;">' +
           '<input type="number" class="modal-input" id="casinoBet" placeholder="Bet amount" min="1" style="margin:0;">' +
         '</div>' +
@@ -1151,16 +1193,24 @@
         else { el.textContent = '\u{1F4A8} Lost ' + Game.formatNumber(bet) + ' sats!'; el.style.color = 'var(--red)'; }
       });
     },
+    updateCasinoPanel: function() {
+      if (this.currentPanel !== 'casino') return;
+      var satEl = document.querySelector('#panel .panel-body p strong');
+      if (satEl) satEl.textContent = Game.formatNumber(Game.state.sats);
+    },
 
     // ═══════════════════════════════════════
     // UTILITY COMPANY
     // ═══════════════════════════════════════
     buildUtilityPanel: function() {
       var s = Game.state, elecCost = Game.getElectricityCost();
+      var lvl = Game.getBuildingLevel ? Game.getBuildingLevel('utility') : 0;
+      var panelEff = (100 + lvl * 10);
       return '<div class="panel-body">' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Electricity Rate</span><span>$' + elecCost.toFixed(3) + '/s</span></div>' +
         '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Pending Bill</span><span>$' + Game.formatNumber(s.electricityBill) + '</span></div>' +
-        '<div class="ex-stat" style="margin-bottom:12px;"><span class="ex-stat-label">Solar Panels</span><span>' + s.electricitySolar + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:8px;"><span class="ex-stat-label">Solar Panels</span><span>' + s.electricitySolar + '</span></div>' +
+        '<div class="ex-stat" style="margin-bottom:12px;"><span class="ex-stat-label">Utility Perk</span><span>Panel efficiency: ' + panelEff + '%</span></div>' +
         (s.housing === 'solar' ? '<p style="color:var(--green);text-align:center;font-weight:800;">Solar Farm = FREE electricity!</p>' :
           '<div class="hw-card' + (s.usd < 500 ? ' locked' : '') + '" id="buySolar">' +
             '<div class="hw-icon">\u2600\uFE0F</div>' +
@@ -1177,6 +1227,12 @@
         UI.toast('Solar panel installed!');
         UI.showPanel(UI.currentBuilding);
       });
+    },
+    updateUtilityPanel: function() {
+      if (this.currentPanel !== 'utility') return;
+      if (Date.now() - this._lastPanelRefresh < 1000) return;
+      this._lastPanelRefresh = Date.now();
+      this.showPanel(this.currentBuilding);
     },
 
     // ═══════════════════════════════════════

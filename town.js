@@ -277,20 +277,27 @@
       this._scene.fogDensity = 0.000055;
       this._scene.fogColor = new BABYLON.Color3(0.68, 0.78, 0.88);
 
-      // Camera: steeper angle, distance adapts to screen width
-      var camRadius = canvasEl.clientWidth < 600 ? 1000 : 700; // farther on mobile
-      this._camera3 = new BABYLON.ArcRotateCamera('cam', -Math.PI/4, 0.65, camRadius,
-        new BABYLON.Vector3(WORLD_W/2, 0, WORLD_H/2), this._scene);
-      // Remove all default inputs, then only add scroll wheel zoom
-      this._camera3.inputs.clear();
-      this._camera3.inputs.addMouseWheel();
-      this._camera3.lowerRadiusLimit = 400;
-      this._camera3.upperRadiusLimit = 1200;
-      // Lock alpha (horizontal rotation) so arrow keys stay consistent
-      this._camera3.lowerAlphaLimit = -Math.PI / 4;
-      this._camera3.upperAlphaLimit = -Math.PI / 4;
-      this._camera3.lowerBetaLimit = 0.62;
-      this._camera3.upperBetaLimit = 1.0;
+      // Camera: third-person follow behind character at chest height
+      this._camDistance = canvasEl.clientWidth < 600 ? 140 : 100;
+      this._camMinDist = 50;
+      this._camMaxDist = 400;
+      this._camHeight = 40;        // height above ground (chest-level view)
+      this._camHeightOffset = 22;  // look-at height on avatar
+      this._camOrbitAngle = 0;     // orbit angle around character (left/right arrows rotate this)
+      this._camera3 = new BABYLON.FreeCamera('cam',
+        new BABYLON.Vector3(WORLD_W/2, this._camHeight, WORLD_H/2 - this._camDistance),
+        this._scene);
+      this._camera3.setTarget(new BABYLON.Vector3(WORLD_W/2, this._camHeightOffset, WORLD_H/2));
+      this._camera3.inputs.clear(); // we control the camera manually
+      this._camera3.minZ = 1;
+      this._camera3.maxZ = 5000;
+      // Zoom via scroll wheel (prevent browser Ctrl+Scroll from hijacking)
+      var self = this;
+      canvasEl.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var delta = e.deltaY > 0 ? 20 : -20;
+        self._camDistance = Math.max(self._camMinDist, Math.min(self._camMaxDist, self._camDistance + delta));
+      }, { passive: false });
 
       var hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0,1,0), this._scene);
       hemi.intensity = 0.6; hemi.diffuse = new BABYLON.Color3(0.98,0.97,0.95);
@@ -1166,21 +1173,21 @@
       var av = Game.state.avatar;
       if (!av) return;
 
+      // Left/Right rotate the camera orbit around the character
+      var rotSpeed = 2.5; // radians per second
+      if (keys.left)  this._camOrbitAngle -= rotSpeed * dt;
+      if (keys.right) this._camOrbitAngle += rotSpeed * dt;
+
+      // Up/Down move character forward/backward relative to camera direction
       var dx = 0, dy = 0;
-
-      if (keys.left)  dx -= 1;
-      if (keys.right) dx += 1;
-      if (keys.up)    dy -= 1;
-      if (keys.down)  dy += 1;
-
-      // Rotate input from screen space to world space using live camera alpha
-      // BabylonJS left-handed: screen-right = (-sinA, cosA), screen-down = (cosA, sinA)
-      if ((dx !== 0 || dy !== 0) && this._camera3) {
-        var a = this._camera3.alpha;
-        var sinA = Math.sin(a), cosA = Math.cos(a);
-        var rdx = dx * (-sinA) + dy * cosA;
-        var rdy = dx * cosA + dy * sinA;
-        dx = rdx; dy = rdy;
+      var moveAngle = this._camOrbitAngle;
+      if (keys.up) {
+        dx += Math.sin(moveAngle);
+        dy += Math.cos(moveAngle);
+      }
+      if (keys.down) {
+        dx -= Math.sin(moveAngle);
+        dy -= Math.cos(moveAngle);
       }
 
       if (dx !== 0 || dy !== 0) {
@@ -1322,12 +1329,22 @@
     updateCamera: function(dt) {
       var av = Game.state.avatar;
       if (!av) return;
-      var target = this._camera3.target;
-      this._camera3.target = new BABYLON.Vector3(
-        target.x + (av.x - target.x) * 0.15,
-        0,
-        target.z + (av.y - target.z) * 0.15
-      );
+      var cam = this._camera3;
+
+      // Position camera behind the character using orbit angle
+      var dist = this._camDistance;
+      var angle = this._camOrbitAngle;
+      var behindX = av.x - Math.sin(angle) * dist;
+      var behindZ = av.y - Math.cos(angle) * dist;
+
+      // Smooth camera follow (lerp)
+      var lerpFactor = 0.1;
+      cam.position.x += (behindX - cam.position.x) * lerpFactor;
+      cam.position.y += (this._camHeight - cam.position.y) * lerpFactor;
+      cam.position.z += (behindZ - cam.position.z) * lerpFactor;
+
+      // Look at avatar chest height
+      cam.setTarget(new BABYLON.Vector3(av.x, this._camHeightOffset, av.y));
     },
 
     // ── Render ──

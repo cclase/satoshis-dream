@@ -164,6 +164,13 @@ function freshTown() {
       this.lowerBetaLimit = 0; this.upperBetaLimit = 0;
       this.target = new Vector3(0,0,0);
     },
+    FreeCamera: function(name, pos, s) {
+      this.inputs = { clear: function() {} };
+      this.position = pos || new Vector3(0,0,0);
+      this.minZ = 0; this.maxZ = 1000;
+      this.setTarget = function(t) { this.target = t; };
+      this.target = new Vector3(0,0,0);
+    },
     HemisphericLight: function(n, d, s) { return new StubLight(n, d, s); },
     DirectionalLight: function(n, d, s) { return new StubLight(n, d, s); },
     ShadowGenerator: StubShadowGen,
@@ -576,15 +583,14 @@ describe('arrow key movement direction', () => {
     assert.ok(Math.abs(r.dx) < 0.01, 'dx should be ~0 for diagonal');
     assert.ok(r.dy > 0, 'dy should be positive');
   });
-  it('camera alpha is locked so rotation cannot break controls', () => {
+  it('camera inputs are cleared for manual control', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
-    assert.ok(src.includes('lowerAlphaLimit'), 'camera alpha should be locked');
-    assert.ok(src.includes('upperAlphaLimit'), 'camera alpha should be locked');
     assert.ok(src.includes('inputs.clear()'), 'default inputs should be removed');
+    assert.ok(src.includes('FreeCamera'), 'should use FreeCamera for third-person');
   });
-  it('transform uses live camera alpha, not hardcoded', () => {
+  it('camera orbit uses _camOrbitAngle for direction', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
-    assert.ok(src.includes('this._camera3.alpha'), 'should read live camera alpha');
+    assert.ok(src.includes('_camOrbitAngle'), 'should use orbit angle for camera positioning');
   });
 });
 

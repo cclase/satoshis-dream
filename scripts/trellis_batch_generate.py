@@ -73,6 +73,9 @@ def _run_generation(
     remesh: bool,
     remesh_band: int,
     remesh_project: int,
+    start_index: int,
+    count: int | None,
+    skip_existing: bool,
 ) -> None:
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -105,7 +108,13 @@ def _run_generation(
     pipeline = Trellis2ImageTo3DPipeline.from_pretrained(model_id)
     pipeline.cuda()
 
-    selected = manifest[:limit] if limit is not None else manifest
+    selected = manifest
+    if start_index > 0:
+        selected = selected[start_index:]
+    if count is not None:
+        selected = selected[:count]
+    if limit is not None:
+        selected = selected[:limit]
     failures: list[str] = []
 
     for idx, item in enumerate(selected, start=1):
@@ -118,6 +127,10 @@ def _run_generation(
 
         print(f"[{idx}/{len(selected)}] {file_name}")
         print(f"  prompt: {prompt}")
+
+        if skip_existing and out_path.exists() and out_path.stat().st_size > 0:
+            print(f"  skip existing: {out_path} ({out_path.stat().st_size} bytes)")
+            continue
 
         if input_images_dir is not None:
             user_img = _find_reference_image(input_images_dir, stem)
@@ -220,6 +233,24 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Generate only the first N assets (for test runs)",
     )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help="0-based manifest start index for resumable chunk runs.",
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=None,
+        help="How many assets to generate from start-index.",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip output files that already exist (default: true).",
+    )
     return parser.parse_args()
 
 
@@ -240,6 +271,9 @@ def main() -> int:
         remesh=args.remesh,
         remesh_band=args.remesh_band,
         remesh_project=args.remesh_project,
+        start_index=args.start_index,
+        count=args.count,
+        skip_existing=args.skip_existing,
     )
     return 0
 

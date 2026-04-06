@@ -44,6 +44,27 @@ Optional test run (first 2 assets only):
 !cd satoshis-dream && python scripts/trellis_batch_generate.py --limit 2
 ```
 
+### Recommended on free Colab: chunked resumable runs
+
+This avoids long single cells and survives interruptions better. The script now skips already generated files by default.
+
+```bash
+%%bash
+set -e
+cd satoshis-dream
+export TRELLIS2_ROOT=/content/TRELLIS.2
+export ATTN_BACKEND=sdpa
+python scripts/trellis_batch_generate.py --start-index 0 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 3 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 6 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 9 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 12 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 15 --count 3 --output-dir generated_models --references-dir generated_references
+python scripts/trellis_batch_generate.py --start-index 18 --count 3 --output-dir generated_models --references-dir generated_references
+```
+
+If a chunk fails, re-run the same command; completed files are skipped.
+
 ## 5) Import generated assets into `models/`
 
 ```bash

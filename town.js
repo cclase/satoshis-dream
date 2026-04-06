@@ -243,13 +243,13 @@
     post_office: 'post_office.glb',
     gym: 'gym.glb',
     real_estate: 'real_estate_office.glb',
-    car_dealer: 'hardware_shop.glb',
+    car_dealer: 'car_dealership.glb',
     pet_shop: 'pet_shop.glb',
     pawn_shop: 'pawn_shop.glb',
-    utility: 'bitcoin_atm.glb',
+    utility: 'utility_hub.glb',
     clothing: 'clothing_store.glb',
     apartment: 'apartment_building.glb',
-    homegoods: 'furniture_store.glb'
+    homegoods: 'homegoods_center.glb'
   };
   var LEGACY_MODEL_FILES = ['building-small-a.glb', 'building-small-b.glb', 'building-small-c.glb', 'building-small-d.glb', 'building-garage.glb'];
 

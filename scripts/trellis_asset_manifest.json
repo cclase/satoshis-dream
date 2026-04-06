@@ -65,43 +65,48 @@
     "seed": 113
   },
   {
+    "file": "car_dealership.glb",
+    "prompt": "photorealistic car dealership exterior, showroom glazing, parked display cars, contemporary commercial architecture, neutral daylight background",
+    "seed": 114
+  },
+  {
     "file": "pet_shop.glb",
     "prompt": "photorealistic pet shop building exterior, colorful storefront, grooming entrance, realistic windows, neutral daylight background",
-    "seed": 114
+    "seed": 115
   },
   {
     "file": "pawn_shop.glb",
     "prompt": "photorealistic pawn shop exterior, compact commercial building, secure front windows, neutral daylight background",
-    "seed": 115
+    "seed": 116
   },
   {
-    "file": "bitcoin_atm.glb",
-    "prompt": "photorealistic small bitcoin ATM kiosk structure exterior, contemporary urban kiosk, realistic materials, neutral daylight background",
-    "seed": 116
+    "file": "utility_hub.glb",
+    "prompt": "photorealistic neighborhood utility operations building exterior, transformers and service infrastructure, contemporary industrial architecture, neutral daylight background",
+    "seed": 117
   },
   {
     "file": "clothing_store.glb",
     "prompt": "photorealistic fashion clothing store exterior, contemporary facade, display windows, neutral daylight background",
-    "seed": 117
+    "seed": 118
   },
   {
     "file": "apartment_building.glb",
     "prompt": "photorealistic mid-rise apartment building exterior, balconies, realistic residential windows, neutral daylight background",
-    "seed": 118
+    "seed": 119
   },
   {
-    "file": "furniture_store.glb",
-    "prompt": "photorealistic furniture showroom exterior, wide storefront glazing, modern signage zone, neutral daylight background",
-    "seed": 119
+    "file": "homegoods_center.glb",
+    "prompt": "photorealistic home goods retail center exterior, broad storefront glazing, landscaping planters, contemporary architecture, neutral daylight background",
+    "seed": 120
   },
   {
     "file": "avatar_player.glb",
     "prompt": "photorealistic adult human character full body, neutral A-pose, casual clothing, game-ready, isolated on plain background",
-    "seed": 120
+    "seed": 121
   },
   {
     "file": "npc_craig.glb",
     "prompt": "photorealistic adult male character full body, neutral A-pose, business-casual outfit, game-ready, isolated on plain background",
-    "seed": 121
+    "seed": 122
   }
 ]

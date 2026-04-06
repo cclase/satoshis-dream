@@ -453,6 +453,62 @@ def real_estate():
     return p
 
 
+def car_dealership():
+    p = []
+    p.append(box([1.52, 0.18, 1.04], [0, 0.09, 0], "#6a737f"))
+    p.append(box([1.26, 0.62, 0.78], [0, 0.45, -0.06], "#7b8793"))
+    p.append(box([1.2, 0.46, 0.08], [0, 0.45, 0.43], "#2a323c"))
+    p.append(box([1.08, 0.36, 0.09], [0, 0.45, 0.45], "#9bc3de"))
+    p.append(box([0.94, 0.08, 0.3], [0, 0.71, 0.45], "#5aa0df"))
+    p.append(box([0.64, 0.14, 0.4], [0, 0.17, 0.24], "#3f4a55"))
+    p.append(cyl(0.08, 0.08, [-0.22, 0.09, 0.24], "#20252b"))
+    p.append(cyl(0.08, 0.08, [0.22, 0.09, 0.24], "#20252b"))
+    p.append(box([0.58, 0.11, 0.34], [0.44, 0.19, -0.1], "#4b5562"))
+    p.append(cyl(0.07, 0.07, [0.3, 0.085, -0.1], "#20252b"))
+    p.append(cyl(0.07, 0.07, [0.58, 0.085, -0.1], "#20252b"))
+    add_windows_front(p, 1.14, 0.78, floors=1, cols=6, y_bottom=0.22, floor_h=0.3, glass="#9ecae6")
+    add_facade_bands(p, 1.14, 0.78, [0.31, 0.62], "#5d6875")
+    add_recessed_entry(p, 1.14, 0.78, door_width=0.24, door_height=0.33, awning_color="#5aa0df")
+    add_corner_roundovers(p, 1.14, 0.78, 0.62, "#75808d", radius=0.05)
+    add_roof_guardrail(p, 1.16, 0.76, 0.86, "#55606c")
+    return p
+
+
+def utility_hub():
+    p = []
+    p.append(box([1.26, 0.18, 0.96], [0, 0.09, 0], "#586371"))
+    p.append(box([0.94, 0.64, 0.68], [0, 0.5, 0], "#697787"))
+    p.append(box([0.4, 0.42, 0.4], [-0.32, 0.83, -0.1], "#5a6877"))
+    p.append(cyl(0.12, 0.98, [0.34, 0.67, -0.05], "#8e9aa7"))
+    p.append(cyl(0.1, 0.82, [0.52, 0.58, 0.14], "#7a8794"))
+    p.append(box([0.86, 0.08, 0.2], [0, 0.38, 0.48], "#f2ad34"))
+    p.append(box([0.7, 0.05, 0.22], [0, 0.48, 0.52], "#232a34"))
+    p.append(box([0.24, 0.18, 0.12], [0.2, 0.23, 0.36], "#151c25"))
+    p.append(box([0.24, 0.18, 0.12], [-0.2, 0.23, 0.36], "#151c25"))
+    add_windows_front(p, 0.86, 0.68, floors=2, cols=4, y_bottom=0.24, floor_h=0.2, glass="#87afcd")
+    add_recessed_entry(p, 0.86, 0.68, door_width=0.2, door_height=0.34, awning_color="#f2ad34")
+    add_facade_bands(p, 0.86, 0.68, [0.36, 0.72], "#5f6d7d")
+    add_corner_roundovers(p, 0.86, 0.68, 0.64, "#667686", radius=0.045)
+    return p
+
+
+def homegoods_center():
+    p = []
+    p.append(box([1.36, 0.17, 1.02], [0, 0.085, 0], "#6e7b62"))
+    p.append(box([1.1, 0.58, 0.82], [0, 0.42, 0], "#7e8d71"))
+    p.append(box([0.52, 0.44, 0.42], [0.34, 0.52, 0.16], "#748367"))
+    p.append(box([0.68, 0.08, 0.24], [0, 0.46, 0.53], "#9ac060"))
+    p.append(box([0.74, 0.04, 0.3], [0, 0.54, 0.58], "#d7c4a2"))
+    p.append(box([0.24, 0.26, 0.15], [-0.26, 0.24, 0.33], "#3d4438"))
+    p.append(box([0.2, 0.16, 0.2], [0.46, 0.21, -0.22], "#986f48"))
+    p.append(box([0.24, 0.09, 0.24], [0.46, 0.31, -0.22], "#58756a"))
+    add_windows_front(p, 1.0, 0.82, floors=1, cols=5, y_bottom=0.22, floor_h=0.28, glass="#9ec6dc")
+    add_recessed_entry(p, 1.0, 0.82, door_width=0.22, door_height=0.34, awning_color="#9ac060")
+    add_facade_bands(p, 1.0, 0.82, [0.34], "#66735a")
+    add_corner_roundovers(p, 1.0, 0.82, 0.58, "#7a896d", radius=0.045)
+    return p
+
+
 def pet_shop():
     p = []
     p.append(box([1.14, 0.14, 0.92], [0, 0.07, 0], "#9f8079"))
@@ -781,12 +837,13 @@ def main():
         "post_office.glb": post_office,
         "gym.glb": gym,
         "real_estate_office.glb": real_estate,
+        "car_dealership.glb": car_dealership,
         "pet_shop.glb": pet_shop,
         "pawn_shop.glb": pawn_shop,
-        "bitcoin_atm.glb": bitcoin_atm,
+        "utility_hub.glb": utility_hub,
         "clothing_store.glb": clothing_store,
         "apartment_building.glb": apartment,
-        "furniture_store.glb": furniture_store,
+        "homegoods_center.glb": homegoods_center,
         "building-garage.glb": garage,
         "building-small-a.glb": small_a,
         "building-small-b.glb": small_b,

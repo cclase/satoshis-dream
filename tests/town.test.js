@@ -451,14 +451,15 @@ describe('building model assignment', () => {
     post_office: 'post_office.glb',
     gym: 'gym.glb',
     real_estate: 'real_estate_office.glb',
+    car_dealer: 'car_dealership.glb',
     pet_shop: 'pet_shop.glb',
     pawn_shop: 'pawn_shop.glb',
-    utility: 'bitcoin_atm.glb',
+    utility: 'utility_hub.glb',
     clothing: 'clothing_store.glb',
     apartment: 'apartment_building.glb',
-    homegoods: 'furniture_store.glb',
+    homegoods: 'homegoods_center.glb',
   };
-  it('all 19 unique building model files exist', () => {
+  it('all building model files exist', () => {
     for (const [type, file] of Object.entries(ALL_BUILDING_MODELS)) {
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'models', file)),
         `Missing model ${file} for building type ${type}`);
@@ -820,8 +821,11 @@ describe('avatar modal readability styles', () => {
     const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
     const ui = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
     assert.ok(ui.includes('modal-card avatar-modal'), 'avatar creation should use dedicated large-layout modal class');
+    assert.ok(ui.includes('modal-card offline-report-modal'), 'offline report should use dedicated readable modal class');
     assert.ok(css.includes('.avatar-modal {'), 'avatar modal class should exist');
+    assert.ok(css.includes('.offline-report-modal {'), 'offline report modal class should exist');
     assert.ok(css.includes('max-width: min(760px, 96vw);'), 'desktop avatar modal should not be capped to tiny width');
+    assert.ok(css.includes('max-width: min(620px, 94vw);'), 'offline report modal should be widened for readability');
     assert.ok(css.includes('.modal-title { font-size: 24px; }'), 'mobile modal title should stay at least 24px');
     assert.ok(css.includes('.modal-input { font-size: 17px; }'), 'mobile name input should stay at least 17px');
     assert.ok(css.includes('.modal-btn { padding: 13px; font-size: 16px; }'), 'mobile start button should stay readable');

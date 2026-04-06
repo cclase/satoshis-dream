@@ -30,12 +30,12 @@
       var mins = Math.floor(report.seconds / 60);
       var hrs = Math.floor(mins / 60);
       var timeStr = hrs > 0 ? hrs + 'h ' + (mins % 60) + 'm' : mins + 'm ' + (report.seconds % 60) + 's';
-      modal.innerHTML = '<div class="modal-card" style="text-align:center;">' +
+      modal.innerHTML = '<div class="modal-card offline-report-modal" style="text-align:center;">' +
         '<div class="modal-title" style="color:var(--gold);">\u{1F44B} Welcome Back!</div>' +
-        '<p style="color:var(--dim);margin-bottom:16px;font-size:14px;">You were away for <strong style="color:var(--text);">' + timeStr + '</strong></p>' +
-        '<div style="background:rgba(247,147,26,0.1);border:1px solid rgba(247,147,26,0.3);border-radius:10px;padding:16px;margin-bottom:16px;">' +
-          '<div style="font-size:12px;color:var(--dim);margin-bottom:4px;">OFFLINE EARNINGS (' + report.efficiency + '% efficiency)</div>' +
-          '<div style="font-size:28px;font-weight:900;color:var(--gold);">+' + Game.formatNumber(report.sats) + ' sats</div>' +
+        '<p class="offline-report-time">You were away for <strong style="color:var(--text);">' + timeStr + '</strong></p>' +
+        '<div class="offline-report-box">' +
+          '<div class="offline-report-label">OFFLINE EARNINGS (' + report.efficiency + '% efficiency)</div>' +
+          '<div class="offline-report-amount">+' + Game.formatNumber(report.sats) + ' sats</div>' +
         '</div>' +
         '<button class="modal-btn" id="offlineDismiss">Continue</button></div>';
       document.getElementById('offlineDismiss').addEventListener('click', function() {

@@ -14,6 +14,7 @@ Latest regeneration in this commit:
 
 - `scripts/generate_building_overhaul.py` was updated and re-run to replace all major building and character models with higher-detail procedural meshes (facade bands, recessed entries, rounded corner masses, expanded roof details, and richer character anatomy).
 - A follow-up pass further overhauled prop/tree assets (street furniture, hydrants, planters, bus stops, lamps, and trees) and corrected local mesh rotation behavior in the generator for consistent placement.
+- Latest pass added distinct models for `car_dealership.glb`, `utility_hub.glb`, and `homegoods_center.glb`, and removed obsolete unused files (`bitcoin_atm.glb`, `furniture_store.glb`) from `models/`.
 
 Primary generation scripts:
 

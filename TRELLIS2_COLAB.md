@@ -105,3 +105,4 @@ git push origin HEAD:main
 - For best realism, place curated reference photos into a folder and run with:
   - `--input-images-dir your_reference_images`
   - file names should match manifest stems (e.g. `bank.png`, `diner.jpg`, `avatar_player.png`).
+- If `o_voxel` import fails (often due missing `nvdiffrast`), the script falls back to geometry-only `.glb` export so chunk generation can still continue.

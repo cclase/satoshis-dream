@@ -19,8 +19,10 @@ import urllib.parse
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import requests
 from PIL import Image
+import trimesh
 
 
 def _load_manifest(path: Path) -> list[dict[str, Any]]:
@@ -95,7 +97,17 @@ def _run_generation(
                 "or install TRELLIS.2 dependencies in this runtime."
             ) from ex
 
-    import o_voxel  # noqa: PLC0415
+    o_voxel = None
+    o_voxel_err = None
+    try:
+        import o_voxel as _o_voxel  # noqa: PLC0415
+        o_voxel = _o_voxel
+    except Exception as ex:  # pragma: no cover
+        o_voxel_err = ex
+        print(
+            "Warning: o_voxel import failed; using geometry-only GLB fallback "
+            f"(no PBR textures). error={ex}"
+        )
 
     if not torch.cuda.is_available():
         raise RuntimeError(
@@ -148,22 +160,30 @@ def _run_generation(
         for attempt in range(1, retry_count + 1):
             try:
                 mesh = pipeline.run(image, seed=seed)[0]
-                glb = o_voxel.postprocess.to_glb(
-                    vertices=mesh.vertices,
-                    faces=mesh.faces,
-                    attr_volume=mesh.attrs,
-                    coords=mesh.coords,
-                    attr_layout=mesh.layout,
-                    voxel_size=mesh.voxel_size,
-                    aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-                    decimation_target=decimation_target,
-                    texture_size=texture_size,
-                    remesh=remesh,
-                    remesh_band=remesh_band,
-                    remesh_project=remesh_project,
-                    verbose=True,
-                )
-                glb.export(str(out_path), extension_webp=True)
+                if o_voxel is not None:
+                    glb = o_voxel.postprocess.to_glb(
+                        vertices=mesh.vertices,
+                        faces=mesh.faces,
+                        attr_volume=mesh.attrs,
+                        coords=mesh.coords,
+                        attr_layout=mesh.layout,
+                        voxel_size=mesh.voxel_size,
+                        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+                        decimation_target=decimation_target,
+                        texture_size=texture_size,
+                        remesh=remesh,
+                        remesh_band=remesh_band,
+                        remesh_project=remesh_project,
+                        verbose=True,
+                    )
+                    glb.export(str(out_path), extension_webp=True)
+                else:
+                    simple = trimesh.Trimesh(
+                        vertices=np.asarray(mesh.vertices),
+                        faces=np.asarray(mesh.faces),
+                        process=False,
+                    )
+                    simple.export(str(out_path))
                 print(f"  wrote: {out_path} ({out_path.stat().st_size} bytes)")
                 done = True
                 break
@@ -180,6 +200,12 @@ def _run_generation(
         for row in failures:
             print(f"  - {row}")
         raise RuntimeError(f"{len(failures)} asset(s) failed")
+
+    if o_voxel is None and o_voxel_err is not None:
+        print(
+            "\nCompleted with geometry-only fallback because o_voxel was unavailable.\n"
+            f"Original import error: {o_voxel_err}"
+        )
 
     print("\nGeneration completed successfully.")
 

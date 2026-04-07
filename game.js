@@ -583,7 +583,7 @@
       if (reward.starterNpc) parts.push('A surprise event is on the way');
       if (reward.startCraigRace) parts.push('Craig challenge unlocked');
       if (reward.prestigeTeaser) parts.push('Prestige preview unlocked');
-      return parts.join(' • ');
+      return parts.join(' | ');
     },
 
     syncObjectiveCompletion: function(silent) {

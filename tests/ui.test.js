@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -154,7 +154,7 @@ describe('objective hud regression', () => {
   it('renders a larger objective completion celebration card', () => {
     const { UI, elements } = freshUI();
 
-    UI.showObjectiveComplete({ label: 'Buy a Desktop' }, 'Unlocked 2 new destinations • +$10');
+    UI.showObjectiveComplete({ label: 'Buy a Desktop' }, 'Unlocked 2 new destinations | +$10');
 
     assert.ok(elements.objectiveCelebration.innerHTML.includes('Objective Complete'));
     assert.ok(elements.objectiveCelebration.innerHTML.includes('Buy a Desktop'));

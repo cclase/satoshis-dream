@@ -510,7 +510,6 @@
       if (this._firstSellSpotlightTimer) clearTimeout(this._firstSellSpotlightTimer);
       this._firstSellSpotlightTimer = setTimeout(function() { el.classList.remove('show'); }, 3200);
     },
-
     _minimapCanvas: null, _minimapTooltip: null,
     _renderMinimap: function() {
       var self = this;

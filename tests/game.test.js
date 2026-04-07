@@ -1947,7 +1947,6 @@ describe('retention progression overhaul', () => {
     assert.equal(Game.state.unlockedBuildings.exchange, true);
     assert.equal(Game.state.unlockedBuildings.utility, true);
   });
-
   it('advanced save migration stays silent and does not create duplicate rewards on reload', () => {
     Game.state.lifetimeSats = 10000;
     Game.ensureProgressionState();

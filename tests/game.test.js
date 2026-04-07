@@ -29,8 +29,8 @@ describe('defaultState', () => {
   it('initializes tokens to 0', () => {
     assert.equal(Game.state.tokens, 0);
   });
-  it('initializes version to 3', () => {
-    assert.equal(Game.state.version, 3);
+  it('initializes version to 4', () => {
+    assert.equal(Game.state.version, 4);
   });
   it('has empty owned object', () => {
     assert.equal(Object.keys(Game.state.owned).length, 0);
@@ -987,6 +987,14 @@ describe('prestige reset', () => {
     Game.prestige();
     assert.ok(Game.state.storyFound.ch1);
   });
+  it('unlocks the full town after prestige so veterans do not repeat onboarding gates', () => {
+    Game.state.lifetimeSats = 200000;
+    Game.state.avatar = { name: 'Test', bonus: 'none' };
+    Game.prestige();
+    assert.equal(Game.state.currentObjective, Game.OBJECTIVES.length);
+    assert.equal(Game.state.unlockedBuildings.exchange, true);
+    assert.equal(Game.state.unlockedBuildings.utility, true);
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -1881,6 +1889,7 @@ describe('retention progression overhaul', () => {
     assert.equal(Game.state.unlockedBuildings.hardware, true);
     assert.equal(Game.state.sessionFlags.scriptedNpcQueued, true);
     assert.ok(Game.state.sessionFlags.scriptedNpcAt > Date.now());
+    assert.equal(Math.floor(Game.state.sessionFlags.firstSellSpotlight.objectiveBonus), 10);
   });
 
   it('buying a desktop unlocks the first build phase buildings and seeds a starter delivery', () => {
@@ -1930,6 +1939,14 @@ describe('retention progression overhaul', () => {
     assert.equal(Game.state.unlockedBuildings.pet_shop, true);
   });
 
+  it('prestige token holders skip the onboarding gate and keep the town unlocked', () => {
+    Game.state.tokens = 1;
+    Game.ensureProgressionState();
+
+    assert.equal(Game.state.currentObjective, Game.OBJECTIVES.length);
+    assert.equal(Game.state.unlockedBuildings.exchange, true);
+    assert.equal(Game.state.unlockedBuildings.utility, true);
+  });
   it('advanced save migration stays silent and does not create duplicate rewards on reload', () => {
     Game.state.lifetimeSats = 10000;
     Game.ensureProgressionState();

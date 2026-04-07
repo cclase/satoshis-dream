@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -21,6 +21,7 @@ function freshUI(gameOverrides) {
 
   function StubElement(id) {
     this.id = id || '';
+    this.className = '';
     this.style = {};
     this.innerHTML = '';
     this.textContent = '';
@@ -29,6 +30,7 @@ function freshUI(gameOverrides) {
     this.classList = makeClassList();
     this.parentElement = null;
     this.appendChild = function(child) {
+      if (child.id) elements[child.id] = child;
       child.parentElement = this;
       this.children.push(child);
       return child;
@@ -36,6 +38,7 @@ function freshUI(gameOverrides) {
     this.addEventListener = function() {};
     this.querySelectorAll = function() { return []; };
     this.querySelector = function() { return null; };
+    this.contains = function(target) { return target === this; };
     this.focus = function() {};
     this.remove = function() {};
   }
@@ -146,6 +149,36 @@ describe('objective hud regression', () => {
     assert.ok(elements.objectiveBar.innerHTML.includes('Own 3 rigs total'));
     assert.ok(elements.objectiveBar.innerHTML.includes('Complete 5 deliveries'));
     assert.equal(Game.state.currentObjective >= Game.OBJECTIVES.length, true);
+  });
+
+  it('renders a larger objective completion celebration card', () => {
+    const { UI, elements } = freshUI();
+
+    UI.showObjectiveComplete({ label: 'Buy a Desktop' }, 'Unlocked 2 new destinations | +$10');
+
+    assert.ok(elements.objectiveCelebration.innerHTML.includes('Objective Complete'));
+    assert.ok(elements.objectiveCelebration.innerHTML.includes('Buy a Desktop'));
+    assert.ok(elements.objectiveCelebration.innerHTML.includes('Unlocked 2 new destinations'));
+  });
+
+  it('renders a first-sell spotlight with the tutorial bonus messaging', () => {
+    const { UI, elements } = freshUI();
+
+    UI.showFirstSellSpotlight({ usdGain: 0.02, objectiveBonus: 10 });
+
+    assert.ok(elements.firstSellSpotlight.innerHTML.includes('First Cash-Out'));
+    assert.ok(elements.firstSellSpotlight.innerHTML.includes('Objective bonus: +$10.00'));
+  });
+
+  it('renders a production boost card after a hardware upgrade', () => {
+    const { UI, elements } = freshUI();
+
+    UI.showProductionBoost({ name: 'Desktop' }, 1, 1, 7);
+
+    assert.ok(elements.productionBoost.innerHTML.includes('Production Boost'));
+    assert.ok(elements.productionBoost.innerHTML.includes('Desktop'));
+    assert.ok(elements.productionBoost.innerHTML.includes('1/s'));
+    assert.ok(elements.productionBoost.innerHTML.includes('7/s'));
   });
 });
 

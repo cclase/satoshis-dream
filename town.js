@@ -29,6 +29,10 @@
     { id: 'apartment',    name: 'Your Home',       emoji: '\u{1F3E0}', x: 960, y: 1408, w: 128, h: 128, color: '#555577', panelType: 'apartment' },
     { id: 'homegoods',    name: 'Home Goods',      emoji: '\u{1F6CB}\uFE0F', x: 1344, y: 1408, w: 192, h: 128, color: '#88aa66', panelType: 'homegoods' },
   ];
+  for (var bdi = 0; bdi < BUILDINGS.length; bdi++) {
+    if (!BUILDINGS[bdi].unlockId) BUILDINGS[bdi].unlockId = BUILDINGS[bdi].id;
+    if (!BUILDINGS[bdi].lockedLabel) BUILDINGS[bdi].lockedLabel = 'Opens soon';
+  }
 
   // Road definitions
   var H_ROADS = [
@@ -262,7 +266,7 @@
     _avatarRoot: null, _avatarBody: null, _avatarHead: null,
     _avatarLabelTex: null, _avatarLastName: null,
     _moveTargetMesh: null, _promptMesh: null,
-    _buildingMeshes: [], _time: 0,
+    _buildingMeshes: [], _buildingVisuals: {}, _time: 0,
     _lastAvatarX: 0, _lastAvatarY: 0, _stuckTimer: 0,
     _collectibles: [], // {mesh, x, z, active, respawnAt}
     _ghostMeshes: [], _ghostIdx: 0, _craigMesh: null,
@@ -350,6 +354,10 @@
         }
 
         if (clickedBuilding) {
+          if (!Game.isBuildingUnlocked(clickedBuilding)) {
+            if (UI && UI.toast) UI.toast(Game.getLockedBuildingLabel(clickedBuilding));
+            return;
+          }
           worldX = clickedBuilding.x + clickedBuilding.w / 2;
           worldY = clickedBuilding.y + clickedBuilding.h + 30;
           self._pathWaypoints = null;
@@ -365,6 +373,10 @@
           }
           self._pathWaypoints = null;
           if (tappedBuilding) {
+            if (!Game.isBuildingUnlocked(tappedBuilding)) {
+              if (UI && UI.toast) UI.toast(Game.getLockedBuildingLabel(tappedBuilding));
+              return;
+            }
             self.moveTarget = { x: tappedBuilding.x+tappedBuilding.w/2, y: tappedBuilding.y+tappedBuilding.h+30 };
             self.autoEnterBuilding = tappedBuilding;
           } else { self.moveTarget = { x: worldX, y: worldY }; self.autoEnterBuilding = null; }
@@ -619,6 +631,7 @@
     _buildBuildings: function() {
       var s = this._scene;
       this._buildingMeshes = [];
+      this._buildingVisuals = {};
       var self = this;
       this._labelMeshes = [];
       this._emojiMeshes = [];
@@ -647,6 +660,7 @@
           stripeMat.diffuseColor = new BABYLON.Color3(0.83, 0.84, 0.82);
           stripeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
           stripeMat.specularColor = new BABYLON.Color3(0.01, 0.01, 0.01);
+          self._buildingVisuals[b.id] = { lot: lot, label: null, emoji: null, root: null, stripes: [] };
 
           var lotCenterX = b.x + b.w / 2;
           var lotCenterZ = b.y + b.h / 2;
@@ -669,6 +683,7 @@
             var stripe = BABYLON.MeshBuilder.CreateGround('lotStripe_'+b.id+'_'+si,{width:1.1,height:b.h*0.22},s);
             stripe.position.set(sx, 0.18, b.y + b.h * 0.37);
             stripe.material = stripeMat;
+            self._buildingVisuals[b.id].stripes.push(stripe);
           }
 
           // Floating label (always visible, doesn't need model to load)
@@ -686,6 +701,7 @@
           lp.position.set(b.x + b.w / 2, bh * 1.3 + 18, b.y + b.h / 2);
           lp.material = lmat; lp.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
           self._labelMeshes[idx] = lp;
+          self._buildingVisuals[b.id].label = lp;
 
           var etex = new BABYLON.DynamicTexture('et' + b.id, {width: 128, height: 128}, s, false);
           var ectx = etex.getContext(); ectx.font = '88px sans-serif'; ectx.textAlign = 'center';
@@ -697,6 +713,7 @@
           ep.position.set(b.x + b.w / 2, bh * 1.3 + 38, b.y + b.h / 2);
           ep.material = emat; ep.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
           self._emojiMeshes[idx] = ep;
+          self._buildingVisuals[b.id].emoji = ep;
 
           function polishMaterial(mat) {
             if (!mat) return;
@@ -757,6 +774,7 @@
               if (self._shadowGen) self._shadowGen.addShadowCaster(meshes[mi]);
               if (meshes[mi].material) polishMaterial(meshes[mi].material);
             }
+            self._buildingVisuals[b.id].root = root;
             self._buildingMeshes.push(root);
           }
 
@@ -773,6 +791,7 @@
             box.material = mat;
             box.receiveShadows = true;
             if (self._shadowGen) self._shadowGen.addShadowCaster(box);
+            self._buildingVisuals[b.id].root = box;
             self._buildingMeshes.push(box);
           }
 
@@ -1154,6 +1173,29 @@
       this._proximityRing.setEnabled(false);
     },
 
+    _applyBuildingUnlockVisuals: function() {
+      for (var i = 0; i < BUILDINGS.length; i++) {
+        var b = BUILDINGS[i];
+        var visuals = this._buildingVisuals[b.id];
+        if (!visuals) continue;
+        var unlocked = !window.Game || !Game.isBuildingUnlocked ? true : Game.isBuildingUnlocked(b);
+        var visibility = unlocked ? 1 : 0.35;
+        if (visuals.root) {
+          if (typeof visuals.root.getChildMeshes === 'function') {
+            var childMeshes = visuals.root.getChildMeshes();
+            for (var mi = 0; mi < childMeshes.length; mi++) childMeshes[mi].visibility = visibility;
+          }
+          visuals.root.visibility = visibility;
+        }
+        if (visuals.lot) visuals.lot.visibility = unlocked ? 1 : 0.5;
+        if (visuals.label) visuals.label.visibility = visibility;
+        if (visuals.emoji) visuals.emoji.visibility = unlocked ? 1 : 0.25;
+        if (visuals.stripes) {
+          for (var si = 0; si < visuals.stripes.length; si++) visuals.stripes[si].visibility = unlocked ? 1 : 0.2;
+        }
+      }
+    },
+
     // ── Resize ──
 
     resize: function() {
@@ -1311,7 +1353,7 @@
         var cx = Math.max(b.x, Math.min(av.x, b.x + b.w));
         var cy = Math.max(b.y, Math.min(av.y, b.y + b.h));
         var dist = Math.sqrt((av.x - cx) * (av.x - cx) + (av.y - cy) * (av.y - cy));
-        if (dist < INTERACT_DIST) {
+        if (dist < INTERACT_DIST && (!window.Game || !Game.isBuildingUnlocked || Game.isBuildingUnlocked(b))) {
           return b;
         }
       }
@@ -1380,6 +1422,7 @@
       if (!this._engine) return;
       dt = dt || 0.016;
       this._time += dt;
+      this._applyBuildingUnlockVisuals();
       // Day/night cycle: 300 seconds (5 minutes)
       this._dayTime = (this._dayTime + dt / 300) % 1.0;
       this._updateDayNight();

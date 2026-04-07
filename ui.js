@@ -185,6 +185,8 @@
 
       navBtn.addEventListener('click', function() { self.toggleNavMenu(); });
       navBtn.addEventListener('touchstart', function(e) { e.preventDefault(); self.toggleNavMenu(); });
+      this.renderNavMenu();
+      return;
 
       var html = '<div class="nav-menu-header">' +
         '<div class="nav-menu-title">\u{1F5FA}\uFE0F Go To Building</div>' +
@@ -219,8 +221,46 @@
       });
     },
 
+    renderNavMenu: function() {
+      var navMenu = document.getElementById('nav-menu');
+      var html = '<div class="nav-menu-header">' +
+        '<div class="nav-menu-title">\u{1F5FA}\uFE0F Go To Building</div>' +
+        '<button class="panel-close" id="navCloseBtn">\u2715</button></div>' +
+        '<div class="nav-grid">';
+      Town.BUILDINGS.forEach(function(b) {
+        var unlocked = Game.isBuildingUnlocked(b);
+        html += '<div class="nav-item' + (unlocked ? '' : ' locked') + '" data-nav="' + b.id + '">' +
+          '<span class="nav-item-emoji">' + (unlocked ? b.emoji : '\u{1F512}') + '</span>' +
+          '<span class="nav-item-name">' + (unlocked ? b.name : 'Locked') + '</span>' +
+          (unlocked ? '' : '<span class="nav-item-lock">' + Game.getLockedBuildingLabel(b) + '</span>') +
+          '</div>';
+      });
+      html += '</div>';
+      navMenu.innerHTML = html;
+      document.getElementById('navCloseBtn').addEventListener('click', function() { UI.hideNavMenu(); });
+      navMenu.querySelectorAll('.nav-item').forEach(function(el) {
+        el.addEventListener('click', function() {
+          var b = Town.BUILDINGS.find(function(x) { return x.id === el.dataset.nav; });
+          if (!b) return;
+          if (!Game.isBuildingUnlocked(b)) {
+            UI.toast(Game.getLockedBuildingLabel(b));
+            return;
+          }
+          if (Game.state.avatar) {
+            Game.state.avatar.x = b.x + b.w / 2;
+            Game.state.avatar.y = b.y + b.h + 30;
+          }
+          Town.moveTarget = null;
+          Town._pathWaypoints = null;
+          UI.hideNavMenu();
+          setTimeout(function() { UI.showPanel(b); }, 200);
+        });
+      });
+    },
+
     toggleNavMenu: function() {
       var menu = document.getElementById('nav-menu');
+      this.renderNavMenu();
       if (menu.classList.contains('active')) this.hideNavMenu();
       else { menu.classList.add('active'); this.panelOpen = true; }
     },
@@ -264,7 +304,8 @@
           '<div class="energy-bar"><div class="energy-fill" id="energyFill"></div></div>' +
           '<div class="energy-label" id="energyLabel">\u26A1 100</div>' +
         '</div>' +
-        '<div class="event-bar" id="eventBar"></div>';
+        '<div class="event-bar" id="eventBar"></div>' +
+        '<div id="objectiveBar" class="objective-bar"></div>';
       document.getElementById('hudReset').addEventListener('click', function() { UI.showResetConfirm(); });
       document.getElementById('hudMenu').addEventListener('click', function() {
         var dd = document.getElementById('hudDropdown');
@@ -371,7 +412,38 @@
         if (pcEl2) pcEl2.remove();
       }
       // Minimap
+      this.renderObjectiveBar();
       this._renderMinimap();
+    },
+
+    renderObjectiveBar: function() {
+      var root = document.getElementById('objectiveBar');
+      if (!root || !Game.state.avatar) return;
+      var primary = Game.getPrimaryGoal();
+      if (!primary) { root.innerHTML = ''; root.style.display = 'none'; return; }
+      var progress = primary.progress || { text: '' };
+      var html = '<div class="objective-card">' +
+        '<div class="objective-phase">' + (primary.phase === 'objective' ? '\u{1F4CB} Objective' : '\u{1F3AF} Goal') + '</div>' +
+        '<div class="objective-title">' + primary.label + '</div>' +
+        '<div class="objective-progress">' + progress.text + '</div>';
+      var race = Game.state.sessionFlags && Game.state.sessionFlags.craigRace;
+      if (race && !race.resolved) {
+        html += '<div class="objective-race">\u{1F9D4} Craig ' + Game.formatNumber(Math.floor((Game.state.craig && Game.state.craig.sats) || 0)) +
+          ' / You ' + Game.formatNumber(Math.floor(Game.state.lifetimeSats || 0)) + '</div>';
+      }
+      if (Game.state.currentObjective >= Game.OBJECTIVES.length && Game.state.activeMilestones.length) {
+        html += '<div class="milestone-list">';
+        Game.state.activeMilestones.forEach(function(id) {
+          var milestone = Game.getMilestoneById(id);
+          if (!milestone) return;
+          var info = Game.getGoalProgress(milestone);
+          html += '<div class="milestone-chip">' + milestone.label + ' <span>' + info.text + '</span></div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      root.innerHTML = html;
+      root.style.display = 'block';
     },
 
     _minimapCanvas: null, _minimapTooltip: null,
@@ -426,6 +498,10 @@
           }
           Town._pathWaypoints = null;
           if (hit) {
+            if (!Game.isBuildingUnlocked(hit)) {
+              UI.toast(Game.getLockedBuildingLabel(hit));
+              return;
+            }
             Town.moveTarget = { x: hit.x + hit.w / 2, y: hit.y + hit.h + 30 };
             Town.autoEnterBuilding = hit;
           } else {
@@ -536,6 +612,10 @@
 
     // ── Panel System ──
     showPanel: function(building) {
+      if (!Game.isBuildingUnlocked(building)) {
+        this.toast(Game.getLockedBuildingLabel(building));
+        return;
+      }
       if (window.Sound) Sound.doorOpen();
       var panel = document.getElementById('panel');
       panel.style.display = 'block';
@@ -546,7 +626,7 @@
       // Tutorial: step 1 (go to mine) → step 2
       if (Game.state.tutorialStep === 1 && building.panelType === 'mine') Game.state.tutorialStep = 2;
       // Track building visits
-      Game.visitBuilding(building.panelType);
+      Game.visitBuilding(building.panelType, building.id);
       // Auto-complete delivery quest
       if (Game.state.activeDelivery && Game.state.activeDelivery.targetId === building.id) {
         Game.completeDelivery();
@@ -1516,7 +1596,7 @@
       });
       var self = this;
       startBtn.addEventListener('click', function() {
-        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 473, y: 1315 };
+        Game.state.avatar = { name: nameInput.value.trim()||'Satoshi', sprite: sprites[selectedSprite].emoji, bonus: selectedBonus, x: 200, y: 250 };
         if (selectedBonus === 'trustfund') Game.state.usd += 100;
         modal.classList.remove('active'); modal.innerHTML = '';
         if (document.activeElement) document.activeElement.blur();
@@ -1573,10 +1653,8 @@
       '', // step 0: not started
       '\u{1F9D9} Welcome! Head to the glowing Mining HQ \u26CF\uFE0F to earn your first Bitcoin!',
       '\u{1F9D9} Tap the \u20BF button to mine sats! Try it!',
-      '\u{1F9D9} Nice! You earned your first sat! Keep tapping to earn more.', // step 3 (skipped)
-      '\u{1F9D9} You can afford a Laptop now! Visit the Hardware Shop \u{1F527} to buy one.', // step 4 (skipped)
       '\u{1F9D9} Free Laptop! You\'re mining automatically now. Visit the Exchange \u{1F4C8} to sell sats for USD.',
-      '\u{1F9D9} You\'re a real miner now! Explore the town \u2014 there\'s lots to discover. Good luck! \u{1F680}',
+      '\u{1F9D9} Nice sale. Follow your objective list to unlock more of the town.',
     ],
     _lastGuideStep: -1,
 
@@ -1636,6 +1714,7 @@
         var result = npcDef ? npcDef.effect(s) : 'Something happened.';
         s.pendingNpcEvent = null; self._npcShowing = false;
         modal.classList.remove('active'); modal.innerHTML = '';
+        Game.syncObjectiveCompletion();
         if (result) self.toast(evt.icon + ' ' + result);
       });
     },
@@ -1924,7 +2003,7 @@
         document.getElementById('hardResetConfirm').addEventListener('click', function() {
           localStorage.removeItem('sd_town_v1');
           Game.running = false;
-          Object.assign(Game.state, {avatar:null,sats:0,usd:0,totalSats:0,lifetimeSats:0,heat:0,owned:{},tokens:0,price:65000,buyMulti:1,priceEvent:null,nextEventAt:0,housing:'studio',vehicle:null,pet:null,energy:100,research:{},loans:[],loanTime:0,electricityBill:0,electricitySolar:0,policeRisk:0,mailOrders:[],gymLevel:0,health:100,casinoLock:0,prestigeUpgrades:{},achievements:{},version:3,lastTick:Date.now()});
+          Game.state = Game.defaultState();
           Game.floatingTexts = [];
           Game.init();
           modal.classList.remove('active'); modal.innerHTML = '';
@@ -1945,7 +2024,7 @@
           // Reset current game
           localStorage.removeItem('sd_town_v1');
           Game.running = false;
-          Object.assign(Game.state, {avatar:null,sats:0,usd:0,totalSats:0,lifetimeSats:0,heat:0,owned:{},tokens:0,price:65000,buyMulti:1,priceEvent:null,nextEventAt:0,housing:'studio',vehicle:null,pet:null,energy:100,research:{},loans:[],loanTime:0,electricityBill:0,electricitySolar:0,policeRisk:0,mailOrders:[],gymLevel:0,health:100,casinoLock:0,prestigeUpgrades:{},achievements:{},version:3,lastTick:Date.now()});
+          Game.state = Game.defaultState();
           Game.floatingTexts = [];
           Game.init();
           modal.classList.remove('active'); modal.innerHTML = '';

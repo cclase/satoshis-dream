@@ -137,6 +137,35 @@
     { id: 'a_darkweb',      name: 'Dark Side',       desc: 'Buy from the dark web',         icon: '\u{1F480}', reward: 500,   check: function(s){ return (s.owned.d1||0)+(s.owned.d2||0)+(s.owned.d3||0) > 0; } },
   ];
 
+  var ALL_BUILDING_IDS = [
+    'mining_hq', 'exchange', 'hardware', 'post_office', 'diner',
+    'bank', 'coffee', 'university', 'hospital', 'internet_cafe',
+    'casino', 'gym', 'real_estate', 'apartment', 'utility',
+    'car_dealer', 'pet_shop', 'pawn_shop', 'clothing', 'homegoods'
+  ];
+
+  var OBJECTIVES = [
+    { id: 'visit_mine', label: 'Reach Mining HQ', kind: 'visitBuilding', panelType: 'mine', reward: {} },
+    { id: 'mine_once', label: 'Mine your first Bitcoin', kind: 'tapCount', target: 1, reward: { unlocks: ['exchange'] } },
+    { id: 'sell_first', label: 'Sell sats at the Exchange', kind: 'satsSold', target: 1, reward: { unlocks: ['hardware'], usd: 10, starterNpc: true } },
+    { id: 'buy_desktop', label: 'Buy a Desktop', kind: 'owned', itemId: 'u2', target: 1, reward: { unlocks: ['post_office', 'diner'], starterDelivery: true } },
+    { id: 'complete_delivery', label: 'Complete your first delivery', kind: 'deliveries', target: 1, reward: { unlocks: ['bank', 'coffee'], usd: 25 } },
+    { id: 'earn_2k_sats', label: 'Earn 2,000 lifetime sats', kind: 'lifetimeSats', target: 2000, reward: { unlocks: ['university', 'hospital'] } },
+    { id: 'buy_gpu', label: 'Buy a GPU Rig', kind: 'owned', itemId: 'u3', target: 1, reward: { unlocks: ['internet_cafe', 'casino', 'gym'], startCraigRace: 5000 } },
+    { id: 'beat_craig', label: 'Beat Craig to 5,000 sats', kind: 'craigRace', target: 5000, reward: { unlocks: ['real_estate', 'apartment', 'utility'] } },
+    { id: 'earn_100_usd', label: 'Reach $100 earned', kind: 'usdEarned', target: 100, reward: { unlocks: ['car_dealer', 'pet_shop', 'clothing', 'homegoods', 'pawn_shop'] } },
+    { id: 'research_overclock', label: 'Research Overclocking', kind: 'research', researchId: 'overclock', reward: { prestigeTeaser: true } },
+  ];
+
+  var MILESTONES = [
+    { id: 'own_three_rigs', label: 'Own 3 rigs total', kind: 'totalHardware', target: 3 },
+    { id: 'five_deliveries', label: 'Complete 5 deliveries', kind: 'deliveries', target: 5 },
+    { id: 'buy_research', label: 'Buy 1 research upgrade', kind: 'researchCount', target: 1 },
+    { id: 'visit_eight_buildings', label: 'Visit 8 unique buildings', kind: 'uniqueBuildings', target: 8 },
+    { id: 'reach_apartment', label: 'Upgrade to an Apartment', kind: 'housing', target: 'apartment' },
+    { id: 'beat_craig_rematch', label: 'Beat Craig in a rematch', kind: 'craigRematch', target: 1 },
+  ];
+
   function defaultState() {
     return {
       avatar: null,
@@ -186,6 +215,13 @@
       gymLevel: 0,
       health: 100,
       casinoLock: 0,
+      currentObjective: 0,
+      completedObjectives: [],
+      activeMilestones: [],
+      completedMilestones: [],
+      unlockedBuildings: { mining_hq: true },
+      firstVisitRewards: {},
+      sessionFlags: {},
       // Prestige upgrades (persist through prestige)
       prestigeUpgrades: {},
       // Achievements (persist through prestige)
@@ -197,15 +233,18 @@
 
   var Game = {
     state: defaultState(),
+    defaultState: defaultState,
     HARDWARE: HARDWARE, DARK_WEB: DARK_WEB, HOUSING: HOUSING,
     VEHICLES: VEHICLES, PETS: PETS, RESEARCH: RESEARCH, LOANS: LOANS,
     PRESTIGE_UPGRADES: PRESTIGE_UPGRADES, ACHIEVEMENTS: ACHIEVEMENTS,
+    OBJECTIVES: OBJECTIVES, MILESTONES: MILESTONES,
     COST_SCALE: COST_SCALE, CLOTHING: CLOTHING, FURNITURE: FURNITURE, NPC_EVENTS: NPC_EVENTS,
     lastFrame: 0, running: false, floatingTexts: [],
     _offlineReport: null, // set after offline calc
 
     init: function() {
       this.load();
+      this.ensureProgressionState();
       var all = [].concat(HARDWARE, DARK_WEB);
       for (var i = 0; i < all.length; i++) {
         if (this.state.owned[all[i].id] === undefined) this.state.owned[all[i].id] = 0;
@@ -262,6 +301,7 @@
           for (var k in def) { if (parsed[k] === undefined) parsed[k] = def[k]; }
           Object.assign(this.state, parsed);
         } catch(e) {}
+        this.ensureProgressionState();
         return;
       }
       var oldSave = localStorage.getItem(OLD_SAVE_KEY);
@@ -315,6 +355,7 @@
         for (var k in def) { if (parsed[k] === undefined) parsed[k] = def[k]; }
         this.state = parsed;
         this.state.lastTick = Date.now();
+        this.ensureProgressionState();
         this.save();
         return true;
       } catch(e) { return false; }
@@ -323,6 +364,318 @@
     deleteSlot: function(index) {
       if (index < 0 || index > 3) return;
       localStorage.removeItem('sd_slot_' + index);
+    },
+
+    ensureProgressionState: function() {
+      var s = this.state;
+      if (typeof s.currentObjective !== 'number') s.currentObjective = 0;
+      if (!Array.isArray(s.completedObjectives)) s.completedObjectives = [];
+      if (!Array.isArray(s.activeMilestones)) s.activeMilestones = [];
+      if (!Array.isArray(s.completedMilestones)) s.completedMilestones = [];
+      if (!s.unlockedBuildings) s.unlockedBuildings = {};
+      if (!s.firstVisitRewards) s.firstVisitRewards = {};
+      if (!s.sessionFlags) s.sessionFlags = {};
+      if (!s.stats) s.stats = {};
+      if (typeof s.stats.usdEarned !== 'number') s.stats.usdEarned = 0;
+      if (typeof s.stats.uniqueBuildingsVisited !== 'number') s.stats.uniqueBuildingsVisited = Object.keys(s.firstVisitRewards).length;
+      if (!s.unlockedBuildings.mining_hq) s.unlockedBuildings.mining_hq = true;
+
+      if (this.shouldTreatAsAdvancedSave(s)) {
+        for (var i = 0; i < ALL_BUILDING_IDS.length; i++) s.unlockedBuildings[ALL_BUILDING_IDS[i]] = true;
+        s.currentObjective = OBJECTIVES.length;
+        s.completedObjectives = OBJECTIVES.map(function(obj) { return obj.id; });
+      } else {
+        this.syncObjectiveCompletion(true);
+      }
+      this.refreshMilestones(true);
+    },
+
+    shouldTreatAsAdvancedSave: function(s) {
+      return (s.lifetimeSats || 0) >= 5000 ||
+        ((s.owned && ((s.owned.u3 || 0) > 0 || (s.owned.u4 || 0) > 0)) ? true : false) ||
+        ((s.stats && (s.stats.deliveriesCompleted || 0) > 0) ? true : false) ||
+        ((s.research && Object.keys(s.research).length > 0) ? true : false) ||
+        ((s.buildingVisits && Object.keys(s.buildingVisits).length >= 6) ? true : false) ||
+        s.housing !== 'studio';
+    },
+
+    unlockBuildings: function(ids, silent) {
+      var unlocked = [];
+      if (!ids || !ids.length) return unlocked;
+      for (var i = 0; i < ids.length; i++) {
+        if (!this.state.unlockedBuildings[ids[i]]) {
+          this.state.unlockedBuildings[ids[i]] = true;
+          unlocked.push(ids[i]);
+        }
+      }
+      if (unlocked.length) {
+        this.state.sessionFlags.unlockPulse = { ids: unlocked.slice(), until: Date.now() + 6000 };
+        if (!silent && UI && UI.toast) {
+          UI.toast('\u2728 New destination' + (unlocked.length > 1 ? 's' : '') + ' unlocked!');
+        }
+        if (window.Sound && Sound.levelUp) Sound.levelUp();
+      }
+      return unlocked;
+    },
+
+    isBuildingUnlocked: function(buildingOrId) {
+      var id = typeof buildingOrId === 'string' ? buildingOrId : (buildingOrId ? buildingOrId.id : '');
+      if (!id) return false;
+      return !!this.state.unlockedBuildings[id];
+    },
+
+    getLockedBuildingLabel: function(buildingOrId) {
+      var buildingId = typeof buildingOrId === 'string' ? buildingOrId : (buildingOrId ? buildingOrId.id : '');
+      if (!buildingId) return 'Locked';
+      var current = this.getCurrentObjective();
+      if (!current) return 'Keep progressing';
+      return 'Finish: ' + current.label;
+    },
+
+    getCurrentObjective: function() {
+      if (this.state.currentObjective >= OBJECTIVES.length) return null;
+      return OBJECTIVES[this.state.currentObjective];
+    },
+
+    getPrimaryGoal: function() {
+      var current = this.getCurrentObjective();
+      if (current) return { phase: 'objective', id: current.id, label: current.label, progress: this.getGoalProgress(current) };
+      this.refreshMilestones(true);
+      if (this.state.activeMilestones.length > 0) {
+        var milestone = this.getMilestoneById(this.state.activeMilestones[0]);
+        if (milestone) return { phase: 'milestone', id: milestone.id, label: milestone.label, progress: this.getGoalProgress(milestone) };
+      }
+      return null;
+    },
+
+    getMilestoneById: function(id) {
+      for (var i = 0; i < MILESTONES.length; i++) {
+        if (MILESTONES[i].id === id) return MILESTONES[i];
+      }
+      return null;
+    },
+
+    getGoalProgress: function(goal) {
+      var s = this.state;
+      var info = { current: 0, target: goal.target || 1, text: goal.label };
+      switch (goal.kind) {
+        case 'visitBuilding':
+          info.current = ((s.buildingVisits || {})[goal.panelType] || 0) > 0 ? 1 : 0;
+          info.target = 1;
+          info.text = goal.label;
+          break;
+        case 'tapCount':
+          info.current = s.stats.taps || 0;
+          info.target = goal.target;
+          info.text = info.current + '/' + info.target + ' taps';
+          break;
+        case 'satsSold':
+          info.current = (s.stats.satsSold || 0) > 0 ? 1 : 0;
+          info.target = 1;
+          info.text = 'Sell any amount of sats';
+          break;
+        case 'owned':
+          info.current = s.owned[goal.itemId] || 0;
+          info.target = goal.target;
+          if (goal.itemId === 'u2') info.text = Game.formatNumber(s.sats) + '/150 sats';
+          else if (goal.itemId === 'u3') info.text = Game.formatNumber(s.sats) + '/2.0K sats';
+          else info.text = info.current + '/' + info.target;
+          break;
+        case 'deliveries':
+          info.current = s.stats.deliveriesCompleted || 0;
+          info.target = goal.target;
+          info.text = info.current + '/' + info.target + ' deliveries';
+          break;
+        case 'lifetimeSats':
+          info.current = Math.floor(s.lifetimeSats || 0);
+          info.target = goal.target;
+          info.text = Game.formatNumber(info.current) + '/' + Game.formatNumber(info.target) + ' sats';
+          break;
+        case 'usdEarned':
+          info.current = Math.floor((s.stats.usdEarned || 0) * 100) / 100;
+          info.target = goal.target;
+          info.text = '$' + Game.formatNumber(info.current) + '/$' + Game.formatNumber(info.target) + ' earned';
+          break;
+        case 'research':
+          info.current = s.research && s.research[goal.researchId] ? 1 : 0;
+          info.target = 1;
+          info.text = 'Unlock ' + goal.researchId;
+          break;
+        case 'craigRace':
+          var race = s.sessionFlags.craigRace;
+          var craigNow = Math.floor((s.craig && s.craig.sats) || 0);
+          info.current = Math.floor(s.lifetimeSats || 0);
+          info.target = goal.target;
+          if (race && race.resolved && !race.won && race.unlockAt && Date.now() < race.unlockAt) {
+            info.text = 'Craig won. Unlock in ' + Math.max(1, Math.ceil((race.unlockAt - Date.now()) / 1000)) + 's';
+          } else {
+            info.text = 'You ' + Game.formatNumber(info.current) + ' / Craig ' + Game.formatNumber(craigNow);
+          }
+          break;
+        case 'totalHardware':
+          info.current = this.getTotalRigCount();
+          info.target = goal.target;
+          info.text = info.current + '/' + info.target + ' rigs';
+          break;
+        case 'researchCount':
+          info.current = Object.keys(s.research || {}).length;
+          info.target = goal.target;
+          info.text = info.current + '/' + info.target + ' upgrades';
+          break;
+        case 'uniqueBuildings':
+          info.current = Object.keys(s.firstVisitRewards || {}).length;
+          info.target = goal.target;
+          info.text = info.current + '/' + info.target + ' unique visits';
+          break;
+        case 'housing':
+          info.current = s.housing === goal.target ? 1 : 0;
+          info.target = 1;
+          info.text = 'Current home: ' + s.housing;
+          break;
+        case 'craigRematch':
+          info.current = s.sessionFlags.craigRematchWon ? 1 : 0;
+          info.target = 1;
+          info.text = s.sessionFlags.craigRematchWon ? 'Won' : 'Challenge Craig from the Rival menu';
+          break;
+      }
+      return info;
+    },
+
+    isGoalComplete: function(goal) {
+      var s = this.state;
+      switch (goal.kind) {
+        case 'visitBuilding': return ((s.buildingVisits || {})[goal.panelType] || 0) > 0;
+        case 'tapCount': return (s.stats.taps || 0) >= goal.target;
+        case 'satsSold': return (s.stats.satsSold || 0) >= goal.target;
+        case 'owned': return (s.owned[goal.itemId] || 0) >= goal.target;
+        case 'deliveries': return (s.stats.deliveriesCompleted || 0) >= goal.target;
+        case 'lifetimeSats': return (s.lifetimeSats || 0) >= goal.target;
+        case 'usdEarned': return (s.stats.usdEarned || 0) >= goal.target;
+        case 'research': return !!(s.research && s.research[goal.researchId]);
+        case 'craigRace':
+          var race = s.sessionFlags.craigRace;
+          if (!race || !race.resolved) return false;
+          return race.won || (race.unlockAt && Date.now() >= race.unlockAt);
+        case 'totalHardware': return this.getTotalRigCount() >= goal.target;
+        case 'researchCount': return Object.keys(s.research || {}).length >= goal.target;
+        case 'uniqueBuildings': return Object.keys(s.firstVisitRewards || {}).length >= goal.target;
+        case 'housing': return s.housing === goal.target;
+        case 'craigRematch': return !!s.sessionFlags.craigRematchWon;
+      }
+      return false;
+    },
+
+    getTotalRigCount: function() {
+      var total = 0;
+      for (var i = 0; i < HARDWARE.length; i++) total += this.state.owned[HARDWARE[i].id] || 0;
+      return total;
+    },
+
+    syncObjectiveCompletion: function(silent) {
+      var s = this.state;
+      while (s.currentObjective < OBJECTIVES.length) {
+        var objective = OBJECTIVES[s.currentObjective];
+        if (!this.isGoalComplete(objective)) break;
+        if (s.completedObjectives.indexOf(objective.id) === -1) s.completedObjectives.push(objective.id);
+        this.applyGoalReward(objective, silent);
+        if (!silent && UI && UI.toast) UI.toast('\u{1F4CB} Objective complete: ' + objective.label);
+        s.currentObjective++;
+      }
+      this.refreshMilestones(silent);
+    },
+
+    applyGoalReward: function(goal, silent) {
+      var reward = goal.reward || {};
+      if (reward.unlocks) this.unlockBuildings(reward.unlocks, silent);
+      if (reward.usd && !silent) this.grantUsd(reward.usd, 'Objective reward');
+      if (reward.starterNpc && !silent && !this.state.sessionFlags.scriptedNpcQueued) {
+        this.state.sessionFlags.scriptedNpcQueued = true;
+        this.state.sessionFlags.scriptedNpcAt = Date.now() + 15000 + Math.floor(Math.random() * 15000);
+      }
+      if (reward.starterDelivery && !silent && !this.state.sessionFlags.starterDeliverySeeded) {
+        this.state.sessionFlags.starterDeliverySeeded = true;
+        this.seedStarterDelivery();
+      }
+      if (reward.startCraigRace && !silent && !this.state.sessionFlags.craigRace) {
+        this.state.sessionFlags.craigRace = { active: true, target: reward.startCraigRace, startedAt: Date.now(), deadline: Date.now() + 180000, resolved: false, won: false, unlockAt: 0 };
+        if (!silent && UI && UI.toast) UI.toast('\u{1F9D4} Craig race started: first to ' + Game.formatNumber(reward.startCraigRace) + ' sats!');
+      }
+      if (reward.prestigeTeaser && !this.state.sessionFlags.prestigeTeased) {
+        this.state.sessionFlags.prestigeTeased = true;
+        if (!silent && UI && UI.toast) UI.toast('\u{1FA99} Prestige is coming. Bigger runs will unlock permanent bonuses.');
+      }
+    },
+
+    refreshMilestones: function(silent) {
+      var s = this.state;
+      if (s.currentObjective < OBJECTIVES.length) {
+        s.activeMilestones = [];
+        return;
+      }
+      var changed = false;
+      for (var i = 0; i < MILESTONES.length; i++) {
+        var milestone = MILESTONES[i];
+        if (s.completedMilestones.indexOf(milestone.id) === -1 && this.isGoalComplete(milestone)) {
+          s.completedMilestones.push(milestone.id);
+          changed = true;
+          if (!silent && UI && UI.toast) UI.toast('\u{1F3AF} Milestone complete: ' + milestone.label);
+        }
+      }
+      var nextActive = [];
+      for (var j = 0; j < MILESTONES.length; j++) {
+        var id = MILESTONES[j].id;
+        if (s.completedMilestones.indexOf(id) === -1) nextActive.push(id);
+        if (nextActive.length >= 3) break;
+      }
+      if (changed || s.activeMilestones.join('|') !== nextActive.join('|')) s.activeMilestones = nextActive;
+    },
+
+    seedStarterDelivery: function() {
+      var s = this.state;
+      s.deliveries = [{
+        targetId: 'diner',
+        targetName: 'Diner',
+        sats: 120,
+        usd: 12,
+        starter: true
+      }];
+    },
+
+    grantUsd: function(amount, reason) {
+      if (!amount) return;
+      this.state.usd += amount;
+      if (!this.state.stats) this.state.stats = {};
+      this.state.stats.usdEarned = (this.state.stats.usdEarned || 0) + amount;
+      if (reason && UI && UI.toast) UI.toast(reason + ' +$' + Game.formatNumber(amount));
+    },
+
+    maybeTriggerScriptedNpc: function(now) {
+      var flags = this.state.sessionFlags || {};
+      if (!flags.scriptedNpcQueued || flags.scriptedNpcShown) return;
+      if (now < (flags.scriptedNpcAt || 0)) return;
+      if (this.state.pendingNpcEvent || this.state.tutorialStep < 4) return;
+      var evt = NPC_EVENTS.find(function(event) { return event.id === 'npc_usb'; }) || NPC_EVENTS[0];
+      if (!evt) return;
+      this.state.pendingNpcEvent = { id: evt.id, name: evt.name, icon: evt.icon, desc: evt.desc, accept: evt.accept, decline: evt.decline };
+      flags.scriptedNpcShown = true;
+      this.state.lastNpcTime = now;
+    },
+
+    updateCraigRace: function(now) {
+      var race = this.state.sessionFlags.craigRace;
+      if (!race || race.resolved || this.state.currentObjective >= OBJECTIVES.length && race.won && this.state.sessionFlags.craigRematchWon) return;
+      if (this.state.lifetimeSats >= race.target) {
+        race.resolved = true;
+        race.won = true;
+        if (UI && UI.toast) UI.toast('\u{1F389} You beat Craig to ' + Game.formatNumber(race.target) + ' sats!');
+        return;
+      }
+      if (now >= race.deadline || (this.state.craig && this.state.craig.sats >= race.target)) {
+        race.resolved = true;
+        race.won = false;
+        race.unlockAt = now + 30000;
+        if (UI && UI.toast) UI.toast('\u{1F9D4} Craig got there first. New routes open in 30s.');
+      }
     },
 
     // ── Economy ──
@@ -372,8 +725,8 @@
       }
       if (item.cur === 'sats') this.state.sats -= cost; else this.state.usd -= cost;
       this.state.owned[item.id] = (this.state.owned[item.id] || 0) + count;
+      this.syncObjectiveCompletion();
       // Tutorial: step 4 (buy hardware) → step 5
-      if (this.state.tutorialStep === 4 && item.slots) this.state.tutorialStep = 5;
       return true;
     },
 
@@ -526,12 +879,13 @@
       s.sats += s.activeDelivery.sats;
       s.totalSats += s.activeDelivery.sats;
       s.lifetimeSats += s.activeDelivery.sats;
-      s.usd += s.activeDelivery.usd;
+      this.grantUsd(s.activeDelivery.usd, '');
       if (!s.stats) s.stats = {};
       s.stats.deliveriesCompleted = (s.stats.deliveriesCompleted || 0) + 1;
       if (UI && UI.toast) UI.toast('\u{1F4E6} Delivered! +' + Game.formatNumber(s.activeDelivery.sats) + ' sats, +$' + Game.formatNumber(s.activeDelivery.usd));
       s.activeDelivery = null;
       this.generateDeliveries();
+      this.syncObjectiveCompletion();
       return true;
     },
 
@@ -636,12 +990,18 @@
     },
 
     // ── Building Reputation ──
-    visitBuilding: function(panelType) {
+    visitBuilding: function(panelType, buildingId) {
       var s = this.state;
       if (!s.buildingVisits) s.buildingVisits = {};
       s.buildingVisits[panelType] = (s.buildingVisits[panelType] || 0) + 1;
       if (!s.stats) s.stats = {};
       s.stats.buildingsVisited = (s.stats.buildingsVisited || 0) + 1;
+      if (buildingId && !s.firstVisitRewards[buildingId] && this.isBuildingUnlocked(buildingId)) {
+        s.firstVisitRewards[buildingId] = true;
+        s.stats.uniqueBuildingsVisited = Object.keys(s.firstVisitRewards).length;
+        this.grantUsd(5, 'Welcome bonus:');
+      }
+      this.syncObjectiveCompletion();
     },
     getBuildingDiscount: function(panelType) {
       var visits = (this.state.buildingVisits || {})[panelType] || 0;
@@ -833,6 +1193,10 @@
       var prize = Math.max(10, Math.floor(Math.max(playerScore, craigScore) * 0.5));
       if (won) { s.sats += prize; s.totalSats += prize; s.lifetimeSats += prize; }
       else { s.sats = Math.max(0, s.sats - Math.floor(prize * 0.3)); }
+      if (won && s.currentObjective >= OBJECTIVES.length) {
+        s.sessionFlags.craigRematchWon = true;
+        this.refreshMilestones();
+      }
       return { won: won, prize: prize, playerScore: Math.floor(playerScore), craigScore: Math.floor(craigScore) };
     },
     sabotageCraig: function() {
@@ -957,15 +1321,16 @@
       this.state.totalSats += gain;
       this.state.lifetimeSats += gain;
       this.state.heat = Math.min(100, this.state.heat + 0.05);
-      // Tutorial: first tap grants free Laptop and jumps to step 5 (already mining)
+      // Tutorial: first tap grants a free Laptop and points the player toward the Exchange.
       if (this.state.tutorialStep === 2) {
         this.state.owned.u1 = (this.state.owned.u1 || 0) + 1; // Free Laptop
-        this.state.tutorialStep = 5;
+        this.state.tutorialStep = 3;
       }
       this.checkTreasureDrop();
       this.checkRareDrop();
       if (!this.state.stats) this.state.stats = {};
       this.state.stats.taps = (this.state.stats.taps || 0) + 1;
+      this.syncObjectiveCompletion();
       return gain;
     },
 
@@ -981,15 +1346,20 @@
       var btcAmount = satsToSell / 1e8;
       var usdGain = btcAmount * this.getEffectivePrice() * this.getSellMultiplier();
       this.state.sats -= satsToSell;
-      this.state.usd += usdGain;
+      this.grantUsd(usdGain, '');
       if (!this.state.stats) this.state.stats = {};
       this.state.stats.satsSold = (this.state.stats.satsSold || 0) + satsToSell;
       // Tutorial: step 5 (sell sats) → step 6, then auto-complete to 7
-      if (this.state.tutorialStep === 5) {
-        this.state.tutorialStep = 6;
+      if (this.state.tutorialStep === 3) {
+        this.state.tutorialStep = 4;
         var self = this;
-        setTimeout(function() { if (self.state.tutorialStep === 6) self.state.tutorialStep = 7; }, 5000);
+        setTimeout(function() { if (self.state.tutorialStep === 4) self.state.tutorialStep = 7; }, 5000);
       }
+      if (!this.state.sessionFlags.firstSellMessage) {
+        this.state.sessionFlags.firstSellMessage = true;
+        if (UI && UI.toast) UI.toast('First sale! Small now, but better rigs make every cash-out matter.');
+      }
+      this.syncObjectiveCompletion();
       return usdGain;
     },
 
@@ -1102,7 +1472,6 @@
       s.sats += gain; s.totalSats += gain; s.lifetimeSats += gain;
 
       // Tutorial: step 3 → 4 when player has enough for a laptop
-      if (s.tutorialStep === 3 && s.sats >= 15) s.tutorialStep = 4;
 
       // Heat
       var hGen = 0;
@@ -1128,7 +1497,7 @@
       s.electricityBill += elecCost * dt;
       // Deduct bill every 60 seconds
       if (!s._lastBillTime) s._lastBillTime = now;
-      if (now - s._lastBillTime > 60000) {
+      if (this.isBuildingUnlocked('utility') && now - s._lastBillTime > 60000) {
         var bill = s.electricityBill;
         s.usd -= bill;
         s.electricityBill = 0;
@@ -1330,6 +1699,7 @@
       this.checkSeasonalEvents();
       // Craig rival
       this.updateCraig(dt);
+      this.updateCraigRace(now);
       // Story fragments
       this.checkStoryDrop();
       // Area unlocks
@@ -1367,6 +1737,8 @@
       // Price events
       if (s.priceEvent && now >= s.priceEvent.endsAt) { s.priceEvent = null; this.scheduleNextEvent(); }
       if (!s.priceEvent && s.nextEventAt && now >= s.nextEventAt) this.startPriceEvent();
+      this.maybeTriggerScriptedNpc(now);
+      this.syncObjectiveCompletion();
 
       // Floating texts
       for (var fi = this.floatingTexts.length - 1; fi >= 0; fi--) {

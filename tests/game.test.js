@@ -1796,12 +1796,12 @@ describe('new player experience', () => {
   });
 
   // Fix 4: Free first hardware on first mine tap
-  it('first mine tap grants free Laptop and skips to step 5', () => {
+  it('first mine tap grants free Laptop and advances to the exchange step', () => {
     Game.state.tutorialStep = 2;
     Game.state.owned = {};
     Game.tapMine();
     assert.equal(Game.state.owned.u1, 1);
-    assert.equal(Game.state.tutorialStep, 5);
+    assert.equal(Game.state.tutorialStep, 3);
   });
   it('subsequent mine taps do not grant extra laptops', () => {
     Game.state.tutorialStep = 5;
@@ -1838,5 +1838,200 @@ describe('new player experience', () => {
   });
   it('gameStartTime is set in default state', () => {
     assert.ok(Game.state.gameStartTime > 0);
+  });
+});
+
+describe('retention progression overhaul', () => {
+  let Game;
+  beforeEach(() => { Game = freshGame(); });
+
+  it('starts with mining hq unlocked and objective tracking initialized', () => {
+    assert.equal(Game.state.currentObjective, 0);
+    assert.equal(Game.state.unlockedBuildings.mining_hq, true);
+    assert.equal(Array.from(Game.state.completedObjectives).length, 0);
+    assert.equal(Array.from(Game.state.activeMilestones).length, 0);
+  });
+
+  it('visiting mining hq advances the first objective', () => {
+    Game.visitBuilding('mine', 'mining_hq');
+    assert.equal(Game.state.currentObjective, 1);
+    assert.ok(Game.state.completedObjectives.includes('visit_mine'));
+  });
+
+  it('mining once unlocks the exchange objective reward', () => {
+    Game.state.currentObjective = 1;
+    Game.state.tutorialStep = 2;
+    Game.tapMine();
+    assert.equal(Game.state.currentObjective, 2);
+    assert.equal(Game.state.unlockedBuildings.exchange, true);
+    assert.ok(Game.state.completedObjectives.includes('mine_once'));
+  });
+
+  it('first sell unlocks hardware, grants tutorial cash, and queues the early npc event', () => {
+    Game.state.currentObjective = 2;
+    Game.state.tutorialStep = 3;
+    Game.state.sats = 1000;
+    const usdBefore = Game.state.usd;
+
+    const usdGain = Game.sellSats(1);
+
+    assert.ok(usdGain > 0);
+    assert.ok(Game.state.usd > usdBefore + 9.9);
+    assert.equal(Game.state.currentObjective, 3);
+    assert.equal(Game.state.unlockedBuildings.hardware, true);
+    assert.equal(Game.state.sessionFlags.scriptedNpcQueued, true);
+    assert.ok(Game.state.sessionFlags.scriptedNpcAt > Date.now());
+  });
+
+  it('buying a desktop unlocks the first build phase buildings and seeds a starter delivery', () => {
+    Game.state.currentObjective = 3;
+    Game.state.sats = 1000;
+
+    assert.ok(Game.buyItem(Game.HARDWARE[1], 1));
+
+    assert.equal(Game.state.currentObjective, 4);
+    assert.equal(Game.state.unlockedBuildings.post_office, true);
+    assert.equal(Game.state.unlockedBuildings.diner, true);
+    assert.equal(Game.state.deliveries.length, 1);
+    assert.equal(Game.state.deliveries[0].targetId, 'diner');
+  });
+
+  it('completing the first delivery unlocks bank and coffee and grants the cash reward', () => {
+    Game.state.currentObjective = 4;
+    Game.state.activeDelivery = { targetId: 'diner', targetName: 'Diner', sats: 120, usd: 12 };
+    const usdBefore = Game.state.usd;
+
+    assert.ok(Game.completeDelivery());
+
+    assert.equal(Game.state.currentObjective, 5);
+    assert.equal(Game.state.unlockedBuildings.bank, true);
+    assert.equal(Game.state.unlockedBuildings.coffee, true);
+    assert.ok(Game.state.usd >= usdBefore + 37);
+  });
+
+  it('first visit rewards only grant usd once per unlocked building', () => {
+    Game.state.unlockedBuildings.exchange = true;
+    const usdBefore = Game.state.usd;
+
+    Game.visitBuilding('exchange', 'exchange');
+    Game.visitBuilding('exchange', 'exchange');
+
+    assert.equal(Game.state.usd, usdBefore + 5);
+    assert.equal(Game.state.firstVisitRewards.exchange, true);
+    assert.equal(Game.state.stats.uniqueBuildingsVisited, 1);
+  });
+
+  it('advanced saves migrate to broad building unlocks', () => {
+    Game.state.lifetimeSats = 10000;
+    Game.ensureProgressionState();
+
+    assert.equal(Game.state.currentObjective, Game.OBJECTIVES.length);
+    assert.equal(Game.state.unlockedBuildings.utility, true);
+    assert.equal(Game.state.unlockedBuildings.pet_shop, true);
+  });
+
+  it('advanced save migration stays silent and does not create duplicate rewards on reload', () => {
+    Game.state.lifetimeSats = 10000;
+    Game.ensureProgressionState();
+    Game.save();
+
+    Game.state = Game.defaultState();
+    Game.load();
+
+    assert.equal(Game.state.currentObjective, Game.OBJECTIVES.length);
+    assert.equal(Game.state.usd, 50);
+    assert.equal(Game.state.deliveries.length, 0);
+    assert.equal(!!Game.state.sessionFlags.scriptedNpcQueued, false);
+    assert.equal(Game.state.unlockedBuildings.utility, true);
+  });
+
+  it('first-sell objective reward does not replay on reload', () => {
+    Game.state.currentObjective = 2;
+    Game.state.unlockedBuildings.exchange = true;
+    Game.state.sats = 1000;
+
+    Game.sellSats(1);
+    const savedUsd = Game.state.usd;
+    const savedObjective = Game.state.currentObjective;
+    const savedHardwareUnlock = Game.state.unlockedBuildings.hardware;
+
+    Game.save();
+    Game.state = Game.defaultState();
+    Game.load();
+
+    assert.equal(Game.state.currentObjective, savedObjective);
+    assert.equal(Game.state.usd, savedUsd);
+    assert.equal(Game.state.unlockedBuildings.hardware, savedHardwareUnlock);
+    assert.equal(Game.state.sessionFlags.scriptedNpcQueued, true);
+  });
+
+  it('desktop unlock reward does not seed duplicate starter deliveries after reload', () => {
+    Game.state.currentObjective = 3;
+    Game.state.sats = 1000;
+
+    assert.ok(Game.buyItem(Game.HARDWARE[1], 1));
+    assert.equal(Game.state.deliveries.length, 1);
+
+    Game.save();
+    Game.state = Game.defaultState();
+    Game.load();
+
+    assert.equal(Game.state.currentObjective, 4);
+    assert.equal(Game.state.deliveries.length, 1);
+    assert.equal(Game.state.deliveries[0].targetId, 'diner');
+  });
+
+  it('delivery completion reward does not replay on reload', () => {
+    Game.state.currentObjective = 4;
+    Game.state.activeDelivery = { targetId: 'diner', targetName: 'Diner', sats: 120, usd: 12 };
+
+    assert.ok(Game.completeDelivery());
+    const savedUsd = Game.state.usd;
+
+    Game.save();
+    Game.state = Game.defaultState();
+    Game.load();
+
+    assert.equal(Game.state.currentObjective, Game.OBJECTIVES.length);
+    assert.equal(Game.state.usd, savedUsd);
+    assert.equal(Game.state.unlockedBuildings.bank, true);
+    assert.equal(Game.state.unlockedBuildings.coffee, true);
+  });
+
+  it('scripted npc event only queues once even if objective sync runs repeatedly', () => {
+    Game.state.currentObjective = 2;
+    Game.state.sats = 1000;
+
+    Game.sellSats(1);
+    const firstScheduledAt = Game.state.sessionFlags.scriptedNpcAt;
+
+    Game.syncObjectiveCompletion();
+    Game.syncObjectiveCompletion();
+
+    assert.equal(Game.state.sessionFlags.scriptedNpcQueued, true);
+    assert.equal(Game.state.sessionFlags.scriptedNpcAt, firstScheduledAt);
+  });
+
+  it('first-visit usd reward does not return after save-load and reopen of the same building', () => {
+    Game.state.unlockedBuildings.exchange = true;
+    Game.visitBuilding('exchange', 'exchange');
+    const savedUsd = Game.state.usd;
+
+    Game.save();
+    Game.state = Game.defaultState();
+    Game.load();
+    Game.visitBuilding('exchange', 'exchange');
+
+    assert.equal(Game.state.usd, savedUsd);
+    assert.equal(Game.state.firstVisitRewards.exchange, true);
+    assert.equal(Game.state.stats.uniqueBuildingsVisited, 1);
+  });
+
+  it('post-objective saves activate three milestone goals', () => {
+    Game.state.currentObjective = Game.OBJECTIVES.length;
+    Game.refreshMilestones(true);
+
+    assert.equal(Game.state.activeMilestones.length, 3);
+    assert.deepEqual(Array.from(Game.state.activeMilestones), ['own_three_rigs', 'five_deliveries', 'buy_research']);
   });
 });

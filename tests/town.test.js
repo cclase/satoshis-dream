@@ -549,6 +549,18 @@ describe('new player visual aids', () => {
 // ─────────────────────────────────────────────
 // 11. Arrow Key Movement Direction
 // ─────────────────────────────────────────────
+describe('building lock access paths', () => {
+  it('guards locked buildings across panel, minimap, and world-click entry points', () => {
+    const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+    const townSrc = fs.readFileSync(path.join(__dirname, '..', 'town.js'), 'utf8');
+
+    assert.ok(uiSrc.includes('if (!Game.isBuildingUnlocked(building))'), 'panel entry should reject locked buildings');
+    assert.ok(uiSrc.includes('if (!Game.isBuildingUnlocked(hit))'), 'minimap entry should reject locked buildings');
+    assert.ok(townSrc.includes('if (!Game.isBuildingUnlocked(clickedBuilding))'), 'direct building click should reject locked buildings');
+    assert.ok(townSrc.includes('if (!Game.isBuildingUnlocked(tappedBuilding))'), 'building-footprint ground click should reject locked buildings');
+  });
+});
+
 describe('arrow key movement direction', () => {
   // Simulate the rotation transform from town.js using live camera alpha.
   // BabylonJS left-handed: screen-right = (-sinA, cosA), screen-down = (cosA, sinA)

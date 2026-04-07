@@ -446,6 +446,71 @@
       root.style.display = 'block';
     },
 
+    formatMoney: function(amount) {
+      if (!isFinite(amount)) return '0.00';
+      if (amount >= 1000) return (Math.round(amount * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+      if (amount >= 1) return amount.toFixed(2);
+      if (amount >= 0.01) return amount.toFixed(2);
+      return amount > 0 ? amount.toFixed(3) : '0.00';
+    },
+
+    ensureFeedbackLayer: function(id, variant) {
+      var el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement('div');
+        el.id = id;
+        document.body.appendChild(el);
+      }
+      el.className = 'feedback-layer ' + (variant || '');
+      return el;
+    },
+
+    showObjectiveComplete: function(goal, rewardText) {
+      if (!goal) return;
+      var el = this.ensureFeedbackLayer('objectiveCelebration', 'objective-celebration');
+      el.innerHTML =
+        '<div class="feedback-card feedback-objective">' +
+          '<div class="feedback-kicker">\u{1F4CB} Objective Complete</div>' +
+          '<div class="feedback-title">' + goal.label + '</div>' +
+          '<div class="feedback-body">' + (rewardText || 'Progress pushed forward.') + '</div>' +
+        '</div>';
+      el.classList.add('show');
+      if (this._objectiveCelebrationTimer) clearTimeout(this._objectiveCelebrationTimer);
+      this._objectiveCelebrationTimer = setTimeout(function() { el.classList.remove('show'); }, 2400);
+    },
+
+    showProductionBoost: function(item, count, beforeRate, afterRate) {
+      if (!item || afterRate <= beforeRate) return;
+      var el = this.ensureFeedbackLayer('productionBoost', 'production-boost');
+      var gain = afterRate - beforeRate;
+      el.innerHTML =
+        '<div class="feedback-card feedback-production">' +
+          '<div class="feedback-kicker">\u26A1 Production Boost</div>' +
+          '<div class="feedback-title">' + item.name + (count > 1 ? ' x' + count : '') + ' online</div>' +
+          '<div class="feedback-body">' + Game.formatNumber(beforeRate) + '/s \u2192 ' + Game.formatNumber(afterRate) + '/s <span class="feedback-positive">+' + Game.formatNumber(gain) + '/s</span></div>' +
+        '</div>';
+      el.classList.add('show');
+      if (this._productionBoostTimer) clearTimeout(this._productionBoostTimer);
+      this._productionBoostTimer = setTimeout(function() { el.classList.remove('show'); }, 2600);
+    },
+
+    showFirstSellSpotlight: function(details) {
+      if (!details) return;
+      var el = this.ensureFeedbackLayer('firstSellSpotlight', 'first-sell-spotlight');
+      var summary = 'Sold your first sats for $' + this.formatMoney(details.usdGain) + '.';
+      if (details.objectiveBonus) summary += ' Objective bonus: +$' + this.formatMoney(details.objectiveBonus) + '.';
+      summary += ' Bigger rigs make each cash-out hit harder.';
+      el.innerHTML =
+        '<div class="feedback-card feedback-sale">' +
+          '<div class="feedback-kicker">\u{1F4B8} First Cash-Out</div>' +
+          '<div class="feedback-title">$' + this.formatMoney(details.usdGain + (details.objectiveBonus || 0)) + ' felt gain</div>' +
+          '<div class="feedback-body">' + summary + '</div>' +
+        '</div>';
+      el.classList.add('show');
+      if (this._firstSellSpotlightTimer) clearTimeout(this._firstSellSpotlightTimer);
+      this._firstSellSpotlightTimer = setTimeout(function() { el.classList.remove('show'); }, 3200);
+    },
+
     _minimapCanvas: null, _minimapTooltip: null,
     _renderMinimap: function() {
       var self = this;
@@ -846,9 +911,12 @@
         var item = Game.HARDWARE.find(function(u) { return u.id === id; });
         if (!item) return;
         var n = Game.getBuyCount(item);
+        var beforeRate = Game.getProductionRate() * Game.getMultiplier();
         if (Game.buyItem(item, n)) {
+          var afterRate = Game.getProductionRate() * Game.getMultiplier();
           if (window.Sound) Sound.purchase();
           UI.toast('Bought ' + n + 'x ' + item.name);
+          UI.showProductionBoost(item, n, beforeRate, afterRate);
           container.innerHTML = UI.renderHardwareCards();
           // Update slots display
           var sd = container.parentElement.querySelector('.hw-slots');
@@ -876,7 +944,17 @@
         '<div class="exchange-lifetime"><span class="ex-stat-label">Lifetime Sats</span> <span id="exLifetime">' + Game.formatNumber(s.lifetimeSats) + '</span></div></div>';
     },
     wireExchangePanel: function() {
-      var sell = function(f) { var u = Game.sellSats(f); if (u > 0) { if(window.Sound) Sound.sell(); UI.toast('Sold for $' + Game.formatNumber(u)); } };
+      var sell = function(f) {
+        var u = Game.sellSats(f);
+        if (u > 0) {
+          if (window.Sound) Sound.sell();
+          UI.toast('Sold for $' + UI.formatMoney(u));
+          if (Game.state.sessionFlags && Game.state.sessionFlags.firstSellSpotlight) {
+            UI.showFirstSellSpotlight(Game.state.sessionFlags.firstSellSpotlight);
+            delete Game.state.sessionFlags.firstSellSpotlight;
+          }
+        }
+      };
       var e; e = document.getElementById('exSell25'); if (e) e.onclick = function() { sell(0.25); };
       e = document.getElementById('exSell50'); if (e) e.onclick = function() { sell(0.50); };
       e = document.getElementById('exSellAll'); if (e) e.onclick = function() { sell(1.0); };

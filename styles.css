@@ -137,6 +137,76 @@ body {
   display: none;
 }
 
+.feedback-layer {
+  position: fixed;
+  left: 50%;
+  top: 20%;
+  transform: translate(-50%, -16px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 40;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.feedback-layer.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.feedback-card {
+  min-width: 300px;
+  max-width: 440px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(7, 8, 18, 0.94);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  text-align: center;
+}
+
+.feedback-objective {
+  border-color: rgba(247,147,26,0.55);
+  box-shadow: 0 24px 60px rgba(247,147,26,0.2);
+}
+
+.feedback-production {
+  border-color: rgba(0,212,170,0.45);
+  box-shadow: 0 24px 60px rgba(0,212,170,0.18);
+}
+
+.feedback-sale {
+  border-color: rgba(74,158,255,0.45);
+  box-shadow: 0 24px 60px rgba(74,158,255,0.2);
+}
+
+.feedback-kicker {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.feedback-title {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.feedback-body {
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+.feedback-positive {
+  color: var(--green);
+  font-weight: 800;
+}
+
 .objective-card {
   background: rgba(16,16,37,0.9);
   border: 1px solid rgba(247,147,26,0.35);

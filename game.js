@@ -226,7 +226,7 @@
       prestigeUpgrades: {},
       // Achievements (persist through prestige)
       achievements: {},
-      version: 3,
+      version: 4,
       lastTick: Date.now(),
     };
   }
@@ -391,7 +391,8 @@
     },
 
     shouldTreatAsAdvancedSave: function(s) {
-      return (s.lifetimeSats || 0) >= 5000 ||
+      return (s.tokens || 0) > 0 ||
+        (s.lifetimeSats || 0) >= 5000 ||
         ((s.owned && ((s.owned.u3 || 0) > 0 || (s.owned.u4 || 0) > 0)) ? true : false) ||
         ((s.stats && (s.stats.deliveriesCompleted || 0) > 0) ? true : false) ||
         ((s.research && Object.keys(s.research).length > 0) ? true : false) ||
@@ -571,6 +572,20 @@
       return total;
     },
 
+    getGoalRewardSummary: function(goal) {
+      var reward = goal && goal.reward ? goal.reward : {};
+      var parts = [];
+      if (reward.unlocks && reward.unlocks.length) {
+        parts.push('Unlocked ' + reward.unlocks.length + ' new destination' + (reward.unlocks.length > 1 ? 's' : ''));
+      }
+      if (reward.usd) parts.push('+$' + this.formatNumber(reward.usd));
+      if (reward.starterDelivery) parts.push('Starter delivery ready');
+      if (reward.starterNpc) parts.push('A surprise event is on the way');
+      if (reward.startCraigRace) parts.push('Craig challenge unlocked');
+      if (reward.prestigeTeaser) parts.push('Prestige preview unlocked');
+      return parts.join(' • ');
+    },
+
     syncObjectiveCompletion: function(silent) {
       var s = this.state;
       while (s.currentObjective < OBJECTIVES.length) {
@@ -578,6 +593,7 @@
         if (!this.isGoalComplete(objective)) break;
         if (s.completedObjectives.indexOf(objective.id) === -1) s.completedObjectives.push(objective.id);
         this.applyGoalReward(objective, silent);
+        if (!silent && UI && UI.showObjectiveComplete) UI.showObjectiveComplete(objective, this.getGoalRewardSummary(objective));
         if (!silent && UI && UI.toast) UI.toast('\u{1F4CB} Objective complete: ' + objective.label);
         s.currentObjective++;
       }
@@ -1357,6 +1373,11 @@
       }
       if (!this.state.sessionFlags.firstSellMessage) {
         this.state.sessionFlags.firstSellMessage = true;
+        this.state.sessionFlags.firstSellSpotlight = {
+          usdGain: usdGain,
+          satsSold: satsToSell,
+          objectiveBonus: this.getCurrentObjective() && this.getCurrentObjective().id === 'sell_first' ? 10 : 0,
+        };
         if (UI && UI.toast) UI.toast('First sale! Small now, but better rigs make every cash-out matter.');
       }
       this.syncObjectiveCompletion();
